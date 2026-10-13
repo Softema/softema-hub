@@ -9,10 +9,12 @@ const screens: Screen[] = [
   { name: 'contact-detail', route: 'kontakty/1', ready: p => p.getByRole('heading', { level: 2, name: 'Jan Novák' }) },
   { name: 'campaign-wizard-basics', route: 'kampane/nova', ready: p => p.getByRole('heading', { name: 'Začněme tím podstatným.' }) },
   { name: 'campaign-wizard-content', route: 'kampane/sablony', ready: p => p.getByRole('heading', { name: 'E-mail, který bude radost číst.' }) },
+  { name: 'campaign-report', route: 'kampane/2', ready: p => p.getByRole('heading', { level: 1, name: 'Jak na marketing, který přináší výsledky' }) },
   {
     name: 'email-editor',
     route: 'kampane/sablony',
-    prepare: p => p.getByRole('button', { name: 'Otevřít editor e-mailu' }).click(),
+    // Keyboard instead of a click: the pointer must not hover the editor canvas.
+    prepare: p => p.getByRole('button', { name: 'Otevřít editor e-mailu' }).press('Enter'),
     ready: p => p.getByRole('button', { name: 'Uložit a zavřít' }),
   },
 ];
@@ -23,6 +25,8 @@ for (const screen of screens) {
     await openHub(page, screen.route);
     await screen.prepare?.(page);
     await expect(screen.ready(page)).toBeVisible();
+    // Opening a screen can scroll; full-page captures must start from the top (sticky topbar).
+    await page.evaluate(() => window.scrollTo(0, 0));
     await expect(page).toHaveScreenshot(`${screen.name}.png`, { fullPage: true, stylePath: screenshotStyle });
     noErrors();
   });
