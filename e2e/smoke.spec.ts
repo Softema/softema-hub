@@ -59,6 +59,40 @@ test('contact list → detail → back', async ({ page }) => {
   noErrors();
 });
 
+test('contact custom fields: add, validate, edit, remove', async ({ page }) => {
+  const noErrors = trackPageErrors(page);
+  await openHub(page, 'kontakty/1');
+  const box = page.locator('section[aria-labelledby="custom-fields-title"]');
+  const rows = box.locator('.custom-field-row');
+  const dialog = page.getByRole('dialog');
+  await expect(rows).toHaveCount(4);
+
+  await box.getByRole('button', { name: 'Přidat vlastní pole' }).click();
+  await dialog.getByRole('button', { name: 'Přidat pole' }).click();
+  await expect(dialog.getByRole('alert')).toHaveText('Doplňte název pole.');
+  await dialog.getByLabel('Název pole').fill('Obor');
+  await dialog.getByRole('button', { name: 'Přidat pole' }).click();
+  await expect(dialog.getByRole('alert')).toContainText('už u tohoto kontaktu existuje');
+  await dialog.getByLabel('Název pole').fill('Web');
+  await dialog.getByLabel('Hodnota').fill('novakstudio.cz');
+  await dialog.getByRole('button', { name: 'Přidat pole' }).click();
+  await expect(rows).toHaveCount(5);
+  await expect(rows.last()).toContainText('novakstudio.cz');
+
+  await rows.last().click();
+  await dialog.getByLabel('Hodnota').fill('www.novakstudio.cz');
+  await dialog.getByRole('button', { name: 'Uložit změny' }).click();
+  await expect(rows.last()).toContainText('www.novakstudio.cz');
+  await rows.last().click();
+  await dialog.getByRole('button', { name: 'Odebrat pole' }).click();
+  await expect(rows).toHaveCount(4);
+
+  await page.getByRole('button', { name: 'Zpět na kontakty' }).click();
+  await page.getByRole('cell').getByRole('button', { name: /^Petra Svobodová/ }).click();
+  await expect(box.getByText('Zatím tu nejsou žádná vlastní pole.')).toBeVisible();
+  noErrors();
+});
+
 test('new campaign → wizard → editor → back', async ({ page }) => {
   const noErrors = trackPageErrors(page);
   await openHub(page, 'kampane');

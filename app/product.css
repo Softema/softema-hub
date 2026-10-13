@@ -3,3 +3,4 @@
 .flow-node{display:block}.flow-branches{margin-top:0}
 
 .hub-website-link{display:flex;align-items:center;gap:7px;padding:9px 2px 14px;color:#8b929e;font-size:12px}.hub-website-link:hover{color:#d76334}
+.custom-field-row{width:100%;text-align:left;cursor:pointer}.custom-field-row strong{overflow-wrap:anywhere}.custom-field-row:hover span,.custom-field-row:hover strong{color:var(--primary)}

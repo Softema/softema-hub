@@ -1,5 +1,7 @@
 import {demoWorkspaces} from '@/lib/domain/tenancy';
-export type Contact = {id:number; name:string; email:string; company:string; phone:string; tags:string[]; status:string; value:number; source:string; owner:string; color:string; workspace:string;workspaceId:string; notes:string[]};
+export type Contact = {id:number; name:string; email:string; company:string; phone:string; tags:string[]; status:string; value:number; source:string; owner:string; color:string; workspace:string;workspaceId:string; notes:string[]; customFields?:CustomField[]};
+// Free-form text fields of one contact (JSONB custom fields in the target model); no workspace-level field types yet.
+export type CustomField={id:string;name:string;value:string};
 const people = [
  ['Jan Novák','jan.novak@novakstudio.cz','Novák Studio','Klient','VIP,Newsletter',48500,'Webinář','blue'],
  ['Petra Svobodová','petra@bloomdesign.cz','Bloom Design','Klient','Newsletter,Kurz',12900,'Formulář','pink'],
@@ -14,8 +16,15 @@ const people = [
  ['Michal Král','michal@kraltech.cz','Král Technologies','Zájemce','Webinář',0,'Chatbot','blue'],
  ['Barbora Fialová','bara@fialovakvetina.cz','Fialová květina','Klient','Kurz,Newsletter',14900,'Formulář','pink']
 ] as const;
-export const initialContacts:Contact[]=people.map((p,i)=>({id:i+1,name:p[0],email:p[1],company:p[2],status:p[3],tags:p[4].split(','),value:p[5],source:p[6],color:p[7],phone:`+420 7${24+i} 658 ${140+i}`,owner:'Marie Smolková',workspace:'Softema Creative',workspaceId:demoWorkspaces[0].id,notes:i===0?['Zájem o rozšíření spolupráce na e-mailing. Ozvat se s návrhem začátkem října.']:[]}));
-initialContacts.push(...initialContacts.slice(0,4).map((c,i)=>({...c,id:101+i,name:['Adam Beneš','Eva Konečná','Ondřej Urban','Klára Marková'][i],email:['adam','eva','ondrej','klara'][i]+'@example.cz',company:'4legs zákazníci',workspace:'4legs.cz',workspaceId:demoWorkspaces[1].id,tags:['Newsletter'],notes:[]})));
+const sampleFields:Record<number,[string,string][]>={
+ 1:[['Obor','Grafické studio a branding'],['Počet zaměstnanců','8'],['Preferovaný kanál','E-mail, dopoledne'],['Fakturace','Měsíčně, splatnost 14 dní']],
+ 4:[['Obor','Architektura interiérů'],['Město','Brno'],['Zájem o','Kurz Marketing od základů']],
+ 7:[['Obor','Stavebnictví'],['Počet poboček','3'],['Rozpočet na marketing','25 000 Kč / měsíc']],
+ 101:[['Mazlíček','Pes – labradorský retrívr'],['Věrnostní program','Zlatá úroveň']]
+};
+const fieldsFor=(id:number):CustomField[]=>(sampleFields[id]??[]).map(([name,value],k)=>({id:`cf-${id}-${k+1}`,name,value}));
+export const initialContacts:Contact[]=people.map((p,i)=>({id:i+1,name:p[0],email:p[1],company:p[2],status:p[3],tags:p[4].split(','),value:p[5],source:p[6],color:p[7],phone:`+420 7${24+i} 658 ${140+i}`,owner:'Marie Smolková',workspace:'Softema Creative',workspaceId:demoWorkspaces[0].id,notes:i===0?['Zájem o rozšíření spolupráce na e-mailing. Ozvat se s návrhem začátkem října.']:[],customFields:fieldsFor(i+1)}));
+initialContacts.push(...initialContacts.slice(0,4).map((c,i)=>({...c,id:101+i,name:['Adam Beneš','Eva Konečná','Ondřej Urban','Klára Marková'][i],email:['adam','eva','ondrej','klara'][i]+'@example.cz',company:'4legs zákazníci',workspace:'4legs.cz',workspaceId:demoWorkspaces[1].id,tags:['Newsletter'],notes:[],customFields:fieldsFor(101+i)})));
 export type Block={id:string;type:string;text:string;color?:string;url?:string;align?:'left'|'center'|'right'};
 export const defaultBlocks:Block[]=[
  {id:'logo',type:'logo',text:'softema',align:'left'},
