@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Bot, ArrowRight, ArrowUpRight, Check, ChevronRight, Workflow, Users, Mail, Wallet, GraduationCap, Video, MessagesSquare, LayoutDashboard, Menu, X, Play, Plus, Search, Bell, SlidersHorizontal, MousePointer2, Sparkles, CircleCheck, Building2, Layers, HeartHandshake, Clock3 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
@@ -8,13 +9,13 @@ import { navItems } from './data';
 import './marketing.css';
 
 export function Brand({ light = false }: { light?: boolean }) {
-  return <a href="/" className={`m-brand ${light ? 'm-brand-light' : ''}`} aria-label="Softema Hub — úvodní stránka"><Workflow aria-hidden="true" /><span>softema<span>hub</span></span></a>;
+  return <Link href="/" className={`m-brand ${light ? 'm-brand-light' : ''}`} aria-label="Softema Hub — úvodní stránka"><Workflow aria-hidden="true" /><span>softema<span>hub</span></span></Link>;
 }
 
 export function MarketingHeader() {
   const [open, setOpen] = useState(false);
   useEffect(() => { const escape = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); }; window.addEventListener('keydown', escape); return () => window.removeEventListener('keydown', escape); }, []);
-  return <><a className="m-skip" href="#obsah">Přejít na obsah</a><header className="m-header"><div className="m-nav-wrap"><Brand /><nav aria-label="Hlavní navigace" className="m-desktop-nav"><a href="/funkce">Funkce</a><a href="/#pro-koho">Pro koho</a><a href="/#jak-to-funguje">Jak to funguje</a><a href="/#otazky">Časté otázky</a></nav><div className="m-nav-actions"><a className="m-login-link" href="/prihlaseni">Přihlásit se</a><a className="m-btn m-primary m-nav-cta" href="/registrace">Vytvořit účet<ArrowUpRight size={16} /></a><button className="m-menu-button" aria-label={open ? 'Zavřít menu' : 'Otevřít menu'} aria-expanded={open} aria-controls="mobile-menu" onClick={() => setOpen(!open)}>{open ? <X /> : <Menu />}</button></div></div>{open && <nav id="mobile-menu" className="m-mobile-nav" aria-label="Mobilní navigace" onClick={() => setOpen(false)}><a href="/funkce">Funkce</a><a href="/#pro-koho">Pro koho</a><a href="/#jak-to-funguje">Jak to funguje</a><a href="/#otazky">Časté otázky</a><a href="/prihlaseni">Přihlásit se</a><a className="m-btn m-primary" href="/registrace">Vytvořit účet<ArrowRight size={16} /></a></nav>}</header></>;
+  return <><a className="m-skip" href="#obsah">Přejít na obsah</a><header className="m-header"><div className="m-nav-wrap"><Brand /><nav aria-label="Hlavní navigace" className="m-desktop-nav"><a href="/funkce">Funkce</a><Link href="/#pro-koho">Pro koho</Link><Link href="/#jak-to-funguje">Jak to funguje</Link><Link href="/#otazky">Časté otázky</Link></nav><div className="m-nav-actions"><a className="m-login-link" href="/prihlaseni">Přihlásit se</a><a className="m-btn m-primary m-nav-cta" href="/registrace">Vytvořit účet<ArrowUpRight size={16} /></a><button className="m-menu-button" aria-label={open ? 'Zavřít menu' : 'Otevřít menu'} aria-expanded={open} aria-controls="mobile-menu" onClick={() => setOpen(!open)}>{open ? <X /> : <Menu />}</button></div></div>{open && <nav id="mobile-menu" className="m-mobile-nav" aria-label="Mobilní navigace" onClick={() => setOpen(false)}><a href="/funkce">Funkce</a><Link href="/#pro-koho">Pro koho</Link><Link href="/#jak-to-funguje">Jak to funguje</Link><Link href="/#otazky">Časté otázky</Link><a href="/prihlaseni">Přihlásit se</a><a className="m-btn m-primary" href="/registrace">Vytvořit účet<ArrowRight size={16} /></a></nav>}</header></>;
 }
 
 export const modules = [
@@ -66,7 +67,7 @@ export function FinalCTA() {
 }
 
 export function MarketingFooter() {
-  return <footer className="m-footer"><div className="m-footer-main"><div><Brand /><p>Váš marketing. Vaši lidé.<br />Jeden společný prostor.</p><span className="m-made-by">Navrženo pro každodenní práci v marketingu.</span></div><div><h3>Platforma</h3><a href="/funkce">Všechny funkce</a><a href="/funkce#kontakty">Kontakty a CRM</a><a href="/funkce#kampane">E-mailové kampaně</a><a href="/funkce#automatizace">Automatizace</a></div><div><h3>Objevte Hub</h3><a href="/#pro-koho">Pro koho je Hub</a><a href="/#jak-to-funguje">Jak začít</a><a href="/#otazky">Časté otázky</a><a href="/aplikace">Interaktivní ukázka</a></div><div><h3>Váš prostor</h3><a href="/prihlaseni">Přihlášení</a><a href="/registrace">Registrace</a><a href="/obnova-hesla">Obnova hesla</a></div></div><div className="m-footer-bottom"><span>© 2026 Softema Hub</span><span>Interaktivní prototyp · Ukázková data</span><span>Vytvořeno v Česku <span aria-hidden="true">🇨🇿</span></span></div></footer>;
+  return <footer className="m-footer"><div className="m-footer-main"><div><Brand /><p>Váš marketing. Vaši lidé.<br />Jeden společný prostor.</p><span className="m-made-by">Navrženo pro každodenní práci v marketingu.</span></div><div><h3>Platforma</h3><a href="/funkce">Všechny funkce</a><a href="/funkce#kontakty">Kontakty a CRM</a><a href="/funkce#kampane">E-mailové kampaně</a><a href="/funkce#automatizace">Automatizace</a></div><div><h3>Objevte Hub</h3><Link href="/#pro-koho">Pro koho je Hub</Link><Link href="/#jak-to-funguje">Jak začít</Link><Link href="/#otazky">Časté otázky</Link><a href="/aplikace">Interaktivní ukázka</a></div><div><h3>Váš prostor</h3><a href="/prihlaseni">Přihlášení</a><a href="/registrace">Registrace</a><a href="/obnova-hesla">Obnova hesla</a></div></div><div className="m-footer-bottom"><span>© 2026 Softema Hub</span><span>Interaktivní prototyp · Ukázková data</span><span>Vytvořeno v Česku <span aria-hidden="true">🇨🇿</span></span></div></footer>;
 }
 
 export function LandingPage() {
