@@ -1,21 +1,17 @@
-# Copied Sites are standalone projects and cannot inherit the monorepo policy.
+# Supply-chain policy: only releases older than 7 days, verified lockfile,
+# install scripts only for the packages listed in allowBuilds.
 minimumReleaseAge: 10080
 minimumReleaseAgeIgnoreMissingTime: false
 trustLockfile: false
 strictDepBuilds: true
 allowBuilds:
-  esbuild: true
-  fsevents: true
   sharp: true
   unrs-resolver: true
-  workerd: true
+# Project-local pnpm store (path kept from the original export; moving it
+# requires a fresh install). SITES_PNPM_SHARED_STORE may still override it.
 storeDir: ${SITES_PNPM_SHARED_STORE:-.sites-runtime/pnpm-store}
 cacheDir: ${SITES_PNPM_SHARED_STORE:-.sites-runtime/pnpm-store}/policy-cache
 enableGlobalVirtualStore: false
-# A later project-only session must not mutate a shared-store inode through node_modules.
 packageImportMethod: clone-or-copy
-# The explicit installer owns dependency setup, including restored workspaces.
 verifyDepsBeforeRun: false
 optimisticRepeatInstall: false
-overrides:
-  miniflare>sharp: 0.35.4
