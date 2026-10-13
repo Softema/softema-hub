@@ -1,36 +1,47 @@
 # Softema Hub
 
-Interaktivní návrh české marketingové a CRM aplikace pro Softema Creative. Všechny údaje jsou ukázkové. Neobsahuje produkční backend a neodesílá e-maily ani platby.
+Česká marketingová a CRM platforma agentury Softema Creative. **Aktuální etapa: proklikatelný frontend s mock daty** ke společnému review se zadavatelem. Všechny údaje jsou smyšlené. Aplikace nemá backend a neodesílá e-maily ani platby.
 
-## Veřejný web
+Závazné zadání: [docs/ZADANI-APLIKACE.md](docs/ZADANI-APLIKACE.md). Priority a pořadí dodávek: [docs/ZADANI-PRVNIHO-TASKU.md](docs/ZADANI-PRVNIHO-TASKU.md). [docs/MIGRACE.md](docs/MIGRACE.md) je historický podklad z doby GPT Sites a zadání nepřebíjí.
 
-- Úvodní landing page, interaktivní náhled produktu, funkce, scénáře použití a FAQ.
-- `/funkce` s přehledem modulů a odkazy do jejich ukázek.
-- `/prihlaseni`, `/registrace` (dva kroky), `/obnova-hesla`: prototyp přístupových formulářů s validací. Přístupové údaje se neukládají ani neodesílají; nejde o autentizaci.
-- `/aplikace` zachovává původní kompletní Hub. Původní odkazy s fragmenty URL vedou do aplikace.
-- Veřejný web a aplikace mají navzájem propojenou navigaci.
+## Spuštění
+
+Node.js ≥ 22.13.0 a pnpm 11.25.0. Bez globálního pnpm použijte `npx --yes pnpm@11.25.0` místo `pnpm`.
+
+```sh
+pnpm install --frozen-lockfile
+pnpm dev
+```
+
+Aplikace: **http://localhost:3000/aplikace**, landing page: `http://localhost:3000/`. Vývojový server ukončíte pomocí Ctrl+C. V jedné složce může běžet jen jeden `pnpm dev`.
+
+| Příkaz | Účel |
+| --- | --- |
+| `pnpm dev` | Vývojový server Next.js (Turbopack) |
+| `pnpm build` | Produkční build Next.js; nic nepublikuje |
+| `pnpm start` | Spuštění produkčního buildu (po `pnpm build`) |
+| `pnpm exec tsc --noEmit --incremental false` | Kontrola TypeScriptu |
+| `pnpm lint` | ESLint; původní kód v `app/` zatím hlásí známé nálezy |
+| `node --test tests/foundation.test.mjs` | Izolace demo úložiště a Resend adaptér s mock fetch |
+| `pnpm test:e2e` | Playwright: smoke testy a porovnání se snímky proti běžící aplikaci, viz [e2e/README.md](e2e/README.md) |
+| `pnpm test:e2e:reference` | Přepíše referenční snímky; jen po schválené změně vzhledu |
+
+Podrobnosti o lokálním vývoji, proměnných prostředí a původu exportu jsou v [README-LOCAL.md](README-LOCAL.md).
 
 ## Obrazovky
 
-- Přehled s grafy, změnou období a odkazy do modulů.
-- Kontakty: hledání bez diakritiky, filtrování, detail, časová osa, poznámky, štítky, editace a CSV import.
-- Kampaně: seznam, report odeslané kampaně, příjemci a čtyřkrokový průvodce.
-- Editor e-mailů: přetažení bloků, změna pořadí, úprava obsahu, barev a zarovnání, duplikace, undo/redo, mobilní a desktopový náhled, personalizace.
-- Automatizace: seznam a vizuální větvený scénář, přidávání a editace kroků, přepnutí stavu, zoom.
-- Faktury, předplatné a transakce, detail a vytvoření ukázkové faktury.
-- Kurzy, ukázková lekce, komunita, příspěvky, reakce a komentáře.
-- Webináře, detail registrací a vytvoření ukázkového webináře.
-- Chatbot: vzhled s živým náhledem, správa znalostní báze a chování, předem připravené testovací odpovědi.
-- Nastavení pracovního prostoru, týmu, domén, integrací a oznámení.
+- **Veřejný web:** landing page, `/funkce`, `/prihlaseni`, `/registrace` (dva kroky), `/obnova-hesla`. Přístupové formuláře jsou jen ukázka bez skutečné autentizace.
+- **Přehled:** grafy, změna období, odkazy do modulů.
+- **Kontakty:** hledání bez diakritiky, filtry, detail s časovou osou, poznámky, štítky, editace a CSV import.
+- **Kampaně:** seznam, report odeslané kampaně, příjemci a průvodce ve čtyřech krocích.
+- **Editor e-mailů:** přetahování bloků, úprava obsahu, barev a zarovnání, duplikace, undo/redo, náhled na mobilu, personalizace.
+- **Automatizace:** vizuální větvený scénář, přidávání a editace kroků, zoom.
+- **Platby, kurzy a komunita, webináře, chatbot a nastavení** na úrovni hlavních obrazovek.
 
-Navigace používá fragmenty URL. Data se mění pouze v paměti stránky; po obnovení se resetují. Kontakty a kampaně jsou oddělené pro dva ukázkové pracovní prostory. Ostatní moduly demonstrují UX bez skutečných externích integrací.
+Moduly aplikace se přepínají fragmentem URL (`/aplikace#kontakty/1`). Data jsou jen v paměti a obnovení stránky je vrátí do výchozího stavu. Modul AI agentů je mimo rozsah zadání a pro review bude skrytý.
 
 ## Technologie
 
-React, TypeScript, Vinext / App Router, shadcn/ui, Tailwind CSS, Recharts, Lucide. Publikováno prostřednictvím Sites.
+Next.js 16 (App Router), React 19, TypeScript (strict), Tailwind CSS 4, shadcn/ui (Radix UI), Recharts, Lucide, Sonner, Playwright. Cílová produkční architektura (NestJS, Prisma, PostgreSQL s RLS, Better-Auth, Redis/BullMQ, Docker/Hetzner) je popsaná v zadání a v [CLAUDE.md](CLAUDE.md).
 
-## Ověření
-
-TypeScript kontrola bez chyb. V prohlížeči ověřeno hledání bez diakritiky, CRM detail a uložení poznámky, čtyři kroky kampaně, skutečné přetažení bloku, změna textu, mobilní náhled e-mailu, uložení a naplánování, navigace všech modulů, editace workflow uzlu, živý náhled a ukázkový chat, přepnutí pracovních prostorů.
-
-Vestavěné WebMCP akce jsou registrovány pouze při dostupnosti document.modelContext. Aktuální QA prohlížeč tuto funkci neposkytuje, proto jejich runtime ověření nebylo dostupné. Validace vstupů a vazba na stejný stav UI jsou součástí implementace.
+GitHub CI ([.github/workflows/verify.yml](.github/workflows/verify.yml)) ověřuje instalaci, typy, testy a build. Nic nenasazuje ani nerozesílá. Původní verze prototypu na Vinextu a Cloudflare Workers je uložená v lokální větvi `archive/sites-vinext`.

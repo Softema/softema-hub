@@ -7,6 +7,8 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      NEXT_TELEMETRY_DISABLED: 1
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -16,4 +18,6 @@ jobs:
       - run: node node_modules/typescript/bin/tsc --noEmit --incremental false
       - run: node --test tests/foundation.test.mjs
       - run: npx --yes pnpm@11.25.0 build
+      # Lint is not a gate yet: the original app/ code has known findings.
+      # Playwright screenshots are Windows-specific and run locally only.
       # Intentionally no deployment, secrets, emails or database migrations.
