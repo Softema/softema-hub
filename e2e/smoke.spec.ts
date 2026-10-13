@@ -11,7 +11,7 @@ const modules: [string, string, string][] = [
   ['Webináře', 'Webináře', 'webinare'],
   ['Chatbot', 'Váš webový chatbot', 'chatbot'],
   ['Nastavení', 'Nastavení', 'nastaveni'],
-  ['Přehled', 'Dobrý den, Marie 👋', 'prehled'],
+  ['Přehled', 'Dobrý den, Marie', 'prehled'],
 ];
 
 test('sidebar navigation switches modules', async ({ page }, info) => {

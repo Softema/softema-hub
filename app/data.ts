@@ -45,7 +45,9 @@ export const initialCampaigns:Campaign[]=[
  {id:6,name:'Děkujeme za skvělý Business Fest!',subject:'Tohle byl náš první Business Fest',status:'Odesláno',audience:'Účastníci Business Festu',recipients:284,date:'4. 9. 2026 · 10:00',open:'68,3 %',click:'12,6 %'}
 ].map(c=>({...c,workspace:'Softema Creative',workspaceId:demoWorkspaces[0].id,blocks:defaultBlocks.map(b=>({...b}))}));
 initialCampaigns.push({id:101,name:'Podzimní péče o vaše čtyřnohé parťáky',subject:'Novinky pro vaše mazlíčky',status:'Odesláno',audience:'Odběratelé newsletteru',recipients:1450,date:'23. 9. 2026 · 8:00',open:'38,4 %',click:'4,8 %',workspace:'4legs.cz',workspaceId:demoWorkspaces[1].id,blocks:defaultBlocks.map(b=>({...b}))});
+// Mock performance series (13 points); the dashboard rescales it to the selected period totals.
+export const chartRows=[{d:'1. 9.',v:4200,p:3100},{d:'3. 9.',v:8100,p:5500},{d:'5. 9.',v:6100,p:4700},{d:'7. 9.',v:11700,p:7000},{d:'9. 9.',v:8900,p:6100},{d:'11. 9.',v:16400,p:9400},{d:'13. 9.',v:12900,p:8000},{d:'15. 9.',v:18200,p:11200},{d:'17. 9.',v:15100,p:10500},{d:'19. 9.',v:24500,p:14200},{d:'21. 9.',v:21700,p:13600},{d:'23. 9.',v:31600,p:15800},{d:'25. 9.',v:28400,p:16200}];
 export const fmt=(v:number)=>new Intl.NumberFormat('cs-CZ').format(v);
-export const money=(v:number)=>fmt(v)+' Kč';
+export const money=(v:number)=>fmt(v)+'\u00a0Kč';
 export const normalize=(s:string)=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 export const navItems=[['prehled','Přehled'],['kontakty','Kontakty'],['kampane','Kampaně'],['automatizace','Automatizace'],['ai-agenti','AI agenti'],['platby','Platby'],['kurzy','Kurzy a komunita'],['webinare','Webináře'],['chatbot','Chatbot'],['nastaveni','Nastavení']];

@@ -4,7 +4,7 @@ import { heading, openHub, screenshotStyle, trackPageErrors } from './helpers';
 // Reference screens of the prototype (mock data only, nothing is persisted).
 type Screen = { name: string; route: string; prepare?: (page: Page) => Promise<void>; ready: (page: Page) => Locator };
 const screens: Screen[] = [
-  { name: 'dashboard', route: 'prehled', ready: p => heading(p, 'Dobrý den, Marie 👋') },
+  { name: 'dashboard', route: 'prehled', ready: p => heading(p, 'Dobrý den, Marie') },
   { name: 'contacts', route: 'kontakty', ready: p => heading(p, 'Kontakty') },
   { name: 'contact-detail', route: 'kontakty/1', ready: p => p.getByRole('heading', { level: 2, name: 'Jan Novák' }) },
   { name: 'campaign-wizard-basics', route: 'kampane/nova', ready: p => p.getByRole('heading', { name: 'Začněme tím podstatným.' }) },

@@ -25,7 +25,7 @@ Skutečný kód má přednost před popisy jeho stavu. Rozpor mezi dokumenty, za
 | Oblast | Stav |
 | --- | --- |
 | Framework | **Next.js 16.3.4** (App Router, Turbopack), React 19.2.6, TypeScript 5.9.3 (`strict`). Všechny stránky se předrenderují staticky. Hub je klientská komponenta na `/aplikace`. |
-| UI | Tailwind 4.2.1 (PostCSS), shadcn/ui v `components/ui/` (Radix), Lucide, Sonner, Recharts. Většinu vzhledu tvoří vlastní CSS (`app/globals.css`, `app/product.css`, `app/marketing.css`, `app/ai-agents.css`). Grafy obaluje `ChartBox` v [app/hub.tsx](app/hub.tsx), který je připojí až s nenulovým rozměrem. |
+| UI | Tailwind 4.2.1 (PostCSS), shadcn/ui v `components/ui/` (Radix), Lucide, Sonner, Recharts. Většinu vzhledu tvoří vlastní CSS (`app/globals.css`, `app/product.css`, `app/marketing.css`, `app/ai-agents.css`). Tokeny (rozestupy 4–40 px, barvy textu s kontrastem AA, radiusy, výška ovládacích prvků) a shell (sidebar, horní lišta, spodní navigace na mobilu) jsou v [app/shell.css](app/shell.css); nové styly stav na nich. Dashboard je [app/dashboard.tsx](app/dashboard.tsx) + `dashboard.css` (container queries). Grafy obaluje `ChartBox` z [app/chart-box.tsx](app/chart-box.tsx), který je připojí až s nenulovým rozměrem. |
 | Testy | Playwright 1.63 (Chromium): smoke testy a snímky obrazovek v [e2e/](e2e/). `node --test` pro demo store a Resend adaptér. |
 | Navigace | Veřejné routy `/`, `/funkce`, `/prihlaseni`, `/registrace`, `/obnova-hesla`, `/aplikace`. Moduly Hubu přepíná **hash** (`/aplikace#kontakty/1`) přes `go()` a `HubProvider` ([app/state.tsx](app/state.tsx)). |
 | E-mailový editor | Vlastní React editor v [app/campaigns.tsx](app/campaigns.tsx) (nativní drag & drop). |
@@ -51,7 +51,7 @@ Rozhodnutí zadavatele:
 - **AI agenti** ([app/ai-agents.tsx](app/ai-agents.tsx), `ai-state.tsx`, `lib/domain/ai.ts`, `lib/data/*`) i tvorba kampaní přes **AI brief** jsou mimo rozsah (zadání 1.2). Ve verzi pro review je skryj z navigace, ale kód zachovej. Bez samostatného zadání je nerozvíjej.
 - **Landing page** a `/funkce` ponech, ale dál je nerozvíjej.
 - Používej **pouze smyšlená data**, žádné údaje reálných klientů.
-- Zachovej současné styly a vykreslování písma: `Inter` se nenačítá a vykresluje se systémové písmo. Bez zadání nic z toho neměň.
+- Písmo je **Geist** načtený přes `next/font/google` (`latin` + `latin-ext` pro češtinu) v [app/layout.tsx](app/layout.tsx). Další font přidávej jen se zdůvodněním.
 - Nic z kap. 1.2 zadání nenavrhuj ani nepřipravuj (kalendář, sociální sítě, landing builder, inbox, recenze, affiliate, ad manager).
 
 ## Design, mock data a chování
