@@ -1,19 +1,17 @@
 import { defineConfig, type PlaywrightTestConfig } from '@playwright/test';
 
-// Visual reference = the current Vinext prototype. Next.js projects compare
-// against the very same snapshot files, so any visual drift fails the run.
-// Servers are started manually (see e2e/README.md); nothing is auto-launched.
-const vinextURL = process.env.E2E_VINEXT_URL ?? 'http://localhost:5173';
-const nextURL = process.env.E2E_NEXT_URL ?? 'http://localhost:3000';
+// Reference screenshots were captured from the original Vinext prototype and the
+// Next.js build matches them pixel for pixel; any visual drift fails the run.
+// The server is started manually (see e2e/README.md); nothing is auto-launched.
+const baseURL = process.env.E2E_BASE_URL ?? 'http://localhost:3000';
 
 const desktop = { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 };
 const mobile = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true };
-const snapshots = (device: string) => `{testDir}/__screenshots__/${device}/{arg}-{platform}{ext}`;
 
 type Project = NonNullable<PlaywrightTestConfig['projects']>[number];
-const project = (target: string, baseURL: string, device: 'desktop' | 'mobile'): Project => ({
-  name: `${target}-${device}`,
-  snapshotPathTemplate: snapshots(device),
+const project = (device: 'desktop' | 'mobile'): Project => ({
+  name: device,
+  snapshotPathTemplate: `{testDir}/__screenshots__/${device}/{arg}-{platform}{ext}`,
   use: { browserName: 'chromium', baseURL, ...(device === 'desktop' ? desktop : mobile) },
 });
 
@@ -37,10 +35,5 @@ export default defineConfig({
     reducedMotion: 'reduce',
     trace: 'retain-on-failure',
   },
-  projects: [
-    project('vinext', vinextURL, 'desktop'),
-    project('vinext', vinextURL, 'mobile'),
-    project('next', nextURL, 'desktop'),
-    project('next', nextURL, 'mobile'),
-  ],
+  projects: [project('desktop'), project('mobile')],
 });
