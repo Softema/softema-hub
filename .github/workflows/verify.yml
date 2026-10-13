@@ -1,0 +1,19 @@
+name: Verify Softema Hub
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npx --yes pnpm@11.25.0 install --frozen-lockfile
+      - run: node node_modules/typescript/bin/tsc --noEmit --incremental false
+      - run: node --test tests/foundation.test.mjs
+      - run: npx --yes pnpm@11.25.0 build
+      # Intentionally no deployment, secrets, emails or database migrations.
