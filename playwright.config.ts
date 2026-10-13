@@ -28,7 +28,7 @@ export default defineConfig({
   timeout: 60_000,
   expect: {
     timeout: 15_000,
-    toHaveScreenshot: { animations: 'disabled', caret: 'hide', scale: 'device', maxDiffPixels: 0 },
+    toHaveScreenshot: { animations: 'disabled', caret: 'hide', scale: 'device', maxDiffPixels: 0, threshold: 0 },
   },
   use: {
     locale: 'cs-CZ',
