@@ -45,3 +45,12 @@ next-env.d.ts
 /.codex/
 /outputs/
 /work/
+
+# playwright (reference screenshots in e2e/__screenshots__ ARE versioned)
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# typescript incremental cache
+*.tsbuildinfo

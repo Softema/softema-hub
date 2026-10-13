@@ -1,0 +1,5 @@
+# Keep LF in the repository and working tree regardless of core.autocrlf
+# (shell scripts and SOURCE-MANIFEST.sha256 depend on it).
+* text=auto eol=lf
+*.png binary
+*.jpg binary

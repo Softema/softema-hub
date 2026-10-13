@@ -1,0 +1,2 @@
+/* Applied only during toHaveScreenshot. Hides tooling overlays, never app UI. */
+nextjs-portal { display: none !important; }
