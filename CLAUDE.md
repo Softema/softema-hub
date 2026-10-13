@@ -24,21 +24,27 @@ Skutečný kód má přednost před popisy jeho stavu. Rozpor mezi dokumenty, za
 
 | Oblast | Stav |
 | --- | --- |
-| Framework | Kód je psaný proti Next.js App Router API. **Výchozí** `dev`/`build`/`start` stále běží přes Vinext 1.0.0-beta.5 + Vite 8 + Cloudflare Workers tooling. |
-| Next.js 16.3.4 | Ověřen **vedle** Vinextu přes `dev:next`/`build:next` bez změny kódu. Snímky obrazovek se shodují na pixel. Úplné přepnutí ještě neproběhlo, viz níže. |
-| UI | React 19.2.6, TypeScript 5.9.3, Tailwind 4.2.1, shadcn/ui v `components/ui/` (Radix), Lucide, Sonner, Recharts. Většinu vzhledu tvoří vlastní CSS (`app/globals.css`, `app/product.css`, `app/marketing.css`, `app/ai-agents.css`). |
+| Framework | **Next.js 16.3.4** (App Router, Turbopack), React 19.2.6, TypeScript 5.9.3 (`strict`). Všechny stránky se předrenderují staticky. Hub je klientská komponenta na `/aplikace`. |
+| UI | Tailwind 4.2.1 (PostCSS), shadcn/ui v `components/ui/` (Radix), Lucide, Sonner, Recharts. Většinu vzhledu tvoří vlastní CSS (`app/globals.css`, `app/product.css`, `app/marketing.css`, `app/ai-agents.css`). Grafy obaluje `ChartBox` v [app/hub.tsx](app/hub.tsx), který je připojí až s nenulovým rozměrem. |
+| Testy | Playwright 1.63 (Chromium): smoke testy a snímky obrazovek v [e2e/](e2e/). `node --test` pro demo store a Resend adaptér. |
 | Navigace | Veřejné routy `/`, `/funkce`, `/prihlaseni`, `/registrace`, `/obnova-hesla`, `/aplikace`. Moduly Hubu přepíná **hash** (`/aplikace#kontakty/1`) přes `go()` a `HubProvider` ([app/state.tsx](app/state.tsx)). |
 | E-mailový editor | Vlastní React editor v [app/campaigns.tsx](app/campaigns.tsx) (nativní drag & drop). |
 | Workflow builder | Vlastní HTML/CSS uzly v [app/automations.tsx](app/automations.tsx). |
 | Data | Jen v paměti, refresh je resetuje. Výchozí záznamy jsou v [app/data.ts](app/data.ts), některé moduly mají vlastní lokální stav. |
 
-### Dokončení přepnutí na Next.js (jen na zadání, jako samostatný krok)
+### Migrace z GPT Sites na Next.js (dokončeno)
 
-Přepnout `dev`/`build`/`start` na Next.js. Odebrat Vinext, Vite, `@cloudflare/*`, wrangler, Sites plugin (`build/`, `scripts/run-framework.mjs`, `scripts/sites-env.*`) a D1/Drizzle scaffolding, starý stav uložit do archivní větve. Upravit CI ([.github/workflows/verify.yml](.github/workflows/verify.yml), dnes buildí Vinext) a skript `test:e2e:reference`, který teď snímá referenci z Vinextu. Do té doby Vinext ani Cloudflare konfiguraci **neodstraňuj** a `.openai/hosting.json`, `vendor/`, `build/` ani `SOURCE-MANIFEST.sha256` neměň.
+Vinext, Vite, Cloudflare Workers tooling, instalační skripty a plugin GPT Sites i D1/Drizzle scaffolding jsou odstraněné. Původní funkční verze je v lokální větvi **`archive/sites-vinext`**. Vzhled byl proti ní ověřen se shodou na pixel. Nic z ní nevracej bez zadání.
+
+Pozůstatky, které zůstávají záměrně:
+- lokální úložiště balíčků `.sites-runtime/pnpm-store` v `pnpm-workspace.yaml` (přesun by vyžadoval přeinstalaci),
+- `SOURCE-MANIFEST.sha256`, který dokládá původní export (needituj ho),
+- `supabase/` jako historický návrh,
+- složka `vendor/` (styly shadcn), kterou aplikace používá.
 
 ## Rozsah aktuální etapy
 
-**Pořadí dodávek:** po migraci frameworku následuje **dodávka 1**: shell, dashboard, CRM a e-mailing. Uvnitř je priorita č. 1 tvorba kampaně a editor e-mailu, priorita č. 2 detail kontaktu (časová osa, vlastní pole, historie). Pak review se zadavatelem. **Dodávka 2** jsou ostatní moduly na úrovni proklikatelných hlavních obrazovek.
+**Pořadí dodávek:** migrace frameworku je hotová. Následuje **dodávka 1**: shell, dashboard, CRM a e-mailing. Uvnitř je priorita č. 1 tvorba kampaně a editor e-mailu, priorita č. 2 detail kontaktu (časová osa, vlastní pole, historie). Pak review se zadavatelem. **Dodávka 2** jsou ostatní moduly na úrovni proklikatelných hlavních obrazovek.
 
 Rozhodnutí zadavatele:
 - **Unlayer** přijde v dodávce 1 jako samostatný krok po migraci frameworku. Před integrací ověř licenci a omezení (branding, projectId, CDN). **React Flow** pro automatizace přijde v dodávce 2. Oba editory nikdy neměň současně s migrací frameworku.
@@ -63,9 +69,8 @@ Detail je v zadání v kap. 3–6 a 13–15. Stručně: Next.js App Router + TS 
 
 V aktuální etapě:
 - **Neaktivuj** backend, autentizaci, databázi ani žádnou integraci. `.env.example` nic nezapojuje.
-- `supabase/`, `db/`, `drizzle.config.ts` a `examples/d1/` jsou pozůstatek GPT Sites v jiném stacku. Zachovej je, ale nenavazuj na ně a nerozšiřuj je.
+- `supabase/` a Supabase proměnné v `.env.example` jsou historický návrh v jiném stacku. Nenavazuj na ně, nerozšiřuj je a nevracej Supabase, D1 ani Cloudflare jako cíl.
 - `lib/server/email/resend.ts` je připravený, nezapojený adaptér (Resend je v cílovém stacku). Nepoužívej ho k reálnému odesílání.
-- `app/chatgpt-auth.ts` je nevyužitý helper GPT Sites, ne autentizace.
 - Secrets nikdy nepatří do Gitu, klientského stavu, URL, logů ani do proměnných `NEXT_PUBLIC_`/`VITE_`.
 
 ## Příkazy
@@ -74,24 +79,24 @@ Node.js ≥ 22.13.0, pnpm 11.25.0. Bez globálního pnpm použij `npx --yes pnpm
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm dev                 # Vinext (výchozí), http://localhost:5173
-pnpm dev:next            # Next.js, http://localhost:3000/aplikace
-pnpm build               # Vinext/Workers build, bez deploye
-pnpm build:next          # Next.js produkční build; spuštění: pnpm exec next start --port 3000
+pnpm dev                 # next dev, http://localhost:3000/aplikace
+pnpm build               # next build, bez deploye
+pnpm start               # next start nad hotovým buildem
 pnpm exec tsc --noEmit --incremental false
 pnpm lint                # pozor: v původním kódu app/ zatím hlásí chyby (any, react-hooks)
 node --test tests/foundation.test.mjs   # izolace demo store + Resend adaptér s mock fetch
-pnpm test:e2e:vinext     # Playwright proti běžícímu Vinextu
-pnpm test:e2e:next       # Playwright proti běžícímu Next.js (dev nebo start na :3000)
+pnpm test:e2e            # Playwright proti běžící aplikaci (výchozí :3000, jinak E2E_BASE_URL)
 pnpm test:e2e:reference  # přepíše referenční snímky; jen po schválené změně vzhledu
 ```
 
-Servery pro e2e se nespouštějí automaticky, detaily jsou v [e2e/README.md](e2e/README.md). `pnpm start` spouští Wrangler nad Workers buildem a pro vývoj není potřeba. Při chybě instalace nemaž lockfile a nevypínej instalační ochrany v `pnpm-workspace.yaml`.
+- V jedné složce smí běžet jen jeden `next dev`. Pokud už běží, druhý skončí s adresou a PID prvního. Cizí server neukončuj, použij ho, nebo pro ověření spusť `pnpm build` a `pnpm start --port <jiný>`.
+- Server pro e2e se nespouští automaticky, detaily jsou v [e2e/README.md](e2e/README.md).
+- Při chybě instalace nemaž lockfile a nevypínej instalační ochrany v `pnpm-workspace.yaml`.
 
 ## Ověření změny
 
-- U změny kódu: `tsc` a přiměřeně `build:next` (dokud existuje i Vinext, tak i `build`). Při zásahu do demo store nebo Resend adaptéru spusť `tests/foundation.test.mjs`.
-- U UI změny: `test:e2e:next`. Snímky jsou porovnávané na pixel a pořízené na Windows (`-win32`), takže platí jen na stejném stroji a v Chromiu. Záměrnou změnu vzhledu nech schválit a teprve pak aktualizuj referenci. Selhání neobcházej zvyšováním tolerance.
+- U změny kódu: `tsc` a přiměřeně `pnpm build`. Při zásahu do demo store nebo Resend adaptéru spusť `tests/foundation.test.mjs`. CI ([.github/workflows/verify.yml](.github/workflows/verify.yml)) spouští install, `tsc`, foundation testy a build. Lint a snímky zatím jen lokálně.
+- U UI změny: `pnpm test:e2e`. Snímky jsou porovnávané na pixel a pořízené na Windows (`-win32`), takže platí jen na stejném stroji a v Chromiu. Záměrnou změnu vzhledu nech schválit a teprve pak aktualizuj referenci. Selhání neobcházej zvyšováním tolerance.
 - Ručně projdi dotčenou cestu včetně úzké obrazovky. U editoru: přidání/přesun bloku, editace, undo/redo a návrat do kampaně. U stavu: přepnutí workspace.
 - Smoke testy rozšiřuj s novými prokliky, ale nepiš testy, které jen opisují implementaci.
 - Pokud něco nešlo ověřit, napiš přesně co. Na závěr uveď, co se změnilo, které kontroly skutečně prošly a co zbývá. Prototyp neoznačuj za produkčně připravený.
@@ -99,6 +104,8 @@ Servery pro e2e se nespouštějí automaticky, detaily jsou v [e2e/README.md](e2
 
 ## Next.js pravidla pro agenty
 
-`AGENTS.md` spravuje `next dev`, který do něj při spuštění vkládá svůj blok. Needituj ho ručně. Dokud `AGENTS.md` blok obsahuje, `next dev` tento soubor (`CLAUDE.md`) nemění. Import níže ponech, aby se pravidla Next.js načítala.
+Next.js 16 se od starších verzí liší. Před psaním Next.js kódu si přečti relevantní průvodce v `node_modules/next/dist/docs/` (viz `AGENTS.md`).
+
+`AGENTS.md` spravuje `next dev`, needituj ho ručně. Ověřené chování (`next/dist/server/lib/generate-agent-files.js`): blok se zapisuje jen při `next dev`, jen při detekci AI agenta a jen pokud chybí. Je-li v `AGENTS.md`, `next dev` tento soubor (`CLAUDE.md`) nemění. Nastavení `agentRules` v `next.config.ts` proto není potřeba. Import níže ponech, aby se pravidla Next.js načítala.
 
 @AGENTS.md
