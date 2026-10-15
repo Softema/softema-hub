@@ -211,6 +211,48 @@ test('pipeline moves a deal between stages', async ({ page }) => {
   noErrors();
 });
 
+test('course structure: add module and lesson, edit and reorder', async ({ page }) => {
+  const noErrors = trackPageErrors(page);
+  await openHub(page, 'kurzy/c-email');
+  await page.getByRole('button', { name: 'Přidat modul' }).click();
+  await page.getByLabel('Název modulu').fill('Bonusy');
+  await page.getByRole('button', { name: 'Uložit', exact: true }).click();
+  const bonus = page.getByRole('region', { name: /Modul 3: Bonusy/ });
+  await bonus.getByRole('button', { name: 'Přidat lekci' }).click();
+  await expect(page).toHaveURL(/#kurzy\/c-email\/lekce\/l-/);
+  await page.getByLabel('Název lekce').fill('Bonusová šablona');
+  await page.getByRole('button', { name: 'Uložit lekci' }).click();
+  await page.getByRole('button', { name: 'E-mailing, který prodává' }).click();
+  await expect(bonus.getByRole('button', { name: /^Bonusová šablona/ })).toBeVisible();
+  await bonus.getByRole('button', { name: 'Posunout modul nahoru' }).click();
+  await expect(page.getByRole('region', { name: /Modul 2: Bonusy/ })).toBeVisible();
+  // publish needs lessons → the draft course can be published now
+  await page.getByRole('button', { name: 'Publikovat' }).click();
+  await expect(page.getByText('Publikováno', { exact: true }).first()).toBeVisible();
+  noErrors();
+});
+
+test('student preview marks lessons done and keeps progress', async ({ page }) => {
+  const noErrors = trackPageErrors(page);
+  await openHub(page, 'kurzy/c-marketing/nahled?student=1&lekce=l6');
+  await expect(page.getByRole('heading', { level: 1, name: 'Kvíz: znáte své zákazníky?' })).toBeVisible();
+  await expect(page.locator('.player-course small')).toContainText('5 z 12');
+  await page.getByRole('button', { name: 'Označit jako dokončené' }).click();
+  await expect(page.locator('.player-course small')).toContainText('6 z 12');
+  await page.reload();
+  await page.waitForLoadState('networkidle');
+  await expect(page.locator('.player-course small')).toContainText('6 z 12');
+  // visitors without access only see the free preview lesson
+  await page.getByRole('combobox', { name: 'Zobrazit jako' }).click();
+  await page.getByRole('option', { name: 'Návštěvník bez přístupu' }).click();
+  await page.getByRole('button', { name: /Jak si stanovit cíle/ }).click();
+  await expect(page.getByRole('heading', { name: 'Lekce je zamčená' })).toBeVisible();
+  // the lesson shows up on the contact timeline
+  await openHub(page, 'kontakty/1');
+  await expect(page.getByText('Dokončena lekce Kvíz: znáte své zákazníky?')).toBeVisible();
+  noErrors();
+});
+
 test('public pages render', async ({ page }, info) => {
   test.skip(isMobile(info), 'desktop only');
   const noErrors = trackPageErrors(page);

@@ -214,7 +214,8 @@ function campaignResults(seed: number, recipients: Contact[], openRate: number, 
 }
 
 /* ---------- courses ---------- */
-const lesson = (id: string, title: string, type: Lesson['type'], duration: number, dripDays = 0, preview = false, text = ''): Lesson => ({ id, title, type, duration, videoUrl: type === 'Video' ? 'https://stream.example/video-ukazka' : '', text: text || (type === 'Text' ? 'Text lekce s praktickými kroky a příklady.' : ''), attachments: [], dripDays, preview });
+const QUIZ = '? Co nejlépe popisuje personu?\n* Model typického zákazníka s jeho cíli a potížemi\n- Logo a barvy firmy\n- Seznam všech kontaktů\n? Kde nejspolehlivěji zjistíte potřeby zákazníků?\n* V rozhovorech se zákazníky\n- V ceníku konkurence\n- Ve statistikách návštěvnosti';
+const lesson = (id: string, title: string, type: Lesson['type'], duration: number, dripDays = 0, preview = false, text = ''): Lesson => ({ id, title, type, duration, videoUrl: type === 'Video' ? 'https://stream.example/video-ukazka' : '', text: text || (type === 'Text' ? 'Text lekce s praktickými kroky a příklady.\n\nNa konci lekce najdete krátké shrnutí a úkol na procvičení.' : type === 'Kvíz' ? QUIZ : ''), attachments: [], dripDays, preview });
 function softemaCourses(ws: string, now: Date): Course[] {
   const { ago } = seedClock(now);
   const m1: CourseModule[] = [

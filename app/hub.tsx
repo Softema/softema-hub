@@ -20,6 +20,7 @@ import { Avatar, Btn, IconBtn, Modal } from './ui';
 import Dashboard from './dashboard';
 import Contacts from './contacts';
 import Campaigns from './campaigns';
+import Courses from './courses';
 import { Automations, Chatbot, Learning, Payments, SettingsPage, Webinars } from './modules';
 import AIAgents from './ai-agents';
 import { AIProvider } from './ai-state';
@@ -179,7 +180,8 @@ function Screen() {
     case 'kampane': return <Campaigns />;
     case 'automatizace': return <Automations />;
     case 'platby': return <Payments />;
-    case 'kurzy': case 'komunita': return <Learning />;
+    case 'kurzy': return <Courses />;
+    case 'komunita': return <Learning />;
     case 'webinare': return <Webinars />;
     case 'chatbot': return <Chatbot />;
     case 'nastaveni': return <SettingsPage />;
