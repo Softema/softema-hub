@@ -42,7 +42,7 @@ Průběžně se aktualizuje. Platí pro větev `frontend/complete`.
 | --- | --- | --- |
 | Seznam, hledání s diakritikou i bez, filtry, řazení, stránkování | ✅ | |
 | Hromadné akce | ✅ | Štítky, fáze, zařazení do kampaně, zařazení do automatizace, export, smazání. |
-| Detail: časová osa, vlastní pole, štítky, poznámky, obchody, kurzy, automatizace | ✅ | |
+| Detail: časová osa, vlastní pole, štítky, poznámky, obchody, segmenty, kurzy, automatizace | ✅ | Kap. 8.2 včetně akcí: e-mail (simulace), zařazení do kampaně nebo automatizace, úprava, GDPR. |
 | Souhlasy: evidence, historie, akce | ✅🔌 | Double opt-in e-mail je simulace. |
 | GDPR export, anonymizace a výmaz | ✅ | Účetní záznamy zůstávají a ukazují „Smazaný kontakt“. |
 | Segmenty s živými počty | ✅ | |
@@ -58,7 +58,7 @@ Průběžně se aktualizuje. Platí pro větev `frontend/complete`.
 | Editor Unlayer | ✅🔌 | Běží bez účtu: branding Unlayer, bez prémiových funkcí, skript z `editor.unlayer.com`. Ukládá design JSON i HTML. Volitelný veřejný `NEXT_PUBLIC_UNLAYER_PROJECT_ID`. Náhradní vestavěný editor s undo/redo. |
 | Náhled desktop/mobil, merge tagy, test | ✅🔌 | HTML náhled je v sandboxovaném iframe. Testovací e-mail je simulace. |
 | Plánování a odeslání | ✅🔌 | Simulace. Výsledky se generují lokálně, odhlášení z kampaně odvolá souhlas. |
-| Report kampaně | 🟡 | Metriky, trychtýř, odkazy, příjemci s filtrem, opětovné odeslání neotevřeným. Graf v čase chybí, protože simulace nemá časové značky otevření. |
+| Report kampaně | ✅🔌 | Metriky, graf otevření v čase, trychtýř, odkazy, příjemci s filtrem, opětovné odeslání neotevřeným. Časy otevření jsou odvozená simulace, skutečné dodá tracking. |
 | Doručitelnost, webhooky, suppression, tracking, preferenční centrum | 🔌 | Backend (Resend, BullMQ). Domény a DNS záznamy jsou v Nastavení. |
 
 ## Kurzy a digitální produkty

@@ -165,6 +165,25 @@ function CampaignDetail({ id }: { id: number }) {
   );
 }
 
+/** Deterministic pseudo times of opens (hash of campaign × contact) bucketed by 4 hours. */
+function OpenTimeline({ c }: { c: Campaign }) {
+  const buckets = Array.from({ length: 12 }, () => 0);
+  for (const r of c.results ?? []) {
+    if (!r.opened) continue;
+    let h = 2166136261; for (const ch of `${c.id}:${r.contactId}`) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+    h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16;
+    const u = (h >>> 0) / 4294967296;
+    const hours = Math.min(47.9, -Math.log(1 - u * 0.98) * 7);
+    buckets[Math.floor(hours / 4)]++;
+  }
+  const max = Math.max(1, ...buckets);
+  return (
+    <div className="open-bars" role="img" aria-label={`Otevření po 4 hodinách: ${buckets.join(', ')}`}>
+      {buckets.map((n, k) => <div key={k} className="open-bar"><span className="open-fill" style={{ height: `${(n / max) * 100}%` }} title={`${k * 4}–${k * 4 + 4} h: ${n}`} /><small>{k * 4} h</small></div>)}
+    </div>
+  );
+}
+
 type ResultFilter = 'all' | 'opened' | 'clicked' | 'unopened' | 'bounced' | 'unsub';
 const FILTERS: [ResultFilter, string][] = [['all', 'Všichni'], ['opened', 'Otevřeli'], ['clicked', 'Klikli'], ['unopened', 'Neotevřeli'], ['bounced', 'Nedoručeno'], ['unsub', 'Odhlásili se']];
 
@@ -204,6 +223,9 @@ function Report({ c, actions }: { c: Campaign; actions: ReturnType<typeof useCam
             <Metric label="Míra prokliku" value={percent(s.clickRate)} desc={plural(s.clicked, 'proklik', 'prokliky', 'prokliků')} />
             <Metric label="Odhlášení" value={fmt(s.unsubscribed)} desc={`nedoručeno ${fmt(s.bounced)}`} />
           </div>
+          <Section title="Otevření v čase" desc="Prvních 48 hodin po odeslání · simulované rozložení, skutečné časy dodá tracking po napojení backendu" className="mb-4">
+            <div className="sec-body"><OpenTimeline c={c} /></div>
+          </Section>
           <div className="split">
             <Section title="Trychtýř">
               <div className="sec-body funnel">

@@ -4,7 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { ArrowLeft, Building2, ChevronRight, CreditCard, Download, FileText, GraduationCap, Mail, MapPin, MessageSquare, MousePointer2, Pencil, Phone, Plus, ShieldCheck, ShieldOff, StickyNote, Trash2, User, UserX, Users, Video, Wallet, Workflow, X, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { fmtDate, fmtDateTime, fmtTime, isEmail, money, newId, normalize, percent, plural, daysSince } from '@/lib/hub/format';
-import { contactTimeline, contactValue, courseLessons, invoiceTotal, invoiceView, progressOf, webinarState, type TimelineItem } from '@/lib/hub/logic';
+import { contactTimeline, contactValue, courseLessons, invoiceTotal, invoiceView, matchesRule, progressOf, segmentContext, webinarState, type TimelineItem } from '@/lib/hub/logic';
 import { anonymizeContact, contactExport, deleteContacts, enrollInCourse, enrollInWorkflow, findByEmail, logActivity, setConsent } from '@/lib/hub/ops';
 import { fireTrigger } from '@/lib/hub/flow';
 import { DEAL_STAGES, type ActivityType, type Contact, type CustomField, type Deal, type DealStage, type Lifecycle } from '@/lib/hub/types';
@@ -63,6 +63,7 @@ function Detail({ c }: { c: Contact }) {
   const txs = w.transactions.filter(t => t.contactId === c.id).sort((a, b) => b.date.localeCompare(a.date));
   const subs = w.subscriptions.filter(s => s.contactId === c.id);
   const tags = useMemo(() => [...new Set(w.contacts.flatMap(x => x.tags))].sort((a, b) => a.localeCompare(b, 'cs')), [w.contacts]);
+  const segments = useMemo(() => { const ctx = segmentContext(data, workspaceId); return w.segments.filter(s => !s.rules.length || (s.match === 'all' ? s.rules.every(r => matchesRule(c, r, ctx)) : s.rules.some(r => matchesRule(c, r, ctx)))); }, [data, workspaceId, w.segments, c]);
 
   const update = (fn: (x: Contact) => Contact) => patch('contacts', c.id, fn);
   const setStage = (stage: Lifecycle) => { if (stage === c.stage) return; update(x => ({ ...x, stage })); log(c.id, 'stage', `Fáze změněna na ${stage}`, `Předtím: ${c.stage}`); toast.success('Fáze kontaktu byla změněna.'); };
@@ -170,6 +171,10 @@ function Detail({ c }: { c: Contact }) {
             <div className="side-head"><h3>Obchody</h3><IconBtn label="Nový obchod" onClick={() => setDialog('deal')}><Plus /></IconBtn></div>
             {deals.length ? deals.map(d => <DealRow key={d.id} d={d} contactId={c.id} />) : <p>Žádný obchod. <button type="button" className="text-link inline" onClick={() => setDialog('deal')}>Založit obchod</button></p>}
             <button type="button" className="text-link" onClick={() => go('kontakty/pipeline')}>Otevřít pipeline<ChevronRight size={13} aria-hidden /></button>
+          </section>
+          <section className="panel side-box">
+            <h3>Segmenty</h3>
+            {segments.length ? <div className="contact-tags">{segments.map(s => <button key={s.id} type="button" className="pill-tag solid" onClick={() => go('kontakty/segmenty/' + s.id)}>{s.name}</button>)}</div> : <p>Kontakt nepatří do žádného segmentu.</p>}
           </section>
           <section className="panel side-box">
             <div className="side-head"><h3>Kurzy a produkty</h3><IconBtn label="Přidat do kurzu" onClick={() => setDialog('course')}><Plus /></IconBtn></div>

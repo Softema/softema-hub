@@ -603,3 +603,11 @@ blockquote.post-text { margin: 0; padding: var(--sp-3) var(--sp-4); border-left:
   .card-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 767px) { .inv-row { grid-template-columns: 1fr 1fr 32px; } .inv-row > .field:first-child { grid-column: 1 / -1; } }
+
+/* campaign report: opens over time */
+.open-bars { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--sp-2); align-items: end; height: 160px; }
+.open-bar { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; height: 100%; }
+.open-fill { width: 100%; min-height: 2px; border-radius: 4px 4px 0 0; background: var(--brand-chart); }
+.open-bar small { font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+.pill-tag.solid { border-style: solid; color: var(--ink-2); }
+.pill-tag.solid:hover { border-color: var(--brand-chart); color: var(--brand-ink); }
