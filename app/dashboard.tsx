@@ -1,10 +1,13 @@
 'use client';
 import React, { useState } from 'react';
-import { ArrowDownRight, ArrowUpRight, ChevronRight, GraduationCap, Mail, Plus, UserPlus, Wallet, Workflow } from 'lucide-react';
+import { ChevronRight, Info, Plus, Workflow } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, Tooltip, XAxis, YAxis } from 'recharts';
 import { useHub } from './state';
 import { chartRows, fmt, money, type Campaign } from './data';
-import { Badge, Btn, Pick } from './ui';
+import { Badge, Btn, Metric, Pick } from './ui';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useShell } from './shell-context';
+import { hubEvents } from './events';
 import { ChartBox } from './chart-box';
 import './dashboard.css';
 
@@ -78,18 +81,6 @@ const campaignDate = (c: Campaign) => {
 };
 
 /* ---------- Small building blocks ---------- */
-function Delta({ value, unit }: { value: number; unit: '%' | 'p. b.' }) {
-  const up = value >= 0;
-  const Icon = up ? ArrowUpRight : ArrowDownRight;
-  return (
-    <span className={`delta ${up ? 'up' : 'down'}`} title={unit === 'p. b.' ? 'Změna v procentních bodech oproti předchozímu období' : 'Relativní změna oproti předchozímu období'}>
-      <Icon size={14} aria-hidden />
-      <span className="sr-only">{up ? 'Nárůst o' : 'Pokles o'} </span>
-      {`${up ? '+' : '−'}${decimal(Math.abs(value))}${NB}${unit}`}
-    </span>
-  );
-}
-
 function CardHeader({ id, title, sub, children }: { id: string; title: string; sub?: React.ReactNode; children?: React.ReactNode }) {
   return (
     <header className="dcard-head">
@@ -131,6 +122,7 @@ function ChartTip({ active, payload, format }: { active?: boolean; payload?: rea
 /* ---------- Dashboard ---------- */
 export default function Dashboard() {
   const { go, contacts, campaigns, workspace } = useHub();
+  const { openNotifications } = useShell();
   const [period, setPeriod] = useState<PeriodKey>('30');
   const [metric, setMetric] = useState<Metric>('revenue');
   const cfg = PERIODS[period];
@@ -162,13 +154,7 @@ export default function Dashboard() {
   const formatValue = (v: number) => (metric === 'revenue' ? money(v) : `${fmt(v)}${NB}${pick(v, { one: 'e-mail', few: 'e-maily', other: 'e-mailů' })}`);
   const formatAxis = (v: number) => (metric === 'revenue' ? (v >= 1000 ? `${fmt(Math.round(v / 1000))}${NB}tis.` : fmt(v)) : fmt(v));
 
-  const reportCampaign = campaigns.find(c => c.status === 'Odesláno');
-  const activity = [
-    contacts[0] && { icon: Wallet, who: contacts[0].name, what: 'zaplatil fakturu', desc: `Marketingová konzultace · ${money(12900)}`, time: '12 min', full: 'před 12 minutami', to: 'kontakty/' + contacts[0].id },
-    contacts[2] && { icon: UserPlus, who: contacts[2].name, what: 'je nový kontakt', desc: 'Registrace na webinář AI v marketingu', time: '34 min', full: 'před 34 minutami', to: 'kontakty/' + contacts[2].id },
-    contacts[1] && { icon: GraduationCap, who: contacts[1].name, what: 'dokončila lekci', desc: 'Marketing od základů · Lekce 4', time: '1 h', full: 'před 1 hodinou', to: 'kontakty/' + contacts[1].id },
-    reportCampaign && { icon: Mail, who: '', what: `Kampaň má ${reportCampaign.open} otevření`, desc: reportCampaign.name, time: '2 h', full: 'před 2 hodinami', to: 'kampane/' + reportCampaign.id },
-  ].filter(Boolean) as { icon: typeof Wallet; who: string; what: string; desc: string; time: string; full: string; to: string }[];
+  const activity = hubEvents(contacts, campaigns);
 
   const recent = campaigns.slice(0, 4);
   const sources = [
@@ -188,23 +174,31 @@ export default function Dashboard() {
       <header className="dash-head">
         <div className="dash-title">
           <h1>Dobrý den, Marie</h1>
-          <p>Změny ukazatelů porovnáváme s předchozími {cfg.days} dny ({span(range.prevStart, range.prevEnd)}).</p>
+          <p>Výsledky pracovního prostoru za vybrané období.</p>
         </div>
         <div className="dash-actions">
-          <Pick value={period} onChange={v => setPeriod(v as PeriodKey)} options={periodOptions} label="Období přehledu" className="dash-period" />
+          <div className="dash-period">
+            <Pick value={period} onChange={v => setPeriod(v as PeriodKey)} options={periodOptions} label="Období přehledu" />
+            <Popover>
+              <PopoverTrigger asChild>
+                <button type="button" className="icon-btn period-help" aria-label="Jak porovnáváme období"><Info aria-hidden /></button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="period-help-panel">
+                <strong>Jak porovnáváme období</strong>
+                <p>Změny ukazatelů jsou proti předchozím {cfg.days} dnům ({span(range.prevStart, range.prevEnd)}). U míry otevření jde o rozdíl v procentních bodech, u ostatních o relativní změnu.</p>
+                <p>Graf ukazuje {cfg.bucket}; jejich součet odpovídá hodnotě v kartě.</p>
+              </PopoverContent>
+            </Popover>
+          </div>
           <Btn primary onClick={() => go('kampane/nova')}><Plus aria-hidden />Nová kampaň</Btn>
         </div>
       </header>
 
-      <dl className="kpi-strip" aria-label="Klíčové ukazatele za vybrané období">
+      <div className="metric-grid" role="group" aria-label="Klíčové ukazatele za vybrané období">
         {kpis.map(k => (
-          <div className="kpi" key={k.label}>
-            <dt>{k.label}</dt>
-            <dd className="kpi-value">{k.value}</dd>
-            <dd className="kpi-meta"><Delta value={k.change} unit={k.unit} /><span>{k.detail}</span></dd>
-          </div>
+          <Metric key={k.label} label={k.label} value={k.value} change={`${decimal(Math.abs(k.change))}${NB}${k.unit}`} trend={k.change >= 0 ? 'up' : 'down'} desc={k.detail} />
         ))}
-      </dl>
+      </div>
 
       <div className="dash-cols">
         <div className="dash-main">
@@ -219,12 +213,12 @@ export default function Dashboard() {
             <div className="chart-body">
               <ChartBox>
                 <AreaChart data={series} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} title={`${metric === 'revenue' ? 'Tržby' : 'Odeslané e-maily'} za ${span(range.start, range.end)}, celkem ${formatValue(metricTotal)}`} desc={`${cfg.bucket}; přerušovaná čára je předchozí období. Šipkami vlevo a vpravo procházíte jednotlivé úseky.`}>
-                  <CartesianGrid vertical={false} stroke="#eceef1" />
-                  <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: '#d3d7dd' }} tickMargin={8} minTickGap={20} interval="preserveStartEnd" tick={{ fill: '#5e6570', fontSize: 12 }} />
-                  <YAxis tickLine={false} axisLine={false} width={64} tickMargin={4} tick={{ fill: '#5e6570', fontSize: 12 }} tickFormatter={formatAxis} />
-                  <Tooltip cursor={{ stroke: '#c3c8cf' }} content={props => <ChartTip active={props.active} payload={props.payload} format={formatValue} />} />
-                  <Area dataKey="p" type="monotone" stroke="#6f7782" strokeWidth={1.5} strokeDasharray="4 4" fill="none" dot={false} activeDot={{ r: 3, fill: '#6f7782' }} isAnimationActive={false} />
-                  <Area dataKey="v" type="monotone" stroke="#d4511e" strokeWidth={2.25} fill="#d4511e" fillOpacity={0.07} dot={false} activeDot={{ r: 4, stroke: '#fff', strokeWidth: 2 }} isAnimationActive={false} />
+                  <CartesianGrid vertical={false} />
+                  <XAxis dataKey="label" tickLine={false} axisLine tickMargin={8} minTickGap={20} interval="preserveStartEnd" tick={{ fontSize: 12 }} />
+                  <YAxis tickLine={false} axisLine={false} width={64} tickMargin={4} tick={{ fontSize: 12 }} tickFormatter={formatAxis} />
+                  <Tooltip cursor={{ stroke: 'var(--line-strong)' }} content={props => <ChartTip active={props.active} payload={props.payload} format={formatValue} />} />
+                  <Area dataKey="p" type="monotone" className="series-prev" stroke="#6f7782" strokeWidth={1.5} strokeDasharray="4 4" fill="none" dot={false} activeDot={{ r: 3, fill: '#6f7782' }} isAnimationActive={false} />
+                  <Area dataKey="v" type="monotone" className="series-cur" stroke="#d4511e" strokeWidth={2.25} fill="#d4511e" fillOpacity={0.07} dot={false} activeDot={{ r: 4, stroke: '#fff', strokeWidth: 2 }} isAnimationActive={false} />
                 </AreaChart>
               </ChartBox>
             </div>
@@ -293,14 +287,14 @@ export default function Dashboard() {
         <div className="dash-side">
           <section className="dcard dash-activity" aria-labelledby="dash-activity-title">
             <CardHeader id="dash-activity-title" title="Nedávná aktivita">
-              <CardLink label="Kontakty" onClick={() => go('kontakty')} />
+              <CardLink label="Oznámení" onClick={openNotifications} />
             </CardHeader>
             {activity.length ? (
               <ul className="act-list">
                 {activity.map(a => {
                   const Icon = a.icon;
                   return (
-                    <li key={a.to + a.what}>
+                    <li key={a.id}>
                       <button type="button" className="act-item" onClick={() => go(a.to)}>
                         <span className="act-icon"><Icon size={16} aria-hidden /></span>
                         <span className="act-text">

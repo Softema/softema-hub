@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "test:e2e": "playwright test",
-    "test:e2e:reference": "playwright test e2e/visual.spec.ts --update-snapshots=all"
+    "test:e2e:reference": "playwright test e2e/visual.spec.ts --update-snapshots=all",
+    "theme:css": "node scripts/build-theme-css.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

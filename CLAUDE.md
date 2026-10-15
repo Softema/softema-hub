@@ -25,7 +25,7 @@ Skutečný kód má přednost před popisy jeho stavu. Rozpor mezi dokumenty, za
 | Oblast | Stav |
 | --- | --- |
 | Framework | **Next.js 16.3.4** (App Router, Turbopack), React 19.2.6, TypeScript 5.9.3 (`strict`). Všechny stránky se předrenderují staticky. Hub je klientská komponenta na `/aplikace`. |
-| UI | Tailwind 4.2.1 (PostCSS), shadcn/ui v `components/ui/` (Radix), Lucide, Sonner, Recharts. Většinu vzhledu tvoří vlastní CSS (`app/globals.css`, `app/product.css`, `app/marketing.css`, `app/ai-agents.css`). Tokeny (rozestupy 4–40 px, barvy textu s kontrastem AA, radiusy, výška ovládacích prvků) a shell (sidebar, horní lišta, spodní navigace na mobilu) jsou v [app/shell.css](app/shell.css); nové styly stav na nich. Dashboard je [app/dashboard.tsx](app/dashboard.tsx) + `dashboard.css` (container queries). Grafy obaluje `ChartBox` z [app/chart-box.tsx](app/chart-box.tsx), který je připojí až s nenulovým rozměrem. |
+| UI | Tailwind 4.2.1 (PostCSS), shadcn/ui v `components/ui/` (Radix), Lucide, Sonner, Recharts. Většinu vzhledu tvoří vlastní CSS (`app/globals.css`, `app/product.css`, `app/marketing.css`, `app/ai-agents.css`). Tokeny (rozestupy 4–40 px, barvy textu s kontrastem AA, radiusy, výška ovládacích prvků) a shell (sidebar, horní lišta, spodní navigace na mobilu) jsou v [app/shell.css](app/shell.css); nové styly stav na nich. Dashboard je [app/dashboard.tsx](app/dashboard.tsx) + `dashboard.css` (container queries). **Téma** světlý / tmavý / podle systému: next-themes v [app/theme.tsx](app/theme.tsx) (jen `/aplikace`, veřejný web zůstává světlý); tokeny pro obě témata jsou v `shell.css` (`:root` a `.dark`). Původní styly (`globals.css`, `product.css`, `ai-agents.css`) převádí na tokeny generovaný [app/theme-legacy.css](app/theme-legacy.css). Needituj ho ručně, po změně těchto souborů spusť `pnpm theme:css`. Náhled newsletteru, šablon a widget chatbota zůstávají ve vlastním (světlém) designu. KPI karty jsou sdílená `Metric` v [app/ui.tsx](app/ui.tsx), události pro aktivitu i notifikace v [app/events.ts](app/events.ts). Grafy obaluje `ChartBox` z [app/chart-box.tsx](app/chart-box.tsx), který je připojí až s nenulovým rozměrem. |
 | Testy | Playwright 1.63 (Chromium): smoke testy a snímky obrazovek v [e2e/](e2e/). `node --test` pro demo store a Resend adaptér. |
 | Navigace | Veřejné routy `/`, `/funkce`, `/prihlaseni`, `/registrace`, `/obnova-hesla`, `/aplikace`. Moduly Hubu přepíná **hash** (`/aplikace#kontakty/1`) přes `go()` a `HubProvider` ([app/state.tsx](app/state.tsx)). |
 | E-mailový editor | Vlastní React editor v [app/campaigns.tsx](app/campaigns.tsx) (nativní drag & drop). |
@@ -87,6 +87,7 @@ pnpm lint                # pozor: v původním kódu app/ zatím hlásí chyby (
 node --test tests/foundation.test.mjs   # izolace demo store + Resend adaptér s mock fetch
 pnpm test:e2e            # Playwright proti běžící aplikaci (výchozí :3000, jinak E2E_BASE_URL)
 pnpm test:e2e:reference  # přepíše referenční snímky; jen po schválené změně vzhledu
+pnpm theme:css           # znovu vygeneruje app/theme-legacy.css z původních stylů
 ```
 
 - V jedné složce smí běžet jen jeden `next dev`. Pokud už běží, druhý skončí s adresou a PID prvního. Cizí server neukončuj, použij ho, nebo pro ověření spusť `pnpm build` a `pnpm start --port <jiný>`.

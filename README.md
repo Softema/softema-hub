@@ -25,6 +25,7 @@ Aplikace: **http://localhost:3000/aplikace**, landing page: `http://localhost:30
 | `node --test tests/foundation.test.mjs` | Izolace demo úložiště a Resend adaptér s mock fetch |
 | `pnpm test:e2e` | Playwright: smoke testy a porovnání se snímky proti běžící aplikaci, viz [e2e/README.md](e2e/README.md) |
 | `pnpm test:e2e:reference` | Přepíše referenční snímky; jen po schválené změně vzhledu |
+| `pnpm theme:css` | Znovu vygeneruje `app/theme-legacy.css` (převod původních stylů na tokeny světlého a tmavého tématu) |
 
 Podrobnosti o lokálním vývoji, proměnných prostředí a původu exportu jsou v [README-LOCAL.md](README-LOCAL.md).
 

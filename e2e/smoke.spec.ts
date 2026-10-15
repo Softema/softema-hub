@@ -89,7 +89,7 @@ test('contact custom fields: add, validate, edit, remove', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Zpět na kontakty' }).click();
   await page.getByRole('cell').getByRole('button', { name: /^Petra Svobodová/ }).click();
-  await expect(box.getByText('Zatím tu nejsou žádná vlastní pole.')).toBeVisible();
+  await expect(box.getByText('Zatím tu nejsou žádná vlastní pole.', { exact: false })).toBeVisible();
   noErrors();
 });
 
