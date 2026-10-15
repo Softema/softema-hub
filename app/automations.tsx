@@ -13,7 +13,7 @@ import { CONDITIONS, KIND_LABEL, TRIGGERS, advanceWorkflow, summary, validateWor
 import type { FlowEdge, FlowNode, FlowNodeData, FlowNodeKind, Workflow } from '@/lib/hub/types';
 import { useHub, useUnsavedGuard } from './state';
 import { Avatar, Badge, Btn, Field, IconBtn, Metric, Modal, PageHead, Pick } from './ui';
-import { FormError, Notice, Section, useConfirm, useRoute } from './kit';
+import { FormError, Notice, OptionCombobox, Section, useConfirm, useRoute } from './kit';
 
 const ICON: Record<FlowNodeKind, typeof Mail> = { trigger: Zap, email: Mail, wait: Clock, condition: GitBranch, tag: Tag, untag: Tags, stage: UserCog, campaign: ListChecks, webhook: Globe, notify: Bell, end: Flag };
 const STEP_KINDS: FlowNodeKind[] = ['email', 'wait', 'condition', 'tag', 'untag', 'stage', 'campaign', 'webhook', 'notify', 'end'];
@@ -336,20 +336,19 @@ function NodeSettings({ node, onChange, onRemove, onClose, edges, nodes, onRemov
   const tags = [...new Set(w.contacts.flatMap(x => x.tags))].sort((a, b) => a.localeCompare(b, 'cs'));
   const outs = edges.filter(e => e.source === node.id);
   const title = (id: string) => nodes.find(n => n.id === id)?.data.title ?? '?';
-  const listId = React.useId();
   const Icon = ICON[d.kind];
   return (
     <section className="panel sec flow-settings-panel">
       <header className="sec-head"><div><h2><Icon size={16} aria-hidden /> {KIND_LABEL[d.kind]}</h2><p>Změny se projeví hned, uloží se tlačítkem Uložit.</p></div><IconBtn label="Zavřít nastavení kroku" onClick={onClose}><X /></IconBtn></header>
       <div className="sec-body stack">
         <Field label="Název kroku"><input value={d.title} onChange={e => onChange({ title: e.target.value })} maxLength={80} /></Field>
-        <datalist id={listId}>{tags.map(t => <option key={t} value={t} />)}</datalist>
         {d.kind === 'trigger' && <>
           <Field label="Událost"><Pick value={c.event ?? ''} onChange={v => onChange({ config: { event: v } })} options={(Object.keys(TRIGGERS) as TriggerEvent[]).map(k => [k, TRIGGERS[k].label] as [string, string])} className="full" label="Událost spouštěče" /></Field>
           {(() => { const p = TRIGGERS[c.event as TriggerEvent]?.param; if (!p) return null;
             if (p.key === 'webinar') return <Field label={p.label}><Pick value={c.webinar ?? 'Jakýkoli'} onChange={v => set('webinar', v)} options={['Jakýkoli', ...w.webinars.map(x => x.title)]} className="full" label={p.label} /></Field>;
             if (p.key === 'course') return <Field label={p.label}><Pick value={c.course ?? ''} onChange={v => set('course', v)} options={w.courses.map(x => x.title)} className="full" label={p.label} /></Field>;
-            return <Field label={p.label}><input list={p.key === 'tag' ? listId : undefined} value={c[p.key] ?? ''} onChange={e => set(p.key, e.target.value)} /></Field>; })()}
+            if (p.key === 'tag') return <div className="field"><span>{p.label}</span><OptionCombobox value={c.tag ?? ''} onChange={v => set('tag', v)} options={tags} label={p.label} placeholder="Vyberte štítek" /></div>;
+            return <Field label={p.label}><input value={c[p.key] ?? ''} onChange={e => set(p.key, e.target.value)} /></Field>; })()}
           <Notice>Spouštěč reaguje na události z ostatních modulů jen u aktivního scénáře.</Notice>
         </>}
         {d.kind === 'email' && <>
@@ -362,11 +361,11 @@ function NodeSettings({ node, onChange, onRemove, onClose, edges, nodes, onRemov
         </div>}
         {d.kind === 'condition' && <>
           <Field label="Podmínka"><Pick value={c.check ?? ''} onChange={v => onChange({ config: { check: v } })} options={Object.entries(CONDITIONS)} className="full" label="Podmínka" /></Field>
-          {c.check === 'has_tag' && <Field label="Štítek"><input list={listId} value={c.value ?? ''} onChange={e => set('value', e.target.value)} /></Field>}
+          {c.check === 'has_tag' && <div className="field"><span>Štítek</span><OptionCombobox value={c.value ?? ''} onChange={v => set('value', v)} options={tags} label="Štítek podmínky" placeholder="Vyberte štítek" /></div>}
           {c.check === 'stage_is' && <Field label="Fáze"><Pick value={c.value ?? ''} onChange={v => set('value', v)} options={['Lead', 'Zájemce', 'Klient']} className="full" label="Fáze" /></Field>}
           <p className="small muted">Kontakt pokračuje větví Ano, nebo Ne.</p>
         </>}
-        {(d.kind === 'tag' || d.kind === 'untag') && <Field label="Štítek"><input list={listId} value={c.tag ?? ''} onChange={e => set('tag', e.target.value)} /></Field>}
+        {(d.kind === 'tag' || d.kind === 'untag') && <div className="field"><span>Štítek</span><OptionCombobox value={c.tag ?? ''} onChange={v => set('tag', v)} options={tags} allowCreate={d.kind === 'tag'} label="Štítek kroku" placeholder="Vyberte štítek" /></div>}
         {d.kind === 'stage' && <Field label="Nová fáze kontaktu"><Pick value={c.stage ?? ''} onChange={v => set('stage', v)} options={['Lead', 'Zájemce', 'Klient']} className="full" label="Fáze" /></Field>}
         {d.kind === 'campaign' && <Field label="Kampaň (koncept nebo naplánovaná)"><Pick value={c.campaignId ?? ''} onChange={v => onChange({ config: { campaignId: v, campaignName: w.campaigns.find(x => String(x.id) === v)?.name ?? '' } })} options={w.campaigns.filter(x => x.status !== 'Odesláno').map(x => [String(x.id), x.name] as [string, string])} className="full" label="Kampaň" /></Field>}
         {d.kind === 'webhook' && <>

@@ -11,7 +11,7 @@ import { cancelInvoice, chargeSubscription, newInvoice, payInvoice, payLink, ref
 import type { Contact, Coupon, Invoice, InvoiceItem, PaymentLink, Subscription, Transaction } from '@/lib/hub/types';
 import { useHub, useUnsavedGuard } from './state';
 import { Avatar, Badge, Btn, Empty, Field, IconBtn, Metric, Modal, PageHead, Pick, SearchInput } from './ui';
-import { Bar, FormError, Notice, Pager, Section, SubNav, ToggleRow, download, paginate, toCsv, useConfirm, useRoute } from './kit';
+import { Bar, DateField, FilterTabs, FormError, Notice, OptionCombobox, Pager, Section, SubNav, ToggleRow, download, paginate, toCsv, useConfirm, useRoute } from './kit';
 
 export const invoiceTone = (v: InvoiceView) => (v === 'Zaplacená' ? 'green' : v === 'Po splatnosti' ? 'red' : v === 'Odeslaná' ? 'blue' : v === 'Stornovaná' ? 'gray' : 'gray');
 const txTone = (s: Transaction['status']) => (s === 'Úspěšná' ? 'green' : s === 'Vrácená' ? 'orange' : 'red');
@@ -66,12 +66,20 @@ function Overview() {
         <Metric label="Po splatnosti" value={money(overdue.reduce((s, i) => s + invoiceTotal(i), 0))} desc={plural(overdue.length, 'faktura', 'faktury', 'faktur')} />
         <Metric label="Měsíční opakované tržby" value={money(mrr)} desc={`${w.subscriptions.filter(s => s.status === 'Aktivní').length} aktivních předplatných`} />
       </div>
+      {/* two independent columns: the main column continues below the chart, the side column does not stretch it */}
       <div className="split">
-        <Section title="Tržby po měsících" desc="Úspěšné platby po odečtení vratek">
-          <div className="sec-body month-bars">
-            {months.map(m => <div key={m.label} className="month-bar"><span>{m.label}</span><Bar value={(m.v / max) * 100} label={`Tržby ${m.label}`} /><strong>{money(m.v)}</strong></div>)}
-          </div>
-        </Section>
+        <div className="stack">
+          <Section title="Tržby po měsících" desc="Úspěšné platby po odečtení vratek">
+            <div className="sec-body month-bars">
+              {months.map(m => <div key={m.label} className="month-bar"><span>{m.label}</span><Bar value={(m.v / max) * 100} label={`Tržby ${m.label}`} /><strong>{money(m.v)}</strong></div>)}
+            </div>
+          </Section>
+          <Section title="Poslední platby" actions={<Btn onClick={() => go('platby/transakce')}>Všechny transakce</Btn>}>
+            <ul className="row-list sec-body">
+              {w.transactions.slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6).map(t => <li key={t.id}><button type="button" className="row-item" onClick={() => go('kontakty/' + t.contactId)}><span className="row-icon"><CreditCard size={16} aria-hidden /></span><span className="row-main"><strong>{contacts.get(t.contactId)?.name ?? 'Smazaný kontakt'}</strong><small>{t.description} · {fmtDateTime(t.date)}</small></span><span className="num">{money(t.amount)}</span><Badge tone={txTone(t.status)}>{t.status}</Badge></button></li>)}
+            </ul>
+          </Section>
+        </div>
         <div className="stack">
           <Section title="Po splatnosti" actions={<Btn onClick={() => go('platby/faktury?stav=Po%20splatnosti')}>Všechny</Btn>}>
             <ul className="row-list sec-body">
@@ -88,11 +96,6 @@ function Overview() {
           </Section>
         </div>
       </div>
-      <Section title="Poslední platby" className="mt-4" actions={<Btn onClick={() => go('platby/transakce')}>Všechny transakce</Btn>}>
-        <ul className="row-list sec-body">
-          {w.transactions.slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6).map(t => <li key={t.id}><button type="button" className="row-item" onClick={() => go('kontakty/' + t.contactId)}><span className="row-icon"><CreditCard size={16} aria-hidden /></span><span className="row-main"><strong>{contacts.get(t.contactId)?.name ?? 'Smazaný kontakt'}</strong><small>{t.description} · {fmtDateTime(t.date)}</small></span><span className="num">{money(t.amount)}</span><Badge tone={txTone(t.status)}>{t.status}</Badge></button></li>)}
-        </ul>
-      </Section>
     </>
   );
 }
@@ -367,7 +370,7 @@ function Subscriptions() {
         <Metric label="Zrušená" value={fmt(w.subscriptions.filter(s => s.status === 'Zrušeno').length)} desc="celkem" />
       </div>
       <div className="toolbar">
-        <div className="segmented" role="group" aria-label="Stav předplatného">{[['all', 'Vše'], ['Aktivní', 'Aktivní'], ['Pozastaveno', 'Pozastavená'], ['Zrušeno', 'Zrušená']].map(([k, l]) => <button key={k} type="button" aria-pressed={status === k} className={status === k ? 'active' : ''} onClick={() => setStatus(k)}>{l}</button>)}</div>
+        <FilterTabs label="Stav předplatného" value={status} onChange={setStatus} items={[['all', 'Vše', w.subscriptions.length], ['Aktivní', 'Aktivní', w.subscriptions.filter(s => s.status === 'Aktivní').length], ['Pozastaveno', 'Pozastavená', w.subscriptions.filter(s => s.status === 'Pozastaveno').length], ['Zrušeno', 'Zrušená', w.subscriptions.filter(s => s.status === 'Zrušeno').length]]} />
         <Btn primary onClick={() => setEditing('new')}><Plus aria-hidden />Nové předplatné</Btn>
       </div>
       <section className="panel">
@@ -426,7 +429,7 @@ function SubscriptionDialog({ sub, onClose }: { sub?: Subscription; onClose: () 
     <Modal open onClose={onClose} title={sub ? 'Změnit plán' : 'Nové předplatné'} desc="Bez skutečné platby. Se Stripe se předplatné založí přes Checkout.">
       <div className="stack">
         {!sub && <><Field label="Hledat kontakt"><input value={q} onChange={e => setQ(e.target.value)} /></Field><Field label="Kontakt"><Pick value={v.contact} onChange={c => setV({ ...v, contact: c })} options={options.map(c => [String(c.id), `${c.name} · ${c.email}`] as [string, string])} className="full" label="Kontakt" /></Field></>}
-        <Field label="Plán"><input value={v.plan} onChange={e => setV({ ...v, plan: e.target.value })} list="plans" /><datalist id="plans">{[...new Set(w.subscriptions.map(s => s.plan))].map(p => <option key={p} value={p} />)}</datalist></Field>
+        <div className="field"><span>Plán</span><OptionCombobox value={v.plan} onChange={p => setV({ ...v, plan: p, price: v.price || String(w.subscriptions.find(s => s.plan === p)?.price ?? '') })} options={[...new Set(w.subscriptions.map(s => s.plan))]} label="Plán" placeholder="Vyberte nebo vytvořte plán" /></div>
         <div className="form-grid">
           <Field label="Cena (Kč)"><input type="number" min={1} value={v.price} onChange={e => setV({ ...v, price: e.target.value })} /></Field>
           <Field label="Interval"><Pick value={v.interval} onChange={i => setV({ ...v, interval: i as Subscription['interval'] })} options={['měsíčně', 'ročně']} className="full" label="Interval" /></Field>
@@ -583,7 +586,7 @@ function CouponDialog({ onClose }: { onClose: () => void }) {
           <Field label="Typ slevy"><Pick value={v.kind} onChange={k => setV({ ...v, kind: k as Coupon['kind'] })} options={[['percent', 'Procenta'], ['fixed', 'Pevná částka (Kč)']]} className="full" label="Typ slevy" /></Field>
           <Field label={v.kind === 'percent' ? 'Sleva (%)' : 'Sleva (Kč)'}><input type="number" min={1} value={v.value} onChange={e => setV({ ...v, value: e.target.value })} /></Field>
           <Field label="Limit použití"><input type="number" min={1} value={v.limit} onChange={e => setV({ ...v, limit: e.target.value })} /></Field>
-          <Field label="Platí do"><input type="date" value={v.expires} onChange={e => setV({ ...v, expires: e.target.value })} /></Field>
+          <div className="field"><span>Platí do</span><DateField label="Platí do" value={v.expires} min={toDateInput(new Date(now).toISOString())} onChange={x => { setV({ ...v, expires: x }); setError(''); }} /></div>
         </div>
         <FormError>{error}</FormError>
       </div>

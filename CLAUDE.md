@@ -57,6 +57,13 @@ Rozhodnutí zadavatele:
 ## Design, mock data a chování
 
 - Vizuální reference je současná lokálně běžící aplikace (snímky v `e2e/__screenshots__/`). Používej stávající komponenty z [app/ui.tsx](app/ui.tsx) a `components/ui/`, CSS proměnné, světlý vzhled a oranžový akcent. Nový design nevymýšlej.
+- Sdílené ovládací prvky jsou v [app/kit.tsx](app/kit.tsx):
+  - `OptionCombobox`: výběr štítku, plánu a podobně, i s možností vytvořit novou hodnotu. Nativní `datalist` nepoužívej.
+  - `ContactPicker`: výběr kontaktů v dialozích.
+  - `DateField`: datum. Na desktopu má kalendář v aplikaci, na dotykových zařízeních nativní výběr.
+  - `FilterTabs`: filtrační záložky s podtržením. Segmentový přepínač `.segmented` je jen pro přepnutí režimu.
+- Primární akce používají tokeny `--brand-primary`, `--brand-primary-hover` a `--brand-primary-ink` v [app/shell.css](app/shell.css). Barva #eb6536 má tmavý text, protože s bílým nesplní AA.
+- Okrajové resety prvků patří do `@layer base`. Nevrstvené CSS přebije utility Tailwindu.
 - Dodržuj interakční standard zadání (kap. 7): hover/focus/disabled stavy, prázdné stavy s CTA, toasty, modaly a obousměrné prokliky (seznam ↔ detail, kampaň ↔ editor). Zachovej responzivitu, popisky formulářů a ovládání klávesnicí.
 - `useHub()` vrací kolekce aktivního prostoru (`w.*`). `upsert`/`patch`/`remove` hlídají `workspaceId` samy. `mutate()` dostává celý dataset, takže zachovávej záznamy ostatních prostorů a kontroluj `workspaceId`. Operace, které zasahují víc kolekcí (deduplikace kontaktu, odeslání, platba, spouštěče automatizací), patří do `lib/hub/*.ts` jako čisté funkce.
 - Formuláře s explicitním uložením používají `useUnsavedGuard`. Před navigací po úspěšném uložení zavolej `setGuard(null)`. Destruktivní akce jdou přes `useConfirm` z [app/kit.tsx](app/kit.tsx).

@@ -12,7 +12,7 @@ import { makeCampaign, simulateSend } from '@/lib/hub/ops';
 import type { Audience, Block, Campaign } from '@/lib/hub/types';
 import { useHub } from './state';
 import { Avatar, Badge, Btn, Field, IconBtn, Modal, PageHead, Pick } from './ui';
-import { FormError, Notice, Section, useConfirm, useRoute } from './kit';
+import { ContactPicker, DateField, FormError, Notice, Section, useConfirm, useRoute } from './kit';
 import { BlockEditor, EmailContent, blocksToHtml, linksOf, makeBlock, personalize } from './email-blocks';
 import { consentTone } from './crm-shared';
 
@@ -277,19 +277,14 @@ function Recipients({ c, save, onAddContacts }: { c: Campaign; save: (p: Partial
 
 function AddContactsDialog({ c, open, onClose, onAdd }: { c: Campaign; open: boolean; onClose: () => void; onAdd: (ids: number[]) => void }) {
   const { w } = useHub();
-  const [q, setQ] = useState('');
   const [picked, setPicked] = useState<number[]>([]);
-  const list = w.contacts.filter(x => !c.extraContactIds.includes(x.id) && normalize(`${x.name} ${x.email} ${x.company}`).includes(normalize(q))).slice(0, 40);
+  const candidates = w.contacts.filter(x => !c.extraContactIds.includes(x.id));
   return (
     <Modal open={open} onClose={onClose} title="Přidat příjemce" desc="Vyhledejte kontakty podle jména, e-mailu nebo firmy.">
       <div className="stack">
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Hledat…" aria-label="Hledat kontakty" autoFocus />
-        <ul className="pick-list">
-          {list.map(x => <li key={x.id}><label className="check-row"><input type="checkbox" checked={picked.includes(x.id)} onChange={e => setPicked(p => (e.target.checked ? [...p, x.id] : p.filter(i => i !== x.id)))} /><span>{x.name}<small>{x.email}</small></span><Badge tone={consentTone(x.consent.state)}>{x.consent.state}</Badge></label></li>)}
-          {!list.length && <li className="muted">Nic nenalezeno.</li>}
-        </ul>
+        <ContactPicker candidates={candidates} picked={picked} onChange={setPicked} consent emptyText="Všechny kontakty už jsou mezi příjemci." />
       </div>
-      <div className="form-actions"><Btn onClick={onClose}>Zrušit</Btn><Btn primary disabled={!picked.length} onClick={() => { onAdd(picked); setPicked([]); setQ(''); onClose(); toast.success(`Přidáno: ${plural(picked.length, 'kontakt', 'kontakty', 'kontaktů')}.`); }}>Přidat {picked.length || ''}</Btn></div>
+      <div className="form-actions"><Btn onClick={onClose}>Zrušit</Btn><Btn primary disabled={!picked.length} onClick={() => { onAdd(picked); setPicked([]); onClose(); toast.success(`Přidáno: ${plural(picked.length, 'příjemce', 'příjemci', 'příjemců')}.`); }}>{picked.length ? `Přidat ${plural(picked.length, 'příjemce', 'příjemce', 'příjemců')}` : 'Přidat příjemce'}</Btn></div>
     </Modal>
   );
 }
@@ -342,7 +337,7 @@ function SendDialog({ c, eligible, open, onClose, onDone }: { c: Campaign; eligi
     }
     if (!date || !time) return setError('Vyberte datum a čas.');
     const at = fromPragueInput(date, time);
-    if (+new Date(at) < Date.now() + 5 * 60_000) return setError('Čas odeslání musí být alespoň 5 minut v budoucnosti.');
+    if (+new Date(at) < Date.now() + 5 * 60_000) return setError(`Termín ${fmtDateTime(at)} je v minulosti nebo za méně než 5 minut. Zvolte pozdější datum nebo čas – obsah kampaně zůstává uložený.`);
     mutate(d => ({ ...d, campaigns: d.campaigns.map(x => (x.workspaceId === workspaceId && x.id === c.id ? { ...x, status: 'Naplánováno', scheduledAt: at, updatedAt: new Date().toISOString(), links: x.links.length ? x.links : linksOf(x.blocks) } : x)) }));
     toast.success(`Kampaň je naplánovaná na ${fmtDateTime(at)}.`, { description: 'Po tomto čase ji aplikace při dalším otevření „odešle“ (simulace).' });
     onClose(); onDone();
@@ -356,8 +351,8 @@ function SendDialog({ c, eligible, open, onClose, onDone }: { c: Campaign; eligi
         </div>
         {mode === 'schedule' ? (
           <div className="form-grid">
-            <Field label="Datum"><input type="date" value={date} min={toDateInput(new Date(now).toISOString())} onChange={e => { setDate(e.target.value); setError(''); }} /></Field>
-            <Field label="Čas (Europe/Prague)"><input type="time" value={time} onChange={e => { setTime(e.target.value); setError(''); }} /></Field>
+            <div className="field"><span>Datum</span><DateField label="Datum odeslání" value={date} min={toDateInput(new Date(now).toISOString())} invalid={!!error} onChange={x => { setDate(x); setError(''); }} /></div>
+            <Field label="Čas (Europe/Prague)"><input type="time" step={300} value={time} onChange={e => { setTime(e.target.value); setError(''); }} aria-invalid={!!error || undefined} /></Field>
           </div>
         ) : <Notice tone="warn"><AlertTriangle size={14} aria-hidden className="sr-only" />Odeslání nelze vrátit. Vygenerujeme ukázkové výsledky doručení, otevření a prokliků.</Notice>}
         <FormError>{error}</FormError>

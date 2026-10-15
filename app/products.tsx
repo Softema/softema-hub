@@ -3,12 +3,12 @@
 import React, { useMemo, useState } from 'react';
 import { ArrowLeft, Download, Package, Paperclip, Plus, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { fmt, fmtDate, money, newId, normalize, plural } from '@/lib/hub/format';
+import { fmt, fmtDate, money, newId, plural } from '@/lib/hub/format';
 import { logActivity } from '@/lib/hub/ops';
 import type { DigitalProduct, FileMeta } from '@/lib/hub/types';
 import { useHub, useUnsavedGuard } from './state';
 import { Avatar, Badge, Btn, Field, IconBtn, Metric, Modal, PageHead, Pick } from './ui';
-import { FormError, ImagePicker, Notice, Section, useConfirm } from './kit';
+import { ContactPicker, FormError, ImagePicker, Notice, Section, useConfirm } from './kit';
 import { Art, LearnNav } from './learn-shared';
 
 const KINDS: DigitalProduct['kind'][] = ['E-book', 'Šablona', 'Audio', 'Video', 'Balíček'];
@@ -149,23 +149,18 @@ function ProductDetail({ id }: { id: string }) {
 
 function GrantDialog({ p, open, onClose }: { p: DigitalProduct; open: boolean; onClose: () => void }) {
   const { w, workspaceId, mutate } = useHub();
-  const [q, setQ] = useState('');
   const [id, setId] = useState<number | null>(null);
   const owned = new Set(w.purchases.filter(x => x.productId === p.id).map(x => x.contactId));
-  const list = w.contacts.filter(x => !owned.has(x.id) && normalize(`${x.name} ${x.email}`).includes(normalize(q))).slice(0, 30);
+  const candidates = w.contacts.filter(x => !owned.has(x.id));
   const grant = () => {
     if (id === null) return;
     mutate(d => logActivity({ ...d, purchases: [{ id: newId('pu'), workspaceId, productId: p.id, contactId: id, date: new Date().toISOString(), downloads: 0 }, ...d.purchases] }, workspaceId, id, 'product', 'Udělen přístup k digitálnímu produktu', p.title, 'kurzy/produkty/' + p.id));
-    toast.success('Přístup byl udělen.'); setId(null); setQ(''); onClose();
+    toast.success('Přístup byl udělen.'); setId(null); onClose();
   };
   return (
     <Modal open={open} onClose={onClose} title="Udělit přístup" desc="Ruční přístup bez platby (např. bonus).">
       <div className="stack">
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Hledat kontakt…" aria-label="Hledat kontakt" autoFocus />
-        <ul className="pick-list">
-          {list.map(x => <li key={x.id}><label className="check-row"><input type="radio" name="grant" checked={id === x.id} onChange={() => setId(x.id)} /><span>{x.name}<small>{x.email}</small></span></label></li>)}
-          {!list.length && <li className="muted">Nic nenalezeno.</li>}
-        </ul>
+        <ContactPicker multiple={false} candidates={candidates} picked={id === null ? [] : [id]} onChange={ids => setId(ids[0] ?? null)} emptyText="Všechny kontakty už produkt mají." />
       </div>
       <div className="form-actions"><Btn onClick={onClose}>Zrušit</Btn><Btn primary disabled={id === null} onClick={grant}>Udělit přístup</Btn></div>
     </Modal>

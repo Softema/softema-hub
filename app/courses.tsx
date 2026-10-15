@@ -11,7 +11,7 @@ import { enrollInCourse, logActivity } from '@/lib/hub/ops';
 import type { Course, CourseModule, FileMeta, Lesson, LessonType, PriceType } from '@/lib/hub/types';
 import { useHub, useUnsavedGuard } from './state';
 import { Avatar, Badge, Btn, Empty, Field, IconBtn, Metric, Modal, PageHead, Pick } from './ui';
-import { Bar, FormError, ImagePicker, Notice, Pager, Section, SubNav, ToggleRow, download, paginate, toCsv, useConfirm, useRoute } from './kit';
+import { Bar, ContactPicker, FilterTabs, FormError, ImagePicker, Notice, Pager, Section, SubNav, ToggleRow, download, paginate, toCsv, useConfirm, useRoute } from './kit';
 import CoursePlayer from './course-player';
 import { ACCENTS, Art, LESSON_ICON, LearnNav, minutes, priceLabel } from './learn-shared';
 import Products from './products';
@@ -47,11 +47,7 @@ function CourseList() {
         <Metric label="Dokončili kurz" value={fmt(enrollments.filter(e => { const c = w.courses.find(x => x.id === e.courseId); return c && progressOf(e, c) === 100; }).length)} desc="všechny lekce hotové" />
         <Metric label="Digitální produkty" value={fmt(w.products.length)} desc={plural(w.purchases.length, 'nákup', 'nákupy', 'nákupů')} />
       </div>
-      <div className="toolbar">
-        <div className="segmented" role="group" aria-label="Stav kurzu">
-          {[['all', 'Všechny'], ['Publikováno', 'Publikované'], ['Koncept', 'Koncepty']].map(([k, l]) => <button key={k} type="button" aria-pressed={status === k} className={status === k ? 'active' : ''} onClick={() => setQuery({ stav: k === 'all' ? undefined : k })}>{l}</button>)}
-        </div>
-      </div>
+      <FilterTabs label="Stav kurzu" value={status} onChange={k => setQuery({ stav: k === 'all' ? undefined : k })} items={[['all', 'Všechny', w.courses.length], ['Publikováno', 'Publikované', w.courses.filter(c => c.status === 'Publikováno').length], ['Koncept', 'Koncepty', w.courses.filter(c => c.status === 'Koncept').length]]} />
       {w.courses.length === 0 ? (
         <section className="panel empty"><GraduationCap size={28} aria-hidden /><h3>Zatím nemáte žádný kurz</h3><p>Vytvořte kurz, rozdělte ho do modulů a lekcí a pozvěte první studenty.</p><Btn primary onClick={() => setCreating(true)}><Plus aria-hidden />Vytvořit kurz</Btn></section>
       ) : (
@@ -416,26 +412,21 @@ function Students({ c }: { c: Course }) {
 
 function AddStudent({ c, open, onClose }: { c: Course; open: boolean; onClose: () => void }) {
   const { w, workspaceId, mutate } = useHub();
-  const [q, setQ] = useState('');
   const [picked, setPicked] = useState<number[]>([]);
   const enrolled = new Set(w.enrollments.filter(e => e.courseId === c.id).map(e => e.contactId));
-  const list = w.contacts.filter(x => !enrolled.has(x.id) && normalize(`${x.name} ${x.email}`).includes(normalize(q))).slice(0, 40);
+  const candidates = w.contacts.filter(x => !enrolled.has(x.id));
   const add = () => {
     mutate(d => picked.reduce((acc, id) => logActivity(enrollInCourse(acc, workspaceId, c.id, id).data, workspaceId, id, 'course', 'Ručně udělen přístup ke kurzu', c.title, `kurzy/${c.id}/studenti`), d));
     toast.success(`Přístup ke kurzu udělen: ${plural(picked.length, 'kontakt', 'kontakty', 'kontaktů')}.`);
-    setPicked([]); setQ(''); onClose();
+    setPicked([]); onClose();
   };
   return (
     <Modal open={open} onClose={onClose} title="Přidat studenty" desc="Ruční přístup bez platby. Student se zapíše do časové osy kontaktu.">
       <div className="stack">
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Hledat kontakt…" aria-label="Hledat kontakt" autoFocus />
-        <ul className="pick-list">
-          {list.map(x => <li key={x.id}><label className="check-row"><input type="checkbox" checked={picked.includes(x.id)} onChange={e => setPicked(p => (e.target.checked ? [...p, x.id] : p.filter(i => i !== x.id)))} /><span>{x.name}<small>{x.email}</small></span></label></li>)}
-          {!list.length && <li className="muted">Nic nenalezeno.</li>}
-        </ul>
+        <ContactPicker candidates={candidates} picked={picked} onChange={setPicked} emptyText="Všechny kontakty už jsou studenty kurzu." />
         {c.status === 'Koncept' && <Notice tone="warn">Kurz je koncept. Studenti ho uvidí až po publikování.</Notice>}
       </div>
-      <div className="form-actions"><Btn onClick={onClose}>Zrušit</Btn><Btn primary disabled={!picked.length} onClick={add}>Přidat {picked.length || ''}</Btn></div>
+      <div className="form-actions"><Btn onClick={onClose}>Zrušit</Btn><Btn primary disabled={!picked.length} onClick={add}>{picked.length ? `Přidat ${plural(picked.length, 'studenta', 'studenty', 'studentů')}` : 'Přidat studenty'}</Btn></div>
     </Modal>
   );
 }

@@ -11,7 +11,7 @@ import { logActivity } from '@/lib/hub/ops';
 import type { Registration, Webinar } from '@/lib/hub/types';
 import { useHub, useUnsavedGuard } from './state';
 import { Avatar, Badge, Btn, Empty, Field, Metric, Modal, PageHead, Pick } from './ui';
-import { Bar, FormError, ImagePicker, Notice, Pager, Section, SubNav, ToggleRow, download, paginate, toCsv, useConfirm, useRoute } from './kit';
+import { Bar, ContactPicker, DateField, FilterTabs, FormError, ImagePicker, Notice, Pager, Section, SubNav, ToggleRow, download, paginate, toCsv, useConfirm, useRoute } from './kit';
 import { Art, ACCENTS } from './learn-shared';
 import { RegistrationPage, WebinarRoom } from './webinar-public';
 
@@ -91,10 +91,8 @@ function WebinarList() {
         <Metric label="Účast" value={pastRegs.length ? percent((pastRegs.filter(r => r.attended).length / pastRegs.length) * 100) : '—'} desc="z proběhlých" />
         <Metric label="Shlédli záznam" value={fmt(all.filter(r => r.replay).length)} desc="replay" />
       </div>
-      <div className="segmented wrap-seg" role="group" aria-label="Filtr webinářů">
-        {FILTERS.map(([k, l]) => <button key={k} type="button" aria-pressed={filter === k} className={filter === k ? 'active' : ''} onClick={() => setQuery({ filtr: k === 'upcoming' ? undefined : k })}>{l} ({counts[k]})</button>)}
-      </div>
-      <div className="card-grid mt-4">
+      <FilterTabs label="Filtr webinářů" value={filter} onChange={k => setQuery({ filtr: k === 'upcoming' ? undefined : k })} items={FILTERS.map(([k, l]) => [k, l, counts[k]] as [string, string, number])} />
+      <div className="card-grid">
         {list.map(x => { const s = webinarState(x, now); const st = stats(x); return (
           <article key={x.id} className="panel course-card">
             <button type="button" className="course-card-link" onClick={() => go('webinare/' + x.id)} aria-label={`Otevřít webinář ${x.title}`}><Art accent={x.accent} image={x.image} eyebrow={x.kind === 'live' ? 'Živý webinář' : 'Evergreen'} title={x.title} /></button>
@@ -260,25 +258,20 @@ function Registrants({ x, state }: { x: Webinar; state: WebinarState }) {
 
 function AddRegistrant({ x, open, onClose }: { x: Webinar; open: boolean; onClose: () => void }) {
   const { w, workspaceId, mutate } = useHub();
-  const [q, setQ] = useState('');
   const [picked, setPicked] = useState<number[]>([]);
   const registered = new Set(w.registrations.filter(r => r.webinarId === x.id).map(r => r.contactId));
-  const list = w.contacts.filter(c => !registered.has(c.id) && normalize(`${c.name} ${c.email}`).includes(normalize(q))).slice(0, 40);
+  const candidates = w.contacts.filter(c => !registered.has(c.id));
   const add = () => {
     const date = new Date().toISOString();
     mutate(d => picked.reduce((acc, id) => logActivity({ ...acc, registrations: [{ id: newId('rg'), workspaceId, webinarId: x.id, contactId: id, registeredAt: date, source: 'Ručně v administraci', attended: null, watchMinutes: 0, replay: false }, ...acc.registrations], contacts: acc.contacts.map(c => (c.workspaceId === workspaceId && c.id === id && x.tag && !c.tags.includes(x.tag) ? { ...c, tags: [...c.tags, x.tag] } : c)) }, workspaceId, id, 'webinar', 'Registrace na webinář (ručně)', x.title, 'webinare/' + x.id), d));
-    toast.success(`Registrováno: ${plural(picked.length, 'kontakt', 'kontakty', 'kontaktů')}.`); setPicked([]); setQ(''); onClose();
+    toast.success(`Registrováno: ${plural(picked.length, 'kontakt', 'kontakty', 'kontaktů')}.`); setPicked([]); onClose();
   };
   return (
     <Modal open={open} onClose={onClose} title="Registrovat kontakty" desc={`Kontakty dostanou štítek „${x.tag || '—'}“. Potvrzovací e-mail je v prototypu simulovaný.`}>
       <div className="stack">
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Hledat kontakt…" aria-label="Hledat kontakt" autoFocus />
-        <ul className="pick-list">
-          {list.map(c => <li key={c.id}><label className="check-row"><input type="checkbox" checked={picked.includes(c.id)} onChange={e => setPicked(p => (e.target.checked ? [...p, c.id] : p.filter(i => i !== c.id)))} /><span>{c.name}<small>{c.email}</small></span></label></li>)}
-          {!list.length && <li className="muted">Nic nenalezeno.</li>}
-        </ul>
+        <ContactPicker candidates={candidates} picked={picked} onChange={setPicked} emptyText="Všechny kontakty už jsou registrované." />
       </div>
-      <div className="form-actions"><Btn onClick={onClose}>Zrušit</Btn><Btn primary disabled={!picked.length} onClick={add}>Registrovat {picked.length || ''}</Btn></div>
+      <div className="form-actions"><Btn onClick={onClose}>Zrušit</Btn><Btn primary disabled={!picked.length} onClick={add}>{picked.length ? `Registrovat ${plural(picked.length, 'kontakt', 'kontakty', 'kontaktů')}` : 'Registrovat'}</Btn></div>
     </Modal>
   );
 }
@@ -319,7 +312,7 @@ function WebinarSettings({ x }: { x: Webinar }) {
           </div>
           {v.kind === 'live' ? (
             <div className="form-grid three">
-              <Field label="Datum"><input type="date" value={v.date} onChange={e => set({ date: e.target.value })} /></Field>
+              <div className="field"><span>Datum</span><DateField label="Datum webináře" value={v.date} onChange={x => set({ date: x })} /></div>
               <Field label="Čas"><input type="time" value={v.time} onChange={e => set({ time: e.target.value })} /></Field>
               <Field label="Časové pásmo"><Pick value={v.timezone} onChange={t => set({ timezone: t })} options={['Europe/Prague', 'Europe/Bratislava', 'Europe/Vienna', 'Europe/London']} className="full" label="Časové pásmo" /></Field>
             </div>

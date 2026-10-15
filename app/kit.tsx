@@ -1,11 +1,15 @@
 'use client';
 /* Shared building blocks of the module screens: route helpers, sub-navigation, confirmations,
    pagination, toggles, image picking and file downloads. Visuals come from shell.css / modules.css. */
-import React, { useCallback, useState } from 'react';
-import { AlertTriangle, ChevronLeft, ChevronRight, ImagePlus, Info, Trash2 } from 'lucide-react';
+import React, { useCallback, useState, useSyncExternalStore } from 'react';
+import { AlertTriangle, CalendarDays, Check, ChevronLeft, ChevronRight, ChevronsUpDown, ImagePlus, Info, Plus, Trash2 } from 'lucide-react';
+import { cs } from 'react-day-picker/locale';
 import { Switch } from '@/components/ui/switch';
-import { fmt } from '@/lib/hub/format';
-import type { StoredImage } from '@/lib/hub/types';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Calendar } from '@/components/ui/calendar';
+import { fmt, normalize } from '@/lib/hub/format';
+import type { ConsentState, Contact, StoredImage } from '@/lib/hub/types';
 import { useHub } from './state';
 import { parseRoute, withQuery } from './hash-route';
 import { Btn, Modal } from './ui';
@@ -167,4 +171,143 @@ export function parseCsv(text: string): string[][] {
 /** Simple "x of y" progress bar. */
 export function Bar({ value, label }: { value: number; label?: string }) {
   return <div className="bar" role="progressbar" aria-valuenow={Math.round(value)} aria-valuemin={0} aria-valuemax={100} aria-label={label}><i style={{ width: `${Math.max(0, Math.min(100, value))}%` }} /></div>;
+}
+
+/** Text tabs with an underlined active item for filters inside a page (same look as SubNav). */
+export function FilterTabs({ value, onChange, items, label }: { value: string; onChange: (v: string) => void; items: [id: string, label: string, count?: number][]; label: string }) {
+  return (
+    <div className="subnav filter-tabs" role="group" aria-label={label}>
+      {items.map(([id, l, n]) => (
+        <button key={id} type="button" aria-pressed={value === id} onClick={() => onChange(id)}>
+          {l}{n !== undefined && <span className="subnav-count">{fmt(n)}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Searchable select (Popover + Command) for tags, plans and similar short lists. Works inside modals
+ * (Radix layers), follows the theme tokens and can create a new value from the search text.
+ */
+export function OptionCombobox({ value, onChange, options, label, placeholder = 'Vyberte…', allowCreate = true, trigger, emptyText = 'Nic nenalezeno.' }: {
+  value: string; onChange: (v: string) => void; options: string[]; label: string; placeholder?: string; allowCreate?: boolean;
+  trigger?: React.ReactNode; emptyText?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const query = q.trim();
+  const list = options.filter(o => normalize(o).includes(normalize(query)));
+  const exists = options.some(o => normalize(o) === normalize(query));
+  const pick = (v: string) => { onChange(v); setOpen(false); setQ(''); };
+  return (
+    <Popover modal open={open} onOpenChange={o => { setOpen(o); if (!o) setQ(''); }}>
+      <PopoverTrigger asChild>
+        {trigger ?? (
+          <button type="button" className="combo-trigger" aria-label={label}>
+            <span className={value ? '' : 'muted'}>{value || placeholder}</span><ChevronsUpDown size={16} aria-hidden />
+          </button>
+        )}
+      </PopoverTrigger>
+      <PopoverContent align="start" className="combo-panel" style={{ width: trigger ? 280 : 'var(--radix-popover-trigger-width)' }}>
+        <Command shouldFilter={false} label={label}>
+          <CommandInput value={q} onValueChange={setQ} placeholder={allowCreate ? 'Hledat nebo napsat nový…' : 'Hledat…'} aria-label={`${label}: hledat`} />
+          <CommandList>
+            {list.map(o => (
+              <CommandItem key={o} value={o} onSelect={() => pick(o)}>
+                <Check aria-hidden className={value === o ? 'combo-check' : 'combo-check off'} />{o}
+              </CommandItem>
+            ))}
+            {allowCreate && query && !exists && (
+              <CommandItem value={`__new__${query}`} onSelect={() => pick(query)}><Plus aria-hidden />Vytvořit „{query}“</CommandItem>
+            )}
+            {!list.length && !(allowCreate && query) && <p className="combo-empty">{emptyText}</p>}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+const CONSENT_LABEL: Record<ConsentState, string> = { 'Udělen': 'Souhlas udělen', 'Čeká na potvrzení': 'Čeká na potvrzení', 'Odvolán': 'Odhlášen', 'Bez souhlasu': 'Bez souhlasu' };
+/**
+ * Contact selection list for dialogs: search keeps the selection, long e-mails are truncated,
+ * optional consent hint (contacts without consent "Udělen" will not receive marketing e-mails).
+ */
+export function ContactPicker({ candidates, picked, onChange, multiple = true, consent = false, emptyText = 'Všechny kontakty už jsou vybrané.' }: {
+  candidates: Contact[]; picked: number[]; onChange: (ids: number[]) => void; multiple?: boolean; consent?: boolean; emptyText?: string;
+}) {
+  const [q, setQ] = useState('');
+  const nq = normalize(q.trim());
+  const list = candidates.filter(c => !nq || normalize(`${c.name} ${c.email} ${c.company}`).includes(nq)).slice(0, 80);
+  const name = React.useId();
+  const toggle = (cid: number, on: boolean) => onChange(multiple ? (on ? [...picked, cid] : picked.filter(x => x !== cid)) : [cid]);
+  const noConsent = candidates.filter(c => picked.includes(c.id) && c.consent.state !== 'Udělen').length;
+  return (
+    <div className="picker">
+      <div className="search-field picker-search"><input value={q} onChange={e => setQ(e.target.value)} placeholder="Hledat jméno, e-mail nebo firmu…" aria-label="Hledat kontakty" autoFocus /></div>
+      <div className="picker-list" role="group" aria-label="Kontakty">
+        {list.map(c => {
+          const on = picked.includes(c.id); const ok = c.consent.state === 'Udělen';
+          return (
+            <label key={c.id} className={`picker-row ${on ? 'on' : ''}`}>
+              <input type={multiple ? 'checkbox' : 'radio'} name={name} checked={on} onChange={e => toggle(c.id, e.target.checked)} />
+              <span className="picker-main"><strong>{c.name}</strong><small title={c.email}>{c.email}</small></span>
+              {consent && <span className={`picker-consent ${ok ? 'ok' : 'no'}`} title={ok ? 'Dostane marketingový e-mail' : 'Bez platného souhlasu – e-mail nedostane'}>{CONSENT_LABEL[c.consent.state]}</span>}
+            </label>
+          );
+        })}
+        {!list.length && <p className="picker-empty">{nq ? `Žádný kontakt neodpovídá „${q.trim()}“.` : emptyText}</p>}
+      </div>
+      <div className="picker-foot" aria-live="polite">
+        <span>{multiple ? `Vybráno: ${fmt(picked.length)}` : picked.length ? 'Vybrán 1 kontakt' : 'Nic nevybráno'}{consent && noConsent > 0 ? ` · ${fmt(noConsent)} bez souhlasu e-mail nedostane` : ''}</span>
+        {picked.length > 0 && <button type="button" className="text-link" onClick={() => onChange([])}>Zrušit výběr</button>}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- date field ---------- */
+const coarseQuery = '(pointer: coarse)';
+const subscribeCoarse = (l: () => void) => { const m = window.matchMedia(coarseQuery); m.addEventListener('change', l); return () => m.removeEventListener('change', l); };
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const toIso = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const fromIso = (v: string) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v); return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : undefined; };
+const czText = (v: string) => { const d = fromIso(v); return d ? `${d.getDate()}. ${d.getMonth() + 1}. ${d.getFullYear()}` : ''; };
+/** Parses "16. 10. 2026", "16.10.2026" or "2026-10-16" into "yyyy-mm-dd" (null when invalid). */
+export function parseCzDate(s: string): string | null {
+  const t = s.trim();
+  const m = /^(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})$/.exec(t);
+  if (m) { const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])); return d.getDate() === Number(m[1]) && d.getMonth() === Number(m[2]) - 1 ? toIso(d) : null; }
+  return /^\d{4}-\d{2}-\d{2}$/.test(t) && fromIso(t) ? t : null;
+}
+
+/**
+ * Date input (value "yyyy-mm-dd"): typed Czech date plus a calendar popover in app styles (Czech, Monday first).
+ * Touch devices get the native picker, which is more comfortable there.
+ */
+export function DateField({ value, onChange, min, label, invalid }: { value: string; onChange: (v: string) => void; min?: string; label: string; invalid?: boolean }) {
+  const coarse = useSyncExternalStore(subscribeCoarse, () => window.matchMedia(coarseQuery).matches, () => false);
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState<string | null>(null);
+  const [bad, setBad] = useState(false);
+  if (coarse) return <input type="date" value={value} min={min} onChange={e => onChange(e.target.value)} aria-label={label} aria-invalid={invalid || undefined} />;
+  const commit = () => { if (text === null) return; const v = parseCzDate(text); if (v) { onChange(v); setBad(false); setText(null); } else setBad(!!text.trim()); };
+  const minDate = min ? fromIso(min) : undefined;
+  return (
+    <Popover modal open={open} onOpenChange={setOpen}>
+      <div className={`date-field ${bad || invalid ? 'is-invalid' : ''}`}>
+        <input value={text ?? czText(value)} onChange={e => { setText(e.target.value); setBad(false); }} onBlur={commit}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commit(); } if (e.key === 'ArrowDown' && e.altKey) { e.preventDefault(); setOpen(true); } }}
+          placeholder="d. m. rrrr" aria-label={label} aria-invalid={bad || invalid || undefined} />
+        <PopoverTrigger asChild><button type="button" className="date-btn" aria-label={`${label}: otevřít kalendář`}><CalendarDays size={16} aria-hidden /></button></PopoverTrigger>
+      </div>
+      {bad && <small className="field-error" role="alert">Zadejte datum ve tvaru 16. 10. 2026.</small>}
+      <PopoverContent align="end" className="date-panel" collisionPadding={12}>
+        <Calendar mode="single" locale={cs} weekStartsOn={1} selected={fromIso(value)} defaultMonth={fromIso(value) ?? minDate}
+          disabled={minDate ? { before: minDate } : undefined}
+          onSelect={d => { if (d) { onChange(toIso(d)); setText(null); setBad(false); setOpen(false); } }} />
+      </PopoverContent>
+    </Popover>
+  );
 }

@@ -301,8 +301,8 @@ test('automation: template → activate → CRM tag enrols → insert step with 
   // a tag added in the CRM fires the trigger
   await openHub(page, 'kontakty/10');
   await page.getByRole('button', { name: '+ Přidat', exact: true }).click();
-  await page.getByRole('combobox', { name: 'Nový štítek' }).fill('Newsletter');
-  await page.getByRole('button', { name: 'Přidat', exact: true }).click();
+  await page.locator('.combo-panel input').fill('Newsletter');
+  await page.getByRole('option', { name: 'Newsletter', exact: true }).click();
   await expect(page.getByText('Vstup do automatizace Testovací přivítání')).toBeVisible();
 
   // insert a step on an edge; the empty step blocks saving an active workflow until it is filled in
@@ -440,6 +440,52 @@ test('Unlayer editor loads and stores design + HTML', async ({ page }, info) => 
   await expect.poll(async () => page.evaluate(cid => { const d = JSON.parse(localStorage.getItem('softema-hub:data') ?? '{}').data; const c = d?.campaigns.find((x: { id: number }) => String(x.id) === cid); return !!c?.design && (c?.html ?? '').length > 1000; }, id), { timeout: 15_000 }).toBe(true);
   await page.getByRole('button', { name: 'Náhled' }).click();
   await expect(page.locator('iframe.mail-frame')).toBeVisible();
+  noErrors();
+});
+
+test('bulk tag picker creates a tag; Escape closes only the picker', async ({ page }) => {
+  const noErrors = trackPageErrors(page);
+  await openHub(page, 'kontakty');
+  const boxes = page.locator('tbody .col-check button[role=checkbox]');
+  await boxes.nth(0).click(); await boxes.nth(1).click();
+  await page.getByRole('button', { name: 'Přidat štítek' }).click();
+  await page.locator('.hub-modal .combo-trigger').click();
+  await page.keyboard.type('Podzim 2026');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.combo-panel')).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Přidat štítek' })).toBeVisible();
+  await page.locator('.hub-modal .combo-trigger').click();
+  await page.keyboard.type('Podzim 2026');
+  await page.getByRole('option', { name: /Vytvořit „Podzim 2026“/ }).click();
+  await page.getByRole('dialog', { name: 'Přidat štítek' }).getByRole('button', { name: 'Přidat štítek' }).click();
+  await openHub(page, 'kontakty?stitek=Podzim%202026');
+  await expect(page.locator('.pager')).toContainText('z 2 kontaktů');
+  noErrors();
+});
+
+test('recipients dialog keeps the selection while searching; scheduling rejects a past date', async ({ page }, info) => {
+  const noErrors = trackPageErrors(page);
+  await openHub(page, 'kampane/5/upravit?krok=2');
+  await page.getByRole('button', { name: 'Přidat kontakty' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Přidat příjemce' });
+  await dialog.locator('.picker-row').nth(0).click();
+  await dialog.locator('.picker-row').nth(1).click();
+  await dialog.getByLabel('Hledat kontakty').fill('zzzz');
+  await expect(dialog).toContainText('Žádný kontakt neodpovídá „zzzz“');
+  await dialog.getByLabel('Hledat kontakty').fill('');
+  await expect(dialog.getByRole('button', { name: 'Přidat 2 příjemce' })).toBeEnabled();
+  await dialog.getByRole('button', { name: 'Přidat 2 příjemce' }).click();
+  await expect(page.locator('.mini-list').last().locator('li')).toHaveCount(2);
+
+  test.skip(isMobile(info), 'mobile uses the native date picker');
+  await openHub(page, 'kampane/5/upravit?krok=4');
+  await page.getByRole('button', { name: 'Odeslat nebo naplánovat' }).click();
+  const send = page.getByRole('dialog', { name: 'Odeslat kampaň' });
+  await send.getByLabel('Datum odeslání', { exact: true }).fill('1. 1. 2020');
+  await send.getByLabel('Datum odeslání', { exact: true }).press('Enter');
+  await send.getByRole('button', { name: 'Naplánovat odeslání' }).click();
+  await expect(send.locator('.form-error')).toContainText('je v minulosti');
+  await expect(send).toBeVisible();
   noErrors();
 });
 

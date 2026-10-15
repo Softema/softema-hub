@@ -11,7 +11,7 @@ import { newInvoice, payInvoice } from '@/lib/hub/payments';
 import type { CommunityGroup, Contact, GroupAccess, Membership, Post } from '@/lib/hub/types';
 import { useHub, useUnsavedGuard } from './state';
 import { Avatar, Badge, Btn, Field, Metric, Modal, PageHead, Pick } from './ui';
-import { FormError, Notice, Section, SubNav, useConfirm, useRoute } from './kit';
+import { ContactPicker, FormError, Notice, Section, SubNav, useConfirm, useRoute } from './kit';
 import { ACCENTS, Art } from './learn-shared';
 
 const ACCESS: GroupAccess[] = ['Veřejná', 'Placená', 'Součást kurzu', 'Na pozvání'];
@@ -283,17 +283,15 @@ function Members({ g }: { g: CommunityGroup }) {
 
 function AddMembers({ g, onClose }: { g: CommunityGroup; onClose: () => void }) {
   const { w, workspaceId, mutate } = useHub();
-  const [q, setQ] = useState('');
   const [picked, setPicked] = useState<number[]>([]);
   const inGroup = new Set(w.memberships.filter(m => m.groupId === g.id).map(m => m.contactId));
-  const list = w.contacts.filter(c => !inGroup.has(c.id) && normalize(`${c.name} ${c.email}`).includes(normalize(q))).slice(0, 40);
+  const candidates = w.contacts.filter(c => !inGroup.has(c.id));
   return (
     <Modal open onClose={onClose} title="Přidat členy" desc={g.access === 'Placená' ? 'Ruční členství bez platby (např. bonus).' : 'Pozvánka e-mailem se v prototypu neodesílá.'}>
       <div className="stack">
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Hledat kontakt…" aria-label="Hledat kontakt" autoFocus />
-        <ul className="pick-list">{list.map(c => <li key={c.id}><label className="check-row"><input type="checkbox" checked={picked.includes(c.id)} onChange={e => setPicked(p => (e.target.checked ? [...p, c.id] : p.filter(i => i !== c.id)))} /><span>{c.name}<small>{c.email}</small></span></label></li>)}{!list.length && <li className="muted">Nic nenalezeno.</li>}</ul>
+        <ContactPicker candidates={candidates} picked={picked} onChange={setPicked} emptyText="Všechny kontakty už jsou členy." />
       </div>
-      <div className="form-actions"><Btn onClick={onClose}>Zrušit</Btn><Btn primary disabled={!picked.length} onClick={() => { const date = new Date().toISOString(); mutate(d => picked.reduce((acc, id) => logActivity(acc, workspaceId, id, 'community', `Vstup do skupiny ${g.name}`, 'Přidán ručně', 'komunita/' + g.id), { ...d, memberships: [...d.memberships, ...picked.map(contactId => ({ id: newId('mb'), workspaceId, groupId: g.id, contactId, role: 'Člen' as const, status: 'Aktivní' as const, joinedAt: date }))] })); toast.success(`Přidáno: ${plural(picked.length, 'člen', 'členové', 'členů')}.`); onClose(); }}>Přidat {picked.length || ''}</Btn></div>
+      <div className="form-actions"><Btn onClick={onClose}>Zrušit</Btn><Btn primary disabled={!picked.length} onClick={() => { const date = new Date().toISOString(); mutate(d => picked.reduce((acc, id) => logActivity(acc, workspaceId, id, 'community', `Vstup do skupiny ${g.name}`, 'Přidán ručně', 'komunita/' + g.id), { ...d, memberships: [...d.memberships, ...picked.map(contactId => ({ id: newId('mb'), workspaceId, groupId: g.id, contactId, role: 'Člen' as const, status: 'Aktivní' as const, joinedAt: date }))] })); toast.success(`Přidáno: ${plural(picked.length, 'člen', 'členové', 'členů')}.`); onClose(); }}>{picked.length ? `Přidat ${plural(picked.length, 'člena', 'členy', 'členů')}` : 'Přidat členy'}</Btn></div>
     </Modal>
   );
 }

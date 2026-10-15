@@ -11,7 +11,7 @@ import type { ConsentState, Contact, Lifecycle } from '@/lib/hub/types';
 import { useHub } from './state';
 import { CONSENTS, CrmHead, STAGES, consentTone, stageTone } from './crm-shared';
 import { Avatar, Badge, Btn, Empty, Field, Modal, Pick, SearchInput } from './ui';
-import { FormError, Notice, Pager, download, paginate, toCsv, useConfirm, useRoute } from './kit';
+import { FormError, Notice, OptionCombobox, Pager, download, paginate, toCsv, useConfirm, useRoute } from './kit';
 import ContactDetail from './contact-detail';
 import { Consents, ImportWizard, Pipeline, Segments } from './crm';
 
@@ -217,15 +217,14 @@ function TagDialog({ open, onClose, contacts, tags, mode }: { open: boolean; onC
     toast.success(mode === 'add' ? `Štítek „${existing}“ přidán k ${plural(ids.size, 'kontaktu', 'kontaktům', 'kontaktům')}.` : `Štítek „${t}“ odebrán.`);
     setTag(''); setError(''); onClose();
   };
-  const listId = React.useId();
   return (
     <Modal open={open} onClose={onClose} title={mode === 'add' ? 'Přidat štítek' : 'Odebrat štítek'} desc={`Vybráno ${plural(contacts.length, 'kontakt', 'kontakty', 'kontaktů')}.`}>
       <form onSubmit={submit} noValidate>
         <div className="stack">
           {mode === 'add' ? (
-            <Field label="Štítek" hint="Vyberte existující nebo napište nový."><input list={listId} value={tag} onChange={e => { setTag(e.target.value); setError(''); }} autoFocus /><datalist id={listId}>{tags.map(t => <option key={t} value={t} />)}</datalist></Field>
+            <div className="field"><span>Štítek</span><OptionCombobox value={tag} onChange={v => { setTag(v); setError(''); }} options={tags} label="Štítek" placeholder="Vyberte nebo vytvořte štítek" /><small>Vyberte existující štítek, nebo napište nový a zvolte „Vytvořit“.</small></div>
           ) : present.length ? (
-            <Field label="Štítek"><Pick value={tag || ''} onChange={setTag} options={present} className="full" label="Štítek k odebrání" /></Field>
+            <div className="field"><span>Štítek</span><OptionCombobox value={tag} onChange={v => { setTag(v); setError(''); }} options={present} allowCreate={false} label="Štítek k odebrání" placeholder="Vyberte štítek" /></div>
           ) : <p className="muted">Vybrané kontakty nemají žádné štítky.</p>}
           <FormError>{error}</FormError>
         </div>

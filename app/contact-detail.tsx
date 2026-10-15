@@ -10,7 +10,7 @@ import { fireTrigger } from '@/lib/hub/flow';
 import { DEAL_STAGES, type ActivityType, type Contact, type CustomField, type Deal, type DealStage, type Lifecycle } from '@/lib/hub/types';
 import { useHub } from './state';
 import { Avatar, Badge, Btn, Field, IconBtn, Metric, Modal, Pick, Tabbar } from './ui';
-import { FormError, Notice, download, useConfirm } from './kit';
+import { FormError, Notice, OptionCombobox, download, useConfirm } from './kit';
 import { STAGES, consentTone } from './crm-shared';
 
 const ICON: Partial<Record<ActivityType, [LucideIcon, string]>> = {
@@ -248,25 +248,20 @@ export function Timeline({ items }: { items: TimelineItem[] }) {
 
 function TagsBox({ c, all }: { c: Contact; all: string[] }) {
   const { patch, log, mutate, workspaceId } = useHub();
-  const [adding, setAdding] = useState(false);
-  const [value, setValue] = useState('');
-  const listId = React.useId();
-  const add = (e: React.FormEvent) => {
-    e.preventDefault(); const t = value.trim(); if (!t) return;
-    const tag = all.find(x => normalize(x) === normalize(t)) ?? t;
+  const add = (t: string) => {
+    if (!t.trim()) return;
+    const tag = all.find(x => normalize(x) === normalize(t)) ?? t.trim();
     if (c.tags.some(x => normalize(x) === normalize(tag))) { toast.info('Kontakt už tento štítek má.'); return; }
     patch('contacts', c.id, x => ({ ...x, tags: [...x.tags, tag] })); log(c.id, 'tag', `Přidán štítek ${tag}`, 'Ručně v detailu kontaktu');
     mutate(d => fireTrigger(d, workspaceId, 'tag_added', [c.id], tag));
-    setValue(''); setAdding(false); toast.success('Štítek byl přidán.');
+    toast.success('Štítek byl přidán.');
   };
   return (
     <div className="contact-info">
       <h3>Štítky</h3>
       <div className="contact-tags">
         {c.tags.map(t => <span key={t} className="tag-chip">{t}<button type="button" aria-label={`Odebrat štítek ${t}`} onClick={() => { patch('contacts', c.id, x => ({ ...x, tags: x.tags.filter(y => y !== t) })); log(c.id, 'tag', `Odebrán štítek ${t}`, 'Ručně v detailu kontaktu'); mutate(d => fireTrigger(d, workspaceId, 'tag_removed', [c.id], t)); }}><X size={12} aria-hidden /></button></span>)}
-        {adding ? (
-          <form onSubmit={add} className="tag-add"><input list={listId} value={value} onChange={e => setValue(e.target.value)} aria-label="Nový štítek" autoFocus onBlur={() => !value && setAdding(false)} onKeyDown={e => e.key === 'Escape' && setAdding(false)} /><datalist id={listId}>{all.filter(t => !c.tags.includes(t)).map(t => <option key={t} value={t} />)}</datalist><Btn type="submit" primary>Přidat</Btn></form>
-        ) : <button type="button" className="pill-tag" onClick={() => setAdding(true)}>+ Přidat</button>}
+        <OptionCombobox value="" onChange={add} options={all.filter(t => !c.tags.includes(t))} label="Přidat štítek" trigger={<button type="button" className="pill-tag">+ Přidat</button>} />
       </div>
     </div>
   );
