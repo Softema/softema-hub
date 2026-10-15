@@ -7,9 +7,10 @@ const modules: [string, string, string][] = [
   ['Kampaně', 'Kampaně', 'kampane'],
   ['Automatizace', 'Automatizace', 'automatizace'],
   ['Platby', 'Platby', 'platby'],
-  ['Kurzy a produkty', 'Kurzy a komunita', 'kurzy'],
+  ['Kurzy a produkty', 'Kurzy a produkty', 'kurzy'],
+  ['Komunita', 'Komunita', 'komunita'],
   ['Webináře', 'Webináře', 'webinare'],
-  ['Chatbot', 'Váš webový chatbot', 'chatbot'],
+  ['Chatbot', 'Chatbot', 'chatbot'],
   ['Nastavení', 'Nastavení', 'nastaveni'],
   ['Přehled', 'Dobrý den, Marie', 'prehled'],
 ];
@@ -376,6 +377,39 @@ test('chatbot answers from the knowledge base and saves a lead to CRM', async ({
   await expect(chat).toContainText('kolegové se vám brzy ozvou');
   await openHub(page, 'kontakty?q=chatova');
   await expect(page.getByRole('cell').getByRole('button', { name: /^Jana Chatová/ })).toBeVisible();
+  noErrors();
+});
+
+test('settings: workspace name shows in the shell and demo data can be reset', async ({ page }, info) => {
+  test.skip(isMobile(info), 'desktop sidebar');
+  const noErrors = trackPageErrors(page);
+  await openHub(page, 'nastaveni/prostor');
+  await page.getByLabel('Název prostoru').fill('Softema Studio');
+  await page.getByRole('button', { name: 'Uložit', exact: true }).click();
+  await expect(page.locator('.workspace-switch')).toContainText('Softema Studio');
+  await page.reload();
+  await page.waitForLoadState('networkidle');
+  await expect(page.locator('.workspace-switch')).toContainText('Softema Studio');
+
+  await openHub(page, 'nastaveni/data');
+  await page.getByRole('button', { name: 'Obnovit tento prostor' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Obnovit prostor' }).click();
+  await expect(heading(page, 'Dobrý den, Marie')).toBeVisible();
+  await expect(page.locator('.workspace-switch')).toContainText('Softema Creative');
+  noErrors();
+});
+
+test('integrations never accept something that looks like an API key', async ({ page }) => {
+  const noErrors = trackPageErrors(page);
+  await openHub(page, 'nastaveni/integrace');
+  await page.locator('.link-card').filter({ hasText: 'Mux' }).getByRole('button', { name: 'Připojit' }).click();
+  await page.getByLabel('Název účtu (pro přehled)').fill('sk_live_1234567890abcdef');
+  await expect(page.getByRole('dialog').getByRole('button', { name: 'Připojit (simulace)' })).toBeDisabled();
+  await page.getByLabel('Název účtu (pro přehled)').fill('Produkce');
+  await page.getByRole('dialog').getByRole('button', { name: 'Připojit (simulace)' }).click();
+  await expect(page.locator('.link-card').filter({ hasText: 'Mux' })).toContainText('Připojeno (ukázka)');
+  const stored = await page.evaluate(() => localStorage.getItem('softema-hub:data') ?? '');
+  expect(stored).not.toContain('sk_live_');
   noErrors();
 });
 

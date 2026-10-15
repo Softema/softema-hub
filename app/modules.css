@@ -534,6 +534,32 @@ blockquote.post-text { margin: 0; padding: var(--sp-3) var(--sp-4); border-left:
 .code-block { margin: 0; padding: var(--sp-4); overflow-x: auto; border-radius: var(--r-ctl); background: #15181d; color: #eef0f3; font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (max-width: 1100px) { .chat-layout { grid-template-columns: 1fr; } .chat-side { position: static; } }
 
+/* ===== Settings ===== */
+.settings-layout { grid-template-columns: 220px minmax(0, 1fr); gap: var(--sp-6); }
+.settings-nav { position: sticky; top: 88px; }
+.settings-nav button { font-size: 14px; color: var(--ink-2); }
+.settings-nav button:hover { background: var(--surface-2); color: var(--ink); }
+.settings-nav button.active { background: var(--brand-soft); color: var(--brand-ink); font-weight: 600; }
+.settings-main { display: flex; flex-direction: column; gap: var(--sp-6); min-width: 0; }
+.color-dot { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; }
+.color-dot.on { border-color: var(--ink); box-shadow: 0 0 0 2px var(--surface) inset; }
+.workspace-icon { overflow: hidden; }
+.workspace-icon img { width: 100%; height: 100%; object-fit: cover; }
+.inline-form { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
+.inline-form input { flex: 1 1 200px; min-width: 0; }
+.domain-card { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-4); border: 1px solid var(--line); border-radius: var(--r-card); }
+.domain-card strong { color: var(--ink); }
+.dns-table td { height: auto; padding: var(--sp-2) var(--sp-3); }
+.dns-table th { padding: var(--sp-2) var(--sp-3); }
+.copy-val { display: inline-flex; align-items: center; gap: 6px; text-align: left; color: var(--ink-2); }
+.copy-val:hover { color: var(--brand-ink); }
+.portal-preview { overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-card); background: #fff; color: #25292f; }
+.portal-bar { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); color: #fff; }
+.portal-bar img, .portal-bar span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; background: #ffffff33; object-fit: cover; font-weight: 700; }
+.portal-body { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-4); font-size: 14px; color: #4b525c; }
+.portal-btn { padding: 8px 14px; border-radius: 6px; color: #fff; font-size: 13px; font-weight: 600; }
+@media (max-width: 900px) { .settings-layout { grid-template-columns: 1fr; } .settings-nav { position: static; flex-direction: row; overflow-x: auto; } .settings-nav button { white-space: nowrap; } }
+
 /* ===== Webinars ===== */
 .form-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .wrap-seg { flex-wrap: wrap; }

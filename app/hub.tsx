@@ -21,7 +21,7 @@ import Dashboard from './dashboard';
 import Contacts from './contacts';
 import Campaigns from './campaigns';
 import Courses from './courses';
-import { SettingsPage } from './modules';
+import SettingsPage from './settings';
 import Chatbot from './chatbot';
 import Community from './community';
 import Payments from './payments';
@@ -37,7 +37,7 @@ import './modules.css';
 const ICONS: Record<string, typeof Users> = { prehled: LayoutDashboard, kontakty: Users, kampane: Mail, automatizace: Workflow, platby: Wallet, kurzy: GraduationCap, komunita: UsersRound, webinare: Video, chatbot: MessagesSquare, nastaveni: Settings };
 const GROUPS: [string, string[]][] = [['Pracovní prostor', ['prehled', 'kontakty', 'kampane', 'automatizace', 'platby']], ['Vzdělávání a komunita', ['kurzy', 'komunita', 'webinare', 'chatbot']]];
 const LABEL = Object.fromEntries([...navItems, ...hiddenRoutes]) as Record<string, string>;
-const SUB: Record<string, string> = { nova: 'Nová kampaň', sablony: 'Šablony', segmenty: 'Segmenty', pipeline: 'Pipeline', souhlasy: 'Souhlasy', import: 'Import', faktury: 'Faktury', predplatne: 'Předplatné', transakce: 'Transakce', odkazy: 'Platební odkazy', kupony: 'Kupóny', produkty: 'Digitální produkty', moderace: 'Moderace', profil: 'Můj profil', tym: 'Tým', domeny: 'E-mailové domény', integrace: 'Integrace', data: 'Data a obnova' };
+const SUB: Record<string, string> = { prostor: 'Pracovní prostor', branding: 'Branding a portál', notifikace: 'Notifikace', znalosti: 'Znalostní báze', chovani: 'Chování', instalace: 'Instalace', nova: 'Nová kampaň', sablony: 'Šablony', segmenty: 'Segmenty', pipeline: 'Pipeline', souhlasy: 'Souhlasy', import: 'Import', faktury: 'Faktury', predplatne: 'Předplatné', transakce: 'Transakce', odkazy: 'Platební odkazy', kupony: 'Kupóny', produkty: 'Digitální produkty', moderace: 'Moderace', profil: 'Můj profil', tym: 'Tým', domeny: 'E-mailové domény', integrace: 'Integrace', data: 'Data a obnova' };
 
 function Navigation() {
   const { route, go, workspaceId, setWorkspace, data, profile, contacts } = useHub();
@@ -46,6 +46,7 @@ function Navigation() {
   const nav = (r: string) => { go(r); setOpenMobile(false); };
   const wsName = (id: string) => data.settings.find(s => s.workspaceId === id)?.name ?? demoWorkspaces.find(w => w.id === id)?.name ?? '';
   const wsKind = (id: string) => data.settings.find(s => s.workspaceId === id)?.kind ?? '';
+  const wsIcon = (id: string) => { const s = data.settings.find(x => x.workspaceId === id); return <span className="workspace-icon" style={s?.brandColor ? { background: s.brandColor } : undefined}>{s?.logo ? <img src={s.logo.dataUrl} alt="" /> : wsName(id).slice(0, 1).toUpperCase()}</span>; };
   const item = (id: string) => { const I = ICONS[id]; return (
     <SidebarMenuItem key={id}>
       <SidebarMenuButton isActive={current === id} onClick={() => nav(id)}>
@@ -60,7 +61,7 @@ function Navigation() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button type="button" className="workspace-switch" aria-label={`Pracovní prostor: ${wsName(workspaceId)}. Změnit`}>
-              <span className="workspace-icon">{wsName(workspaceId).slice(0, 1).toUpperCase()}</span>
+              {wsIcon(workspaceId)}
               <span><strong>{wsName(workspaceId)}</strong><small>{wsKind(workspaceId)}</small></span>
               <ChevronsUpDown size={13} className="ml-auto muted" />
             </button>
@@ -69,7 +70,7 @@ function Navigation() {
             <DropdownMenuLabel>Softema · pracovní prostory</DropdownMenuLabel>
             {demoWorkspaces.map(x => (
               <DropdownMenuItem key={x.id} onSelect={() => { setWorkspace(x.id); setOpenMobile(false); }}>
-                <span className="workspace-icon">{wsName(x.id).slice(0, 1).toUpperCase()}</span>{wsName(x.id)}{x.id === workspaceId && <Check size={14} className="ml-auto" />}
+                {wsIcon(x.id)}{wsName(x.id)}{x.id === workspaceId && <Check size={14} className="ml-auto" />}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
@@ -196,13 +197,20 @@ function Screen() {
 }
 
 function Frame() {
-  const { route, go, workspace, workspaceId, profile } = useHub();
+  const { route, go, workspace, workspaceId, profile, w } = useHub();
   const [search, setSearch] = useState(false);
   const [notice, setNotice] = useState(false);
   const [help, setHelp] = useState(false);
   const { parts } = parseRoute(route);
   const mod = parts[0] ?? 'prehled';
   const sub = parts[1];
+  /** Name of the record behind an id in the route (breadcrumb), e.g. a contact or a campaign. */
+  const crumbName = (m: string, id: string) => {
+    const name = m === 'kontakty' ? w.contacts.find(c => String(c.id) === id)?.name : m === 'kampane' ? w.campaigns.find(c => String(c.id) === id)?.name
+      : m === 'kurzy' ? w.courses.find(c => c.id === id)?.title : m === 'webinare' ? w.webinars.find(c => c.id === id)?.title
+      : m === 'automatizace' ? w.workflows.find(c => c.id === id)?.name : m === 'komunita' ? w.groups.find(c => c.id === id)?.name : undefined;
+    return name ?? 'Detail';
+  };
   useEffect(() => {
     const key = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setSearch(s => !s); } };
     window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
@@ -217,7 +225,7 @@ function Frame() {
               <button type="button" className="topbar-home" onClick={() => go('prehled')} aria-label="Přehled"><Workflow aria-hidden /></button>
               <span className="workspace-crumb">{workspace}</span><ChevronRight size={13} className="workspace-crumb" />
               <span>{LABEL[mod] ?? 'Přehled'}</span>
-              {sub && <><ChevronRight size={13} /><span>{SUB[sub] ?? 'Detail'}</span></>}
+              {sub && <><ChevronRight size={13} /><span>{SUB[sub] ?? crumbName(mod, sub)}</span></>}
             </div>
             <div className="topbar-right">
               <button type="button" className="global-search" onClick={() => setSearch(true)} aria-label="Hledat v aplikaci" aria-keyshortcuts="Control+K Meta+K"><Search size={16} aria-hidden /><span>Hledat kontakty, kampaně…</span><kbd>Ctrl K</kbd></button>
