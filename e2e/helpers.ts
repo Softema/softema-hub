@@ -17,6 +17,8 @@ export function trackPageErrors(page: Page) {
 export async function openHub(page: Page, route: string) {
   await page.goto(`/aplikace#${route}`);
   await page.waitForLoadState('networkidle');
+  // The Next.js dev overlay badge sits over the mobile tab bar and would intercept clicks (dev server only).
+  await page.addStyleTag({ content: 'nextjs-portal{display:none!important}' });
   await page.evaluate(() => document.fonts.ready);
 }
 

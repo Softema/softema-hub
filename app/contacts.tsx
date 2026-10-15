@@ -1,15 +1,295 @@
 'use client';
-import React,{useState} from 'react';
-import {Plus,Upload,Download,SlidersHorizontal,ChevronLeft,ChevronRight,ArrowLeft,Mail,Phone,Building2,MapPin,Link2,MoreHorizontal,Tag,Check,User,Clock,MousePointer2,Wallet,GraduationCap,Video,StickyNote,Send,Pencil,ShieldCheck,ExternalLink,Trash2} from 'lucide-react';
-import {Table,TableHeader,TableBody,TableRow,TableHead,TableCell} from '@/components/ui/table';
-import {Checkbox} from '@/components/ui/checkbox';
-import {DropdownMenu,DropdownMenuTrigger,DropdownMenuContent,DropdownMenuItem} from '@/components/ui/dropdown-menu';
-import {Progress} from '@/components/ui/progress';
-import {toast} from 'sonner';
-import {useHub} from './state';
-import {Contact,CustomField,fmt,money,normalize} from './data';
-import {Btn,Avatar,IconBtn,PageHead,Metric,Badge,Pick,CardHead,Modal,Field,Tabbar,SearchInput,Empty} from './ui';
-export default function Contacts(){const {route,go,contacts,setContacts,workspace,workspaceId}=useHub();const id=Number(route.split('/')[1]);const contact=contacts.find(c=>c.id===id);const [query,setQuery]=useState('');const [tab,setTab]=useState('Všechny kontakty');const [filter,setFilter]=useState('Všechny zdroje');const [selected,setSelected]=useState<number[]>([]);const [create,setCreate]=useState(false);const [importing,setImporting]=useState(false);const [csv,setCsv]=useState('');const [filename,setFilename]=useState('');const [tagging,setTagging]=useState(false);const [tag,setTag]=useState('Newsletter');const [error,setError]=useState('');const [sort,setSort]=useState('Nejnovější');if(contact)return <ContactDetail key={contact.id} contact={contact}/>;const shown=contacts.filter(c=>normalize(c.name+' '+c.email+' '+c.company).includes(normalize(query))&&(tab==='Všechny kontakty'||tab==='Segmenty'&&c.tags.includes('Newsletter')||tab===c.status)&&(filter==='Všechny zdroje'||c.source===filter)).sort((a,b)=>sort==='Podle jména'?a.name.localeCompare(b.name,'cs'):a.id-b.id);function addContact(e:React.FormEvent<HTMLFormElement>){e.preventDefault();const f=new FormData(e.currentTarget);const email=String(f.get('email'));if(contacts.some(c=>c.email===email)){setError('Tento e-mail už v databázi máte.');return}const c:Contact={id:Date.now(),name:String(f.get('name')),email,company:String(f.get('company')),phone:String(f.get('phone')),status:'Zájemce',tags:['Newsletter'],value:0,source:'Ruční zadání',workspace,workspaceId,owner:'Marie Smolková',color:'orange',notes:[]};setContacts(cs=>[c,...cs]);setCreate(false);toast.success('Kontakt byl přidán.');go('kontakty/'+c.id)}function importCSV(){const lines=csv.trim().split(/\r?\n/);const result:Contact[]=[];for(const [i,line] of lines.entries()){if(i===0&&/jmeno|jméno|name/i.test(line))continue;const [name,email,company='']=line.split(/[;,]/).map(s=>s.trim().replace(/^"|"$/g,''));if(!name||!email||!email.includes('@'))continue;if(contacts.some(c=>c.email===email)||result.some(c=>c.email===email))continue;result.push({id:Date.now()+i,name,email,company,phone:'',tags:['Import'],status:'Zájemce',value:0,source:'Import',owner:'Marie Smolková',color:'blue',workspace,workspaceId,notes:[]})}if(!result.length){setError('Nenalezen žádný nový platný kontakt. Použijte sloupce jméno, e-mail, firma.');return}setContacts(cs=>[...result,...cs]);toast.success(`Importováno ${result.length} nových kontaktů.`);setImporting(false);setCsv('')}
-return <div className="page"><PageHead title="Kontakty" desc="Každý kontakt má svůj příběh. Mějte ho na jednom místě."><Btn onClick={()=>{setError('');setImporting(true)}}><Upload/>Importovat</Btn><Btn primary onClick={()=>{setError('');setCreate(true)}}><Plus/>Nový kontakt</Btn></PageHead><Tabbar value={tab} onChange={t=>{setTab(t);setSelected([])}} items={['Všechny kontakty','Klient','Zájemce','Odhlášený','Segmenty']}/><div className="toolbar"><SearchInput value={query} onChange={setQuery} placeholder="Hledat jméno, e-mail nebo firmu…"/><div className="flex-row"><Pick value={filter} onChange={setFilter} options={['Všechny zdroje','Webinář','Formulář','Chatbot','Import','Doporučení']} label="Zdroj kontaktu"/><Pick value={sort} onChange={setSort} options={['Nejnovější','Podle jména']} label="Seřadit kontakty"/></div></div>{tab==='Segmenty'&&<div className="preview-notice mb-4"><UsersIcon/>Segment: Odběratelé newsletteru · {shown.length} kontaktů se štítkem Newsletter</div>}{selected.length>0&&<div className="selection-bar">Vybráno: {selected.length}<button onClick={()=>setTagging(true)} className="flex-row"><Tag size={14}/>Přidat štítek</button><button onClick={()=>setSelected([])} className="ml-auto">Zrušit výběr</button></div>}<section className="panel"><Table className="hub-table"><TableHeader><TableRow><TableHead className="w-10"><Checkbox aria-label="Vybrat všechny kontakty" checked={shown.length>0&&shown.every(c=>selected.includes(c.id))} onCheckedChange={v=>setSelected(v?shown.map(c=>c.id):[])}/></TableHead><TableHead>Jméno a e-mail</TableHead><TableHead>Firma</TableHead><TableHead>Štítky</TableHead><TableHead>Stav</TableHead><TableHead>Zdroj</TableHead><TableHead>Vlastník</TableHead><TableHead/></TableRow></TableHeader><TableBody>{shown.map(c=><TableRow key={c.id} onClick={()=>go('kontakty/'+c.id)}><TableCell onClick={e=>e.stopPropagation()}><Checkbox aria-label={'Vybrat '+c.name} checked={selected.includes(c.id)} onCheckedChange={v=>setSelected(s=>v?[...s,c.id]:s.filter(i=>i!==c.id))}/></TableCell><TableCell><div className="name-cell"><Avatar name={c.name} color={c.color}/><button className="text-left">{c.name}<small>{c.email}</small></button></div></TableCell><TableCell className="muted">{c.company||'—'}</TableCell><TableCell><div className="flex-row">{c.tags.slice(0,2).map(t=><Badge key={t}>{t}</Badge>)}</div></TableCell><TableCell><Badge>{c.status}</Badge></TableCell><TableCell className="muted">{c.source}</TableCell><TableCell><Avatar name={c.owner} size="sm"/></TableCell><TableCell><ChevronRight size={15} className="muted"/></TableCell></TableRow>)}</TableBody></Table>{!shown.length&&<Empty/>}<div className="table-foot"><span>Zobrazeno {shown.length} z {contacts.length} kontaktů</span><span>Strana 1 z 1</span></div></section><Modal open={create} onClose={()=>setCreate(false)} title="Nový kontakt" desc="Přidejte kontakt do vašeho pracovního prostoru."><form onSubmit={addContact}><div className="stack"><Field label="Jméno a příjmení"><input name="name" placeholder="Např. Jana Novotná" required autoFocus/></Field><Field label="E-mail"><input type="email" name="email" placeholder="jana@firma.cz" required/></Field><div className="form-grid"><Field label="Firma"><input name="company" placeholder="Název firmy"/></Field><Field label="Telefon"><input name="phone" type="tel" placeholder="+420"/></Field></div>{error&&<p className="text-red-600 text-sm">{error}</p>}</div><div className="form-actions"><Btn type="button" onClick={()=>setCreate(false)}>Zrušit</Btn><Btn primary type="submit">Vytvořit kontakt</Btn></div></form></Modal><Modal open={importing} onClose={()=>setImporting(false)} title="Import kontaktů" desc="CSV se sloupci jméno, e-mail, firma. Existující e-maily se nepřidají znovu."><div className="stack"><Field label="Soubor CSV"><input type="file" accept=".csv,text/csv" onChange={async e=>{const f=e.target.files?.[0];if(f){setFilename(f.name);setCsv(await f.text());setError('')}}}/></Field><Field label={filename?'Náhled: '+filename:'Nebo vložte ukázková data'}><textarea value={csv} onChange={e=>setCsv(e.target.value)} placeholder={'Jméno;E-mail;Firma\nJana Novotná;jana@example.cz;Novotná Studio'} rows={5}/></Field>{error&&<p className="text-red-600 text-sm">{error}</p>}<Btn primary onClick={importCSV} disabled={!csv.trim()}><Upload/>Importovat kontakty</Btn></div></Modal><Modal open={tagging} onClose={()=>setTagging(false)} title="Přidat štítek" desc={`Vybráno ${selected.length} kontaktů.`}><Field label="Štítek"><Pick value={tag} onChange={setTag} options={['Newsletter','VIP','Webinář','Kurz','B2B']} className="full"/></Field><Btn primary onClick={()=>{setContacts(cs=>cs.map(c=>selected.includes(c.id)?{...c,tags:Array.from(new Set([...c.tags,tag]))}:c));setTagging(false);setSelected([]);toast.success('Štítek byl přidán.') }}>Přidat k vybraným kontaktům</Btn></Modal></div>}
-function UsersIcon(){return <User size={16}/>}
-function ContactDetail({contact:c}:{contact:Contact}){const {go,setContacts,campaigns}=useHub();const [tab,setTab]=useState('Časová osa');const [activity,setActivity]=useState('Všechny aktivity');const [note,setNote]=useState('');const [edit,setEdit]=useState(false);const [tagDialog,setTagDialog]=useState(false);const [newTag,setNewTag]=useState('Webinář');const [compose,setCompose]=useState(false);const [subject,setSubject]=useState('Navazujeme na naši spolupráci');const [draft,setDraft]=useState('');const update=(values:Partial<Contact>)=>setContacts(cs=>cs.map(a=>a.id===c.id?{...a,...values}:a));const fields=c.customFields??[];const [fieldDialog,setFieldDialog]=useState<{id?:string}|null>(null);const [fieldName,setFieldName]=useState('');const [fieldValue,setFieldValue]=useState('');const [fieldError,setFieldError]=useState('');/* Custom fields belong to this contact in this workspace only. */const setFields=(next:(fs:CustomField[])=>CustomField[])=>setContacts(cs=>cs.map(a=>a.id===c.id&&a.workspaceId===c.workspaceId?{...a,customFields:next(a.customFields??[])}:a));const openField=(f?:CustomField)=>{setFieldDialog(f?{id:f.id}:{});setFieldName(f?.name??'');setFieldValue(f?.value??'');setFieldError('')};function saveField(e:React.FormEvent<HTMLFormElement>){e.preventDefault();const name=fieldName.trim();const value=fieldValue.trim();const editingId=fieldDialog?.id;if(!name){setFieldError('Doplňte název pole.');return}if(fields.some(f=>f.id!==editingId&&normalize(f.name)===normalize(name))){setFieldError(`Pole „${name}“ už u tohoto kontaktu existuje.`);return}if(editingId)setFields(fs=>fs.map(f=>f.id===editingId?{...f,name,value}:f));else setFields(fs=>[...fs,{id:'cf-'+Date.now(),name,value}]);setFieldDialog(null);toast.success(editingId?'Vlastní pole bylo upraveno.':'Vlastní pole bylo přidáno.')}function removeField(){const id=fieldDialog?.id;if(!id)return;setFields(fs=>fs.filter(f=>f.id!==id));setFieldDialog(null);toast.success('Vlastní pole bylo odebráno.')}const addNote=()=>{if(!note.trim())return;update({notes:[note,...c.notes]});setNote('');toast.success('Poznámka byla přidána.')};const activities=[{type:'Platby',icon:Wallet,tone:'green',name:'Zaplacena faktura 202609028',desc:'Marketingová konzultace · 12 900 Kč',time:'10:30',date:'Dnes · 25. 9. 2026',route:'platby'},{type:'E-maily',icon:MousePointer2,tone:'orange',name:'Kliknutí na odkaz v e-mailu',desc:'Jak na marketing, který přináší výsledky → Zjistit více',time:'9:42',date:'Dnes · 25. 9. 2026',route:'kampane/'+(campaigns[1]?.id||campaigns[0].id)},{type:'E-maily',icon:Mail,tone:'blue',name:'Otevřen e-mail',desc:'Jak na marketing, který přináší výsledky',time:'9:40',date:'Dnes · 25. 9. 2026',route:'kampane/'+(campaigns[1]?.id||campaigns[0].id)},{type:'Kurzy',icon:GraduationCap,tone:'purple',name:'Přístup ke kurzu byl aktivován',desc:'Marketing od základů · automaticky po platbě',time:'14:15',date:'24. 9. 2026',route:'kurzy'},{type:'Webináře',icon:Video,tone:'blue',name:'Registrace na webinář',desc:'AI v marketingu bez omáčky · 30. 9. 2026',time:'11:05',date:'22. 9. 2026',route:'webinare'},{type:'Kontakt',icon:User,tone:'gray',name:'Kontakt přidán do databáze',desc:'Zdroj: '+c.source+' · souhlas s e-mailingem udělen',time:'15:42',date:'3. 9. 2026',route:''}];return <div className="page"><button className="back-link" onClick={()=>go('kontakty')}><ArrowLeft size={15}/>Zpět na kontakty</button><div className="contact-layout"><section className="panel"><div className="contact-profile"><Avatar name={c.name} color={c.color} size="lg"/><div><h2>{c.name}</h2><p>{c.company}</p></div><div className="contact-actions"><Btn onClick={()=>setCompose(true)}><Mail/>E-mail</Btn><Btn onClick={()=>setEdit(true)} aria-label="Upravit kontakt"><Pencil/></Btn></div></div><div className="contact-info"><div className="flex-row spread"><h3 className="text-xs">Kontaktní údaje</h3><IconBtn label="Upravit údaje" onClick={()=>setEdit(true)}><Pencil/></IconBtn></div><div className="info-row"><Mail/>{c.email}</div><div className="info-row"><Phone/>{c.phone||'Telefon neuveden'}</div><div className="info-row"><Building2/>{c.company||'Firma neuvedena'}</div><div className="info-row"><MapPin/>Olomouc, Česká republika</div></div><div className="contact-info"><h3 className="text-xs mb-4">Štítky</h3><div className="contact-tags">{c.tags.map(t=><Badge key={t}>{t}</Badge>)}<button className="pill-tag" onClick={()=>setTagDialog(true)}>+ Přidat</button></div></div><section className="contact-info" aria-labelledby="custom-fields-title"><div className="cf-head"><h3 id="custom-fields-title" className="text-xs">Vlastní pole</h3><IconBtn label="Přidat vlastní pole" onClick={()=>openField()}><Plus/></IconBtn></div>{fields.length?<div className="cf-list">{fields.map(f=><button key={f.id} type="button" className="custom-field-row" onClick={()=>openField(f)} aria-label={`Upravit pole ${f.name}`}><span>{f.name}</span><strong>{f.value||'—'}</strong></button>)}</div>:<><p className="cf-empty">Zatím tu nejsou žádná vlastní pole. Doplňte třeba obor nebo preferovaný kanál.</p><button type="button" className="pill-tag" onClick={()=>openField()}>+ Přidat pole</button></>}</section><div className="contact-info"><Field label="Stav kontaktu"><Pick value={c.status} onChange={s=>{update({status:s});toast.success('Stav kontaktu byl změněn.')}} options={['Klient','Zájemce','Odhlášený']} className="full"/></Field><div className="flex-row spread mt"><span className="muted small">Vlastník</span><span className="flex-row small"><Avatar name={c.owner} size="sm"/>{c.owner}</span></div><div className="flex-row spread mt"><span className="muted small">Vytvořeno</span><span className="small">3. 9. 2026</span></div></div><div className="contact-info"><div className="flex-row green text-xs bg-transparent"><ShieldCheck size={15}/>{c.status==='Odhlášený'?'Odhlášen z e-mailingu':'Souhlas s e-mailingem'}</div><p className="small muted mt-2">{c.status==='Odhlášený'?'Kontakt nebude zařazen do kampaní.':'Double opt-in · 3. 9. 2026'}</p></div></section><div><div className="detail-stats"><Metric label="Celková hodnota" value={money(c.value)}/><Metric label="Míra otevření" value="68,4 %"/><Metric label="Dní s námi" value="22"/></div><div className="panel"><div className="px-5"><Tabbar value={tab} onChange={setTab} items={['Časová osa','E-maily','Platby','Poznámky']}/></div>{tab==='Časová osa'?<><div className="px-5 pt-5"><Pick value={activity} onChange={setActivity} options={['Všechny aktivity','E-maily','Platby','Kurzy','Webináře']} label="Filtrovat aktivity"/></div><div className="timeline">{activity==='Všechny aktivity'&&c.notes.map((n,i)=><div className="timeline-item" key={'note'+i}><span className="activity-icon orange"><StickyNote/></span><div className="timeline-body"><div className="flex-row spread"><h3>Interní poznámka</h3><small>Marie Smolková</small></div><div className="note-card">{n}</div></div></div>)}{activities.filter(a=>activity==='Všechny aktivity'||a.type===activity).map((a,i)=>{const I=a.icon;return <React.Fragment key={a.name}><p className="timeline-date">{a.date}</p><div className="timeline-item"><span className={'activity-icon '+a.tone}><I/></span><div className="timeline-body"><div className="flex-row spread"><h3>{a.name}</h3><small>{a.time}</small></div><button className="text-left" onClick={()=>a.route&&go(a.route)}><p>{a.desc}{a.route&&<ChevronRight size={12} className="inline ml-1"/>}</p></button></div></div></React.Fragment>})}</div></>:tab==='E-maily'?<div className="timeline stack">{campaigns.filter(x=>x.status==='Odesláno').map((x,i)=><button key={x.id} className="activity-item" onClick={()=>go('kampane/'+x.id)}><span className="activity-icon blue"><Mail/></span><div><strong>{x.name}</strong><p>{x.date}</p><Badge>{i===0?'Kliknutí':'Otevřeno'}</Badge></div></button>)}</div>:tab==='Platby'?<div className="timeline"><div className="activity-item"><Wallet size={20}/><div><strong>Faktura 202609028</strong><p>Marketingová konzultace · 12 900 Kč</p><Badge>Zaplaceno</Badge></div><IconBtn label="Otevřít platby" onClick={()=>go('platby')}><ChevronRight/></IconBtn></div><Btn className="mt" onClick={()=>go('platby')}>Všechny platby<ChevronRight/></Btn></div>:<div className="timeline stack"><Field label="Nová interní poznámka"><textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="Co by měl tým vědět o tomto kontaktu?"/></Field><Btn primary onClick={addNote} disabled={!note.trim()}><Plus/>Přidat poznámku</Btn>{c.notes.map((n,i)=><div className="note-card" key={i}>{n}<p className="small muted mt-2">Marie Smolková · 25. 9. 2026</p></div>)}</div>}</div></div><aside className="contact-right stack"><section className="panel side-box"><h3>Obchodní příležitost</h3><Badge tone="orange">Nabídka odeslána</Badge><p className="mt">Správa e-mailového marketingu</p><div className="highlight-number text-xl">18 500 Kč <span className="small muted font-normal">/ měsíc</span></div><div className="mini-progress"><div style={{width:'65%'}}/></div><p>Pravděpodobnost 65 %</p></section><section className="panel side-box"><h3>Kurzy a členství</h3><div className="flex-row"><span className="activity-icon purple"><GraduationCap/></span><h3 className="!mb-0">Marketing od základů</h3></div><Progress value={42} className="h-1.5 mt-4 bg-gray-100"/><p className="mt-2">5 z 12 lekcí dokončeno</p><button className="text-link mt-3" onClick={()=>go('kurzy')}>Zobrazit kurz<ChevronRight size={13}/></button></section><section className="panel side-box"><h3>Aktivní automatizace</h3><Badge>Aktivní</Badge><p className="mt-3">Uvítací sekvence</p><p>Čeká 2 dny před dalším e-mailem.</p><button className="text-link" onClick={()=>go('automatizace/1')}>Otevřít scénář<ChevronRight size={13}/></button></section><section className="panel side-box"><h3>Rychlá poznámka</h3><textarea aria-label="Rychlá poznámka" placeholder="Napište si poznámku…" value={note} onChange={e=>setNote(e.target.value)} className="text-xs"/><Btn className="full mt-3" onClick={addNote} disabled={!note.trim()}>Uložit poznámku</Btn></section></aside></div><Modal open={fieldDialog!==null} onClose={()=>setFieldDialog(null)} title={fieldDialog?.id?'Upravit vlastní pole':'Nové vlastní pole'} desc={`${c.name} · v ukázce platí změny jen do obnovení stránky.`}><form onSubmit={saveField} noValidate><div className="stack"><Field label="Název pole" hint="Např. Obor, Město nebo Preferovaný kanál."><input name="field-name" value={fieldName} onChange={e=>{setFieldName(e.target.value);setFieldError('')}} maxLength={60} autoFocus aria-invalid={!!fieldError}/></Field><Field label="Hodnota"><input name="field-value" value={fieldValue} onChange={e=>setFieldValue(e.target.value)} maxLength={500} placeholder="Zadejte hodnotu"/></Field>{fieldError&&<p className="text-red-600 text-sm" role="alert">{fieldError}</p>}</div><div className="form-actions">{fieldDialog?.id&&<Btn type="button" className="mr-auto" onClick={removeField}><Trash2/>Odebrat pole</Btn>}<Btn type="button" onClick={()=>setFieldDialog(null)}>Zrušit</Btn><Btn primary type="submit">{fieldDialog?.id?'Uložit změny':'Přidat pole'}</Btn></div></form></Modal><Modal open={edit} onClose={()=>setEdit(false)} title="Upravit kontakt" desc="Kontaktní údaje a firma."><form onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);update({name:String(f.get('name')),email:String(f.get('email')),phone:String(f.get('phone')),company:String(f.get('company'))});setEdit(false);toast.success('Změny kontaktu uloženy.')}}><div className="stack"><Field label="Jméno a příjmení"><input name="name" defaultValue={c.name} required/></Field><Field label="E-mail"><input name="email" type="email" defaultValue={c.email} required/></Field><Field label="Telefon"><input name="phone" defaultValue={c.phone}/></Field><Field label="Firma"><input name="company" defaultValue={c.company}/></Field></div><div className="form-actions"><Btn primary type="submit">Uložit změny</Btn></div></form></Modal><Modal open={tagDialog} onClose={()=>setTagDialog(false)} title="Přidat štítek"><Pick value={newTag} onChange={setNewTag} options={['Webinář','Newsletter','VIP','Kurz','B2B']} className="full"/><Btn primary onClick={()=>{update({tags:Array.from(new Set([...c.tags,newTag]))});setTagDialog(false);toast.success('Štítek přidán.')}}>Přidat štítek</Btn></Modal><Modal open={compose} onClose={()=>setCompose(false)} title={'E-mail pro '+c.name} desc={c.email}><div className="stack"><Field label="Předmět"><input value={subject} onChange={e=>setSubject(e.target.value)}/></Field><Field label="Zpráva"><textarea rows={6} value={draft} onChange={e=>setDraft(e.target.value)} placeholder={'Dobrý den, '+c.name.split(' ')[0]+',…'}/></Field><div className="preview-notice">Ukázkový koncept. E-mail se nebude skutečně odesílat.</div><Btn primary disabled={!draft.trim()||!subject.trim()} onClick={()=>{update({notes:[`Koncept e-mailu: ${subject}\n${draft}`,...c.notes]});setCompose(false);setTab('Poznámky');toast.success('Koncept uložen k poznámkám kontaktu.')}}><Mail/>Uložit koncept ke kontaktu</Btn></div></Modal></div>}
+/* CRM: contact list with filters and bulk actions; routes to detail, segments, pipeline, consents and import. */
+import React, { useMemo, useState } from 'react';
+import { ChevronRight, Download, ListChecks, Mail, Plus, Tag, Trash2, Upload, Workflow, X } from 'lucide-react';
+import { toast } from 'sonner';
+import { Checkbox } from '@/components/ui/checkbox';
+import { fmt, fmtDate, isEmail, normalize, periodStart, plural } from '@/lib/hub/format';
+import { deleteContacts, makeCampaign, makeContact, enrollInWorkflow, findByEmail } from '@/lib/hub/ops';
+import type { ConsentState, Contact, Lifecycle } from '@/lib/hub/types';
+import { useHub } from './state';
+import { CONSENTS, CrmHead, STAGES, consentTone, stageTone } from './crm-shared';
+import { Avatar, Badge, Btn, Empty, Field, Modal, Pick, SearchInput } from './ui';
+import { FormError, Notice, Pager, download, paginate, toCsv, useConfirm, useRoute } from './kit';
+import ContactDetail from './contact-detail';
+import { Consents, ImportWizard, Pipeline, Segments } from './crm';
+
+export default function Contacts() {
+  const { parts } = useRoute();
+  const sub = parts[1];
+  if (!sub) return <ContactList />;
+  if (sub === 'segmenty') return <Segments />;
+  if (sub === 'pipeline') return <Pipeline />;
+  if (sub === 'souhlasy') return <Consents />;
+  if (sub === 'import') return <ImportWizard />;
+  return <ContactDetail id={Number(sub)} />;
+}
+
+const SORTS: [string, string][] = [['nove', 'Nejnovější'], ['jmeno', 'Podle jména'], ['firma', 'Podle firmy']];
+const PERIOD_LABEL: Record<string, string> = { '7': 'posledních 7 dní', '30': 'posledních 30 dní', '90': 'posledních 90 dní' };
+type BulkDialog = null | 'create' | 'tag' | 'untag' | 'stage' | 'campaign' | 'workflow';
+
+export const contactRows = (list: Contact[]) => toCsv([
+  ['Jméno', 'E-mail', 'Telefon', 'Firma', 'Město', 'Fáze', 'Štítky', 'Zdroj', 'Souhlas', 'Souhlas – zdroj', 'Souhlas – datum', 'Vytvořeno'],
+  ...list.map(c => [c.name, c.email, c.phone, c.company, c.city, c.stage, c.tags.join(', '), c.source, c.consent.state, c.consent.source, fmtDate(c.consent.date), fmtDate(c.createdAt)]),
+]);
+
+function ContactList() {
+  const { w, workspaceId, mutate, go, settings } = useHub();
+  const { query, setQuery } = useRoute();
+  const f = { q: query.get('q') ?? '', faze: query.get('faze') ?? '', stitek: query.get('stitek') ?? '', zdroj: query.get('zdroj') ?? '', souhlas: query.get('souhlas') ?? '', novi: query.get('novi') ?? '', razeni: query.get('razeni') ?? 'nove' };
+  const [now] = useState(() => Date.now());
+  const [selected, setSelected] = useState<Set<number>>(() => new Set());
+  const [dialog, setDialog] = useState<BulkDialog>(null);
+  const [confirmEl, confirm] = useConfirm();
+
+  const tags = useMemo(() => [...new Set(w.contacts.flatMap(c => c.tags))].sort((a, b) => a.localeCompare(b, 'cs')), [w.contacts]);
+  const sources = useMemo(() => [...new Set(w.contacts.map(c => c.source))].sort((a, b) => a.localeCompare(b, 'cs')), [w.contacts]);
+  const filtered = useMemo(() => {
+    const nq = normalize(f.q.trim());
+    const since = f.novi ? periodStart(Number(f.novi), now) : 0;
+    const list = w.contacts.filter(c =>
+      (!nq || normalize(`${c.name} ${c.email} ${c.company} ${c.city} ${c.phone} ${c.tags.join(' ')}`).includes(nq)) &&
+      (!f.faze || c.stage === f.faze) && (!f.stitek || c.tags.includes(f.stitek)) && (!f.zdroj || c.source === f.zdroj) &&
+      (!f.souhlas || c.consent.state === f.souhlas) && (!since || +new Date(c.createdAt) >= since));
+    const by = f.razeni === 'jmeno' ? (a: Contact, b: Contact) => a.name.localeCompare(b.name, 'cs') : f.razeni === 'firma' ? (a: Contact, b: Contact) => (a.company || '￿').localeCompare(b.company || '￿', 'cs') || a.name.localeCompare(b.name, 'cs') : (a: Contact, b: Contact) => b.createdAt.localeCompare(a.createdAt) || b.id - a.id;
+    return list.sort(by);
+  }, [w.contacts, f.q, f.faze, f.stitek, f.zdroj, f.souhlas, f.novi, f.razeni, now]);
+  const { page, pages, slice, from, to } = paginate(filtered, Number(query.get('strana') || 1));
+  const sel = w.contacts.filter(c => selected.has(c.id));
+  const allOnPage = slice.length > 0 && slice.every(c => selected.has(c.id));
+  const chips: [string, string][] = ([['faze', 'Fáze'], ['stitek', 'Štítek'], ['zdroj', 'Zdroj'], ['souhlas', 'Souhlas'], ['novi', 'Přidáno']] as [keyof typeof f, string][])
+    .filter(([k]) => f[k]).map(([k, l]) => [k, `${l}: ${k === 'novi' ? PERIOD_LABEL[f.novi] ?? `${f.novi} dní` : f[k]}`]);
+  const filter = (patch: Record<string, string | undefined>) => setQuery({ ...patch, strana: undefined });
+  const toggle = (id: number, on: boolean) => setSelected(s => { const n = new Set(s); if (on) n.add(id); else n.delete(id); return n; });
+
+  const removeSelected = () => confirm({
+    title: `Smazat ${plural(sel.length, 'kontakt', 'kontakty', 'kontaktů')}?`, danger: true, confirm: 'Smazat kontakty',
+    desc: 'Smažou se i jejich obchody, poznámky, registrace a přístupy. Faktury a platby zůstanou kvůli účetnictví. Akci nelze vrátit.',
+    onConfirm: () => { const ids = sel.map(c => c.id); mutate(d => deleteContacts(d, workspaceId, ids)); setSelected(new Set()); toast.success(`Smazáno: ${plural(ids.length, 'kontakt', 'kontakty', 'kontaktů')}.`); },
+  });
+
+  return (
+    <div className="page">
+      <CrmHead active="kontakty" title="Kontakty" desc={`Databáze pracovního prostoru ${settings.name}. Vyhledávání funguje s diakritikou i bez ní.`}>
+        <Btn onClick={() => download(`kontakty-${normalize(settings.name).replace(/\W+/g, '-')}.csv`, contactRows(filtered))} disabled={!filtered.length}><Download aria-hidden />Export</Btn>
+        <Btn onClick={() => go('kontakty/import')}><Upload aria-hidden />Importovat</Btn>
+        <Btn primary onClick={() => setDialog('create')}><Plus aria-hidden />Nový kontakt</Btn>
+      </CrmHead>
+
+      <div className="filter-bar">
+        <SearchInput value={f.q} onChange={v => filter({ q: v || undefined })} placeholder="Hledat jméno, e-mail, firmu, město…" />
+        <div className="filter-row">
+          <Pick label="Fáze" value={f.faze || 'all'} onChange={v => filter({ faze: v === 'all' ? undefined : v })} options={[['all', 'Všechny fáze'], ...STAGES.map(s => [s, s] as [string, string])]} />
+          <Pick label="Štítek" value={f.stitek || 'all'} onChange={v => filter({ stitek: v === 'all' ? undefined : v })} options={[['all', 'Všechny štítky'], ...tags.map(t => [t, t] as [string, string])]} />
+          <Pick label="Zdroj" value={f.zdroj || 'all'} onChange={v => filter({ zdroj: v === 'all' ? undefined : v })} options={[['all', 'Všechny zdroje'], ...sources.map(t => [t, t] as [string, string])]} />
+          <Pick label="Souhlas" value={f.souhlas || 'all'} onChange={v => filter({ souhlas: v === 'all' ? undefined : v })} options={[['all', 'Jakýkoli souhlas'], ...CONSENTS.map(t => [t, t] as [string, string])]} />
+          <Pick label="Řazení" value={f.razeni} onChange={v => setQuery({ razeni: v === 'nove' ? undefined : v })} options={SORTS} />
+        </div>
+      </div>
+      {chips.length > 0 && (
+        <div className="chips" aria-label="Aktivní filtry">
+          {chips.map(([k, label]) => <button key={k} type="button" className="chip" onClick={() => filter({ [k]: undefined })} aria-label={`Zrušit filtr ${label}`}>{label}<X size={14} aria-hidden /></button>)}
+          <button type="button" className="text-link" onClick={() => filter({ faze: undefined, stitek: undefined, zdroj: undefined, souhlas: undefined, novi: undefined, q: undefined })}>Zrušit všechny filtry</button>
+        </div>
+      )}
+
+      {sel.length > 0 && (
+        <div className="bulk-bar" role="region" aria-label="Hromadné akce">
+          <strong>Vybráno {plural(sel.length, 'kontakt', 'kontakty', 'kontaktů')}</strong>
+          {sel.length < filtered.length && <button type="button" className="text-link" onClick={() => setSelected(new Set(filtered.map(c => c.id)))}>Vybrat všech {fmt(filtered.length)} podle filtru</button>}
+          <div className="bulk-actions">
+            <Btn onClick={() => setDialog('tag')}><Tag aria-hidden />Přidat štítek</Btn>
+            <Btn onClick={() => setDialog('untag')}>Odebrat štítek</Btn>
+            <Btn onClick={() => setDialog('stage')}><ListChecks aria-hidden />Změnit fázi</Btn>
+            <Btn onClick={() => setDialog('campaign')}><Mail aria-hidden />Do kampaně</Btn>
+            <Btn onClick={() => setDialog('workflow')}><Workflow aria-hidden />Do automatizace</Btn>
+            <Btn onClick={() => download('vybrane-kontakty.csv', contactRows(sel))}><Download aria-hidden />Export</Btn>
+            <Btn className="danger-ghost" onClick={removeSelected}><Trash2 aria-hidden />Smazat</Btn>
+            <button type="button" className="text-link" onClick={() => setSelected(new Set())}>Zrušit výběr</button>
+          </div>
+        </div>
+      )}
+
+      <section className="panel">
+        {w.contacts.length === 0 ? (
+          <div className="empty"><h3>V tomto prostoru zatím nejsou kontakty</h3><p>Přidejte první kontakt ručně nebo je naimportujte z CSV.</p><div className="flex-row"><Btn onClick={() => go('kontakty/import')}><Upload aria-hidden />Importovat CSV</Btn><Btn primary onClick={() => setDialog('create')}><Plus aria-hidden />Nový kontakt</Btn></div></div>
+        ) : (
+          <>
+            <div className="table-scroll">
+              <table className="hub-table data-table">
+                <thead>
+                  <tr>
+                    <th className="col-check"><Checkbox aria-label="Vybrat kontakty na této straně" checked={allOnPage} onCheckedChange={v => setSelected(s => { const n = new Set(s); slice.forEach(c => (v ? n.add(c.id) : n.delete(c.id))); return n; })} /></th>
+                    <th>Kontakt</th><th className="col-opt">Firma</th><th className="col-opt">Štítky</th><th className="col-mob">Fáze</th><th className="col-mob">Souhlas</th><th className="col-opt">Zdroj</th><th className="col-opt">Přidáno</th><th aria-hidden />
+                  </tr>
+                </thead>
+                <tbody>
+                  {slice.map(c => (
+                    <tr key={c.id} onClick={() => go('kontakty/' + c.id)} className={selected.has(c.id) ? 'is-selected' : ''}>
+                      <td className="col-check" onClick={e => e.stopPropagation()}><Checkbox aria-label={'Vybrat ' + c.name} checked={selected.has(c.id)} onCheckedChange={v => toggle(c.id, !!v)} /></td>
+                      <td><div className="name-cell"><Avatar name={c.name} color={c.color} /><button type="button" onClick={e => { e.stopPropagation(); go('kontakty/' + c.id); }}>{c.name}<small>{c.email}</small><span className="mob-only tag-cell"><Badge tone={stageTone(c.stage)}>{c.stage}</Badge><Badge tone={consentTone(c.consent.state)}>{c.consent.state}</Badge></span></button></div></td>
+                      <td className="col-opt muted ellipsis" title={c.company || undefined}>{c.company || '—'}</td>
+                      <td className="col-opt"><div className="tag-cell">{c.tags.slice(0, 1).map(t => <Badge key={t} tone="gray">{t}</Badge>)}{c.tags.length > 1 && <span className="muted small" title={c.tags.slice(1).join(', ')}>+{c.tags.length - 1}</span>}</div></td>
+                      <td className="col-mob"><Badge tone={stageTone(c.stage)}>{c.stage}</Badge></td>
+                      <td className="col-mob"><Badge tone={consentTone(c.consent.state)}>{c.consent.state}</Badge></td>
+                      <td className="col-opt muted">{c.source}</td>
+                      <td className="col-opt muted nowrap">{fmtDate(c.createdAt)}</td>
+                      <td className="col-go"><ChevronRight size={16} aria-hidden className="muted" /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {!filtered.length && <Empty text="Žádný kontakt neodpovídá hledání."><Btn onClick={() => filter({ faze: undefined, stitek: undefined, zdroj: undefined, souhlas: undefined, novi: undefined, q: undefined })}>Zrušit filtry</Btn></Empty>}
+            <Pager page={page} pages={pages} total={filtered.length} from={from} to={to} onPage={p => setQuery({ strana: p > 1 ? String(p) : undefined })} noun="kontaktů" />
+          </>
+        )}
+      </section>
+
+      <CreateContact open={dialog === 'create'} onClose={() => setDialog(null)} />
+      <TagDialog mode={dialog === 'untag' ? 'remove' : 'add'} open={dialog === 'tag' || dialog === 'untag'} onClose={() => setDialog(null)} contacts={sel} tags={tags} />
+      <StageDialog open={dialog === 'stage'} onClose={() => setDialog(null)} contacts={sel} />
+      <CampaignDialog open={dialog === 'campaign'} onClose={() => setDialog(null)} contacts={sel} />
+      <WorkflowDialog open={dialog === 'workflow'} onClose={() => setDialog(null)} contacts={sel} />
+      {confirmEl}
+    </div>
+  );
+}
+
+/* ---------- dialogs ---------- */
+export function CreateContact({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated?: (c: Contact) => void }) {
+  const { data, workspaceId, mutate, go, settings } = useHub();
+  const blank = { name: '', email: '', phone: '', company: '', city: '', stage: 'Lead' as Lifecycle, tags: '', consent: 'Bez souhlasu' as ConsentState };
+  const [v, setV] = useState(blank);
+  const [error, setError] = useState('');
+  const set = (patch: Partial<typeof blank>) => { setV(x => ({ ...x, ...patch })); setError(''); };
+  const close = () => { setV(blank); setError(''); onClose(); };
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!v.name.trim()) return setError('Vyplňte jméno a příjmení.');
+    if (!isEmail(v.email)) return setError('Zadejte platný e-mail, např. jana@firma.cz.');
+    const dup = findByEmail(data, workspaceId, v.email);
+    if (dup) return setError(`Kontakt s tímto e-mailem už existuje: ${dup.name}.`);
+    const c = makeContact(data, workspaceId, { ...v, source: 'Ruční zadání', tags: v.tags.split(',').map(t => t.trim()).filter(Boolean), consentSource: v.consent === 'Udělen' ? 'Ručně zaznamenaný souhlas' : 'Ruční zadání', owner: settings.team[0]?.name });
+    mutate(d => ({ ...d, contacts: [c, ...d.contacts] }));
+    toast.success('Kontakt byl vytvořen.');
+    close();
+    if (onCreated) onCreated(c); else go('kontakty/' + c.id);
+  };
+  return (
+    <Modal open={open} onClose={close} title="Nový kontakt" desc={`Kontakt se přidá do prostoru ${settings.name}.`}>
+      <form onSubmit={submit} noValidate>
+        <div className="stack">
+          <Field label="Jméno a příjmení"><input value={v.name} onChange={e => set({ name: e.target.value })} placeholder="Např. Jana Novotná" autoFocus required /></Field>
+          <Field label="E-mail"><input type="email" value={v.email} onChange={e => set({ email: e.target.value })} placeholder="jana@firma.cz" required /></Field>
+          <div className="form-grid">
+            <Field label="Telefon"><input type="tel" value={v.phone} onChange={e => set({ phone: e.target.value })} placeholder="+420" /></Field>
+            <Field label="Firma"><input value={v.company} onChange={e => set({ company: e.target.value })} /></Field>
+            <Field label="Město"><input value={v.city} onChange={e => set({ city: e.target.value })} /></Field>
+            <Field label="Fáze"><Pick value={v.stage} onChange={s => set({ stage: s as Lifecycle })} options={STAGES} className="full" label="Fáze" /></Field>
+          </div>
+          <Field label="Štítky" hint="Oddělte čárkou, např. Newsletter, VIP"><input value={v.tags} onChange={e => set({ tags: e.target.value })} /></Field>
+          <Field label="Souhlas s e-mailingem" hint="„Udělen“ zvolte jen s doložitelným souhlasem. Fáze kontaktu na souhlasu nezávisí.">
+            <Pick value={v.consent} onChange={s => set({ consent: s as ConsentState })} options={[['Bez souhlasu', 'Bez souhlasu'], ['Čeká na potvrzení', 'Odeslat žádost o potvrzení (simulace)'], ['Udělen', 'Udělen – mám doklad']]} className="full" label="Souhlas" />
+          </Field>
+          <FormError>{error}</FormError>
+        </div>
+        <div className="form-actions"><Btn type="button" onClick={close}>Zrušit</Btn><Btn primary type="submit">Vytvořit kontakt</Btn></div>
+      </form>
+    </Modal>
+  );
+}
+
+function TagDialog({ open, onClose, contacts, tags, mode }: { open: boolean; onClose: () => void; contacts: Contact[]; tags: string[]; mode: 'add' | 'remove' }) {
+  const { mutate, workspaceId } = useHub();
+  const [tag, setTag] = useState('');
+  const [error, setError] = useState('');
+  const present = [...new Set(contacts.flatMap(c => c.tags))].sort((a, b) => a.localeCompare(b, 'cs'));
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const t = tag.trim(); if (!t) return setError('Zadejte nebo vyberte štítek.');
+    const ids = new Set(contacts.map(c => c.id));
+    const existing = tags.find(x => normalize(x) === normalize(t)) ?? t;
+    mutate(d => ({ ...d, contacts: d.contacts.map(c => (c.workspaceId === workspaceId && ids.has(c.id) ? { ...c, tags: mode === 'add' ? [...new Set([...c.tags, existing])] : c.tags.filter(x => normalize(x) !== normalize(t)) } : c)) }));
+    toast.success(mode === 'add' ? `Štítek „${existing}“ přidán k ${plural(ids.size, 'kontaktu', 'kontaktům', 'kontaktům')}.` : `Štítek „${t}“ odebrán.`);
+    setTag(''); setError(''); onClose();
+  };
+  const listId = React.useId();
+  return (
+    <Modal open={open} onClose={onClose} title={mode === 'add' ? 'Přidat štítek' : 'Odebrat štítek'} desc={`Vybráno ${plural(contacts.length, 'kontakt', 'kontakty', 'kontaktů')}.`}>
+      <form onSubmit={submit} noValidate>
+        <div className="stack">
+          {mode === 'add' ? (
+            <Field label="Štítek" hint="Vyberte existující nebo napište nový."><input list={listId} value={tag} onChange={e => { setTag(e.target.value); setError(''); }} autoFocus /><datalist id={listId}>{tags.map(t => <option key={t} value={t} />)}</datalist></Field>
+          ) : present.length ? (
+            <Field label="Štítek"><Pick value={tag || ''} onChange={setTag} options={present} className="full" label="Štítek k odebrání" /></Field>
+          ) : <p className="muted">Vybrané kontakty nemají žádné štítky.</p>}
+          <FormError>{error}</FormError>
+        </div>
+        <div className="form-actions"><Btn type="button" onClick={onClose}>Zrušit</Btn><Btn primary type="submit" disabled={mode === 'remove' && !present.length}>{mode === 'add' ? 'Přidat štítek' : 'Odebrat štítek'}</Btn></div>
+      </form>
+    </Modal>
+  );
+}
+
+function StageDialog({ open, onClose, contacts }: { open: boolean; onClose: () => void; contacts: Contact[] }) {
+  const { mutate, workspaceId } = useHub();
+  const [stage, setStage] = useState<Lifecycle>('Zájemce');
+  const apply = () => {
+    const ids = new Set(contacts.map(c => c.id));
+    mutate(d => ({ ...d, contacts: d.contacts.map(c => (c.workspaceId === workspaceId && ids.has(c.id) ? { ...c, stage } : c)) }));
+    toast.success(`Fáze „${stage}“ nastavena u ${plural(ids.size, 'kontaktu', 'kontaktů', 'kontaktů')}.`); onClose();
+  };
+  return (
+    <Modal open={open} onClose={onClose} title="Změnit fázi" desc="Fáze životního cyklu nemění souhlas s e-mailingem.">
+      <Field label="Nová fáze"><Pick value={stage} onChange={s => setStage(s as Lifecycle)} options={STAGES} className="full" label="Fáze" /></Field>
+      <div className="form-actions"><Btn onClick={onClose}>Zrušit</Btn><Btn primary onClick={apply}>Změnit u {plural(contacts.length, 'kontaktu', 'kontaktů', 'kontaktů')}</Btn></div>
+    </Modal>
+  );
+}
+
+function CampaignDialog({ open, onClose, contacts }: { open: boolean; onClose: () => void; contacts: Contact[] }) {
+  const { w, data, workspaceId, mutate, go } = useHub();
+  const drafts = w.campaigns.filter(c => c.status === 'Koncept');
+  const [target, setTarget] = useState('new');
+  const withConsent = contacts.filter(c => c.consent.state === 'Udělen').length;
+  const apply = () => {
+    const ids = contacts.map(c => c.id);
+    if (target === 'new') {
+      const c = makeCampaign(data, workspaceId, { name: `Kampaň pro ${plural(ids.length, 'vybraný kontakt', 'vybrané kontakty', 'vybraných kontaktů')}`, audience: { type: 'manual' }, extraContactIds: ids });
+      mutate(d => ({ ...d, campaigns: [c, ...d.campaigns] }));
+      toast.success('Koncept kampaně byl vytvořen.'); onClose(); go(`kampane/${c.id}/upravit`); return;
+    }
+    const id = Number(target);
+    mutate(d => ({ ...d, campaigns: d.campaigns.map(c => (c.workspaceId === workspaceId && c.id === id ? { ...c, extraContactIds: [...new Set([...c.extraContactIds, ...ids])], updatedAt: new Date().toISOString() } : c)) }));
+    toast.success('Kontakty byly přidány mezi příjemce.', { action: { label: 'Otevřít kampaň', onClick: () => go(`kampane/${id}/upravit`) } }); onClose();
+  };
+  return (
+    <Modal open={open} onClose={onClose} title="Přidat do kampaně" desc={`E-mail dostanou jen kontakty se souhlasem: ${withConsent} z ${contacts.length}.`}>
+      <Field label="Kampaň"><Pick value={target} onChange={setTarget} options={[['new', 'Nová kampaň jen pro vybrané kontakty'], ...drafts.map(c => [String(c.id), `${c.name} (koncept)`] as [string, string])]} className="full" label="Kampaň" /></Field>
+      <div className="form-actions"><Btn onClick={onClose}>Zrušit</Btn><Btn primary onClick={apply}>{target === 'new' ? 'Vytvořit kampaň' : 'Přidat příjemce'}</Btn></div>
+    </Modal>
+  );
+}
+
+function WorkflowDialog({ open, onClose, contacts }: { open: boolean; onClose: () => void; contacts: Contact[] }) {
+  const { w, workspaceId, mutate, go } = useHub();
+  const flows = w.workflows.filter(f => f.status !== 'Koncept');
+  const [id, setId] = useState('');
+  const target = flows.find(f => f.id === id) ?? flows[0];
+  const apply = () => {
+    if (!target) return;
+    let added = 0;
+    mutate(d => { const r = enrollInWorkflow(d, workspaceId, target.id, contacts.map(c => c.id)); added = r.added; return r.data; });
+    toast.success(added ? `Do scénáře „${target.name}“ přidáno: ${plural(added, 'kontakt', 'kontakty', 'kontaktů')}.` : 'Všechny vybrané kontakty už ve scénáři jsou.', { action: { label: 'Otevřít', onClick: () => go('automatizace/' + target.id) } });
+    onClose();
+  };
+  return (
+    <Modal open={open} onClose={onClose} title="Přidat do automatizace" desc="Kontakty vstoupí do prvního kroku scénáře. Běh je simulovaný.">
+      {flows.length ? <Field label="Scénář"><Pick value={target?.id ?? ''} onChange={setId} options={flows.map(f => [f.id, `${f.name} · ${f.status}`] as [string, string])} className="full" label="Scénář" /></Field> : <Notice>Nemáte žádný aktivní ani pozastavený scénář.</Notice>}
+      {target?.status === 'Pozastaveno' && <Notice tone="warn">Scénář je pozastavený, kontakty budou čekat na jeho aktivaci.</Notice>}
+      <div className="form-actions"><Btn onClick={onClose}>Zrušit</Btn><Btn primary onClick={apply} disabled={!target}>Přidat do scénáře</Btn></div>
+    </Modal>
+  );
+}

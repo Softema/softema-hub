@@ -1,24 +1,258 @@
 'use client';
-import React,{useState} from 'react';
-import {Mail,Plus,ChevronRight,ArrowLeft,Check,MoreHorizontal,Copy,Pencil,ArrowRight,Send,CalendarDays,Clock,Type,Image as ImageIcon,SquareMousePointer,Minus,Columns2,AlignLeft,AlignCenter,AlignRight,Monitor,Smartphone,Eye,Undo2,Redo2,GripVertical,Trash2,ChevronUp,ChevronDown,Sparkles,LayoutTemplate,Heading,Link2,CheckCircle2,FileText,X} from 'lucide-react';
-import {Table,TableHeader,TableBody,TableRow,TableHead,TableCell} from '@/components/ui/table';
-import {DropdownMenu,DropdownMenuTrigger,DropdownMenuContent,DropdownMenuItem} from '@/components/ui/dropdown-menu';
-import {RadioGroup,RadioGroupItem} from '@/components/ui/radio-group';
-import {Checkbox} from '@/components/ui/checkbox';
-import {toast} from 'sonner';
-import {useHub} from './state';
-import {Campaign,Block,defaultBlocks,fmt,normalize} from './data';
-import {Btn,Avatar,IconBtn,PageHead,Metric,Badge,Pick,Modal,Field,Tabbar,SearchInput,Empty,CardHead} from './ui';
-import {RevenueChart} from './hub';
-export default function Campaigns(){const {route,campaigns}=useHub();const id=route.split('/')[1];const c=campaigns.find(c=>String(c.id)===id);if(id==='nova'||id==='sablony'||c&&c.status!=='Odesláno')return <Wizard key={id} campaign={c} initialStep={id==='sablony'?3:1}/>;if(c)return <CampaignReport campaign={c}/>;return <CampaignList/>}
-function CampaignList(){const {go,campaigns,setCampaigns}=useHub();const [tab,setTab]=useState('Všechny kampaně');const [search,setSearch]=useState('');const [sort,setSort]=useState('Nejnovější');const filtered=campaigns.filter(c=>(tab==='Všechny kampaně'||tab===c.status)&&normalize(c.name).includes(normalize(search))).sort((a,b)=>sort==='Podle názvu'?a.name.localeCompare(b.name,'cs'):0);function duplicate(c:Campaign){const copy={...c,id:Date.now(),name:c.name+' — kopie',status:'Koncept',date:'Upraveno 25. 9. 2026',open:'—',click:'—'};setCampaigns(cs=>[copy,...cs]);toast.success('Kopie kampaně připravena.');go('kampane/'+copy.id)}return <div className="page"><PageHead title="E-mailové kampaně" desc="Správná zpráva. Správným lidem. Ve správný čas."><Btn onClick={()=>go('kampane/sablony')}><LayoutTemplate/>Šablony e-mailů</Btn><Btn primary onClick={()=>go('kampane/nova')}><Plus/>Nová kampaň</Btn></PageHead><div className="metric-grid"><Metric label="Odesláno tento měsíc" value="24 856" change="18,6 %"/><Metric label="Průměrná míra otevření" value="42,8 %" change="4,2 p. b."/><Metric label="Průměrná míra prokliku" value="6,4 %" change="1,8 p. b."/><Metric label="Doručitelnost" value="99,6 %" change="0,3 p. b."/></div><Tabbar value={tab} onChange={setTab} items={['Všechny kampaně','Odesláno','Naplánováno','Koncept']}/><div className="toolbar"><SearchInput value={search} onChange={setSearch} placeholder="Hledat kampaň…"/><Pick value={sort} onChange={setSort} options={['Nejnovější','Podle názvu']} label="Řazení kampaní"/></div><section className="panel"><Table className="hub-table"><TableHeader><TableRow><TableHead>Kampaň</TableHead><TableHead>Stav</TableHead><TableHead>Příjemci</TableHead><TableHead>Otevření</TableHead><TableHead>Prokliky</TableHead><TableHead>Datum</TableHead><TableHead/></TableRow></TableHeader><TableBody>{filtered.map(c=><TableRow key={c.id} onClick={()=>go('kampane/'+c.id)}><TableCell><div className="name-cell"><span className="mail-box"><Mail size={17}/></span><button className="text-left campaign-name">{c.name}<small>{c.audience}</small></button></div></TableCell><TableCell><Badge>{c.status}</Badge></TableCell><TableCell className="muted">{fmt(c.recipients)}</TableCell><TableCell>{c.open}</TableCell><TableCell className="muted">{c.click}</TableCell><TableCell className="muted small">{c.date}</TableCell><TableCell onClick={e=>e.stopPropagation()}><DropdownMenu><DropdownMenuTrigger asChild><button className="icon-btn" aria-label={'Možnosti kampaně '+c.name}><MoreHorizontal/></button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={()=>go('kampane/'+c.id)}><Eye/>Otevřít kampaň</DropdownMenuItem><DropdownMenuItem onSelect={()=>duplicate(c)}><Copy/>Duplikovat</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell></TableRow>)}</TableBody></Table>{!filtered.length&&<Empty/>}<div className="table-foot"><span>Celkem {filtered.length} kampaní</span><span>Poslední aktualizace 25. 9. 2026 · 10:42</span></div></section><div className="preview-notice mt"><CheckCircle2 size={16} color="#7eaa8b"/>Odesílací doména mail.softema.cz je ověřená. SPF, DKIM a DMARC jsou v pořádku.<button className="text-link ml-auto" onClick={()=>go('nastaveni/domeny')}>Nastavení<ChevronRight size={13}/></button></div></div>}
-const audiences=[{id:'Odběratelé newsletteru',desc:'Kontakty se štítkem Newsletter a aktivním souhlasem',count:2486},{id:'Všechny aktivní kontakty',desc:'Celá databáze bez odhlášených kontaktů',count:3842},{id:'Zájemci o webináře',desc:'Registrovaní na webináře v posledních 90 dnech',count:1860},{id:'VIP klienti',desc:'Vaši klíčoví zákazníci se štítkem VIP',count:126}];
-function Wizard({campaign,initialStep=1}:{campaign?:Campaign;initialStep?:number}){const {go,setCampaigns,workspace,workspaceId}=useHub();const [id]=useState(()=>campaign?.id||Date.now());const [step,setStep]=useState(initialStep);const [name,setName]=useState(campaign?.name||'Podzimní newsletter');const [subject,setSubject]=useState(campaign?.subject||'Podzim přeje novým nápadům 🍂');const [preheader,setPreheader]=useState(campaign?.preheader||'Inspirace, tipy a novinky, které posunou váš marketing.');const [sender,setSender]=useState(campaign?.sender||'Softema Creative');const [senderEmail,setSenderEmail]=useState(campaign?.senderEmail||'ahoj@mail.softema.cz');const [audience,setAudience]=useState(campaign?.audience||'Odběratelé newsletteru');const [blocks,setBlocks]=useState<Block[]>(campaign?.blocks.map(b=>({...b}))||defaultBlocks.map(b=>({...b})));const [editing,setEditing]=useState(false);const [template,setTemplate]=useState('Newsletter');const [mode,setMode]=useState('schedule');const [date,setDate]=useState('2026-09-28');const [time,setTime]=useState('09:00');const [done,setDone]=useState(false);const [error,setError]=useState('');const [preview,setPreview]=useState(false);const recipients=audiences.find(a=>a.id===audience)?.count||328;function save(status='Koncept',leave=false,overrideBlocks=blocks){const record:Campaign={id,name,subject,audience,status,recipients,workspace,workspaceId,blocks:overrideBlocks,sender,senderEmail,preheader,date:status==='Naplánováno'?new Date(date+'T12:00:00').toLocaleDateString('cs-CZ')+' · '+time:status==='Odesláno'?'25. 9. 2026 · 11:00':'Upraveno 25. 9. 2026',open:'—',click:'—'};setCampaigns(cs=>cs.some(c=>c.id===id)?cs.map(c=>c.id===id?record:c):[record,...cs]);if(leave){toast.success('Koncept kampaně uložen.');go('kampane')}}function next(){if(step===1&&(!name.trim()||!subject.trim()||!sender.trim()||!/^\S+@\S+\.\S+$/.test(senderEmail))){setError('Doplňte název, předmět a platné údaje odesílatele.');return}setError('');setStep(Math.min(4,step+1))}function templateSelect(t:string){setTemplate(t);setBlocks(defaultBlocks.map(b=>({...b,text:b.type==='heading'?(t==='Pozvánka'?'Dáme si marketing\nbez omáčky?':t==='Jednoduchý e-mail'?'Pojďme být\nv kontaktu.':b.text):b.text})));toast.success('Šablona '+t+' byla vybrána.')}
-if(editing)return <EmailEditor name={name} initialBlocks={blocks} onBack={b=>{setBlocks(b);setEditing(false)}} onSave={b=>{setBlocks(b);save('Koncept',false,b);toast.success('Obsah e-mailu uložen do konceptu.')}}/>;
-if(done)return <div className="page"><div className="panel wizard pending-screen"><CheckCircle2 size={60}/><h2>{mode==='schedule'?'Kampaň je naplánovaná.':'Ukázkové odeslání je hotové.'}</h2><p><strong>{name}</strong><br/>{mode==='schedule'?`${new Date(date+'T12:00:00').toLocaleDateString('cs-CZ')} v ${time}`:'25. 9. 2026 v 11:00'} · {fmt(recipients)} příjemců</p><div className="preview-notice mb-6 justify-center">Jde o simulaci. Žádné skutečné e-maily se neodesílají.</div><Btn primary onClick={()=>go('kampane')}>Zpět na kampaně<ArrowRight/></Btn></div></div>;
-return <div className="page"><button className="back-link" onClick={()=>{save();go('kampane')}}><ArrowLeft size={15}/>Všechny kampaně</button><PageHead title={campaign?'Upravit kampaň':'Nová e-mailová kampaň'} desc="Od nápadu k doručenému e-mailu ve čtyřech krocích."><Btn onClick={()=>save('Koncept',true)}>Uložit koncept</Btn></PageHead><section className="panel wizard"><div className="wizard-steps">{['Základ','Příjemci','Obsah','Odeslání'].map((s,i)=><React.Fragment key={s}>{i>0&&<div className="step-line"/>}<button disabled={i+1>step} onClick={()=>setStep(i+1)} className={`wizard-step ${step===i+1?'current':step>i+1?'complete':''}`}><b>{step>i+1?<Check size={13}/>:i+1}</b>{s}</button></React.Fragment>)}</div><div className="wizard-body">{step===1?<><h2>Začněme tím podstatným.</h2><p>Pojmenujte kampaň a napište předmět, který stojí za otevření.</p><div className="wizard-form"><Field label="Název kampaně" hint="Interní název. Uvidíte ho jen vy a váš tým."><input value={name} onChange={e=>setName(e.target.value)} required/></Field><Field label="Předmět e-mailu" hint={`${subject.length} znaků · doporučujeme 30–60 znaků`}><input value={subject} onChange={e=>setSubject(e.target.value)} required/></Field><Field label="Text náhledu (preheader)" hint="Doplňuje předmět ve schránce příjemce."><input value={preheader} onChange={e=>setPreheader(e.target.value)}/></Field><div className="form-grid"><Field label="Jméno odesílatele"><input value={sender} onChange={e=>setSender(e.target.value)}/></Field><Field label="E-mail odesílatele"><input type="email" value={senderEmail} onChange={e=>setSenderEmail(e.target.value)}/></Field></div><div className="notification-card"><span className="section-caption">Náhled ve schránce</span><p className="font-semibold mt-2 text-gray-700">{sender} <span className="float-right font-normal muted">9:00</span></p><p className="font-medium text-gray-600">{subject}</p><p>{preheader}</p></div></div></>:step===2?<><h2>Komu dnes napíšeme?</h2><p>Vyberte publikum. Odhlášené a neplatné adresy automaticky vynecháme.</p><RadioGroup value={audience} onValueChange={setAudience}>{audiences.map(a=><label key={a.id} className={`audience-card ${a.id===audience?'selected':''}`}><RadioGroupItem value={a.id}/><div><strong>{a.id}</strong><p>{a.desc}</p></div><span className="count">{fmt(a.count)}</span></label>)}</RadioGroup><div className="preview-notice mt"><CheckCircle2 size={17} color="#719e85"/><strong>{fmt(recipients)} příjemců</strong> s platným souhlasem pro tuto kampaň.</div></>:step===3?<><h2>E-mail, který bude radost číst.</h2><p>Začněte šablonou a upravte ji podle sebe v editoru.</p><div className="template-grid">{['Newsletter','Pozvánka','Jednoduchý e-mail'].map((t,i)=><button key={t} className={'template-card '+(template===t?'selected':'')} onClick={()=>templateSelect(t)}><div className="template-preview"><div className="template-paper"><span className="mini-brand">softema.</span><b>{['Podzim přeje\nnovým nápadům.','Marketing,\nkterý vás posune.','Ahoj, máme\npro vás novinku.'][i]}</b><div className="template-lines"><i/><i/><i/><i/></div><span className="mini-cta">Zjistit více →</span></div></div><footer className="flex-row spread">{t}{template===t&&<CheckCircle2 size={16} color="#de7c51"/>}</footer></button>)}</div><div className="flex-row mt"><Btn primary onClick={()=>setEditing(true)}><Pencil/>Otevřít editor e-mailu</Btn><Btn onClick={()=>setPreview(true)}><Eye/>Náhled</Btn><span className="muted small ml-auto hide-mobile">{blocks.length} obsahových bloků</span></div></>:<><h2>Všechno připravené?</h2><p>Zkontrolujte poslední detaily a vyberte čas odeslání.</p><div className="review-grid"><div>{[['Kampaň',name],['Předmět',subject],['Odesílatel',`${sender} <${senderEmail}>`],['Příjemci',`${audience} (${fmt(recipients)})`]].map(([k,v])=><div className="review-row" key={k}><span>{k}</span><strong>{v}</strong></div>)}<button onClick={()=>setPreview(true)} className="text-link mt"><Eye size={15}/>Zobrazit náhled e-mailu</button><div className="checklist"><p><CheckCircle2/>Odesílací doména je ověřená</p><p><CheckCircle2/>Příjemci mají platný souhlas</p><p><CheckCircle2/>Odkaz pro odhlášení je součástí patičky</p></div></div><div><h3 className="mb-4">Kdy e-mail odešleme?</h3><RadioGroup value={mode} onValueChange={setMode}><label className={'audience-card '+(mode==='schedule'?'selected':'')}><RadioGroupItem value="schedule"/><div><strong>Naplánovat odeslání</strong><p>Vyberte přesný den a čas.</p></div></label><label className={'audience-card '+(mode==='now'?'selected':'')}><RadioGroupItem value="now"/><div><strong>Odeslat hned</strong><p>Ukázka okamžitého odeslání.</p></div></label></RadioGroup>{mode==='schedule'&&<div className="form-grid mt"><Field label="Datum"><input type="date" value={date} min="2026-09-25" onChange={e=>setDate(e.target.value)}/></Field><Field label="Čas"><input type="time" value={time} onChange={e=>setTime(e.target.value)}/></Field><span className="small muted">Časové pásmo: Praha</span></div>}</div></div><div className="preview-notice mt">V tomto prototypu odeslání i plánování pouze simulujeme.</div></>}{error&&<p className="text-red-600 mt-4 text-sm">{error}</p>}</div><footer className="wizard-footer"><Btn onClick={()=>step===1?go('kampane'):setStep(step-1)}><ArrowLeft/>{step===1?'Zrušit':'Zpět'}</Btn><span className="muted small">Krok {step} ze 4</span>{step<4?<Btn primary onClick={next}>Pokračovat<ArrowRight/></Btn>:<Btn primary disabled={mode==='schedule'&&(!date||!time||date<'2026-09-25')} onClick={()=>{save(mode==='schedule'?'Naplánováno':'Odesláno');setDone(true)}}>{mode==='schedule'?<CalendarDays/>:<Send/>}{mode==='schedule'?'Naplánovat kampaň':'Odeslat ukázkově'}</Btn>}</footer></section><Modal open={preview} onClose={()=>setPreview(false)} title="Náhled e-mailu" desc={subject} wide><div className="email-paper"><EmailContent blocks={blocks}/></div></Modal></div>}
-const blockTypes=[{id:'heading',label:'Nadpis',icon:Heading},{id:'text',label:'Text',icon:Type},{id:'image',label:'Obrázek',icon:ImageIcon},{id:'button',label:'Tlačítko',icon:SquareMousePointer},{id:'callout',label:'Zvýraznění',icon:Columns2},{id:'divider',label:'Oddělovač',icon:Minus},{id:'logo',label:'Logo / název',icon:Sparkles},{id:'footer',label:'Patička',icon:FileText}];
-function makeBlock(type:string):Block{return{id:'b'+Date.now()+Math.random().toString(36).slice(2,5),type,text:({heading:'Váš nový nadpis',text:'Napište svůj příběh. Přidejte něco, co vašim čtenářům pomůže.',button:'Zjistit více',callout:'Myšlenka, která si zaslouží pozornost.',logo:'softema',footer:'Softema Creative · Olomouc\nOdhlásit odběr · Upravit předvolby',divider:'',image:''} as Record<string,string>)[type]||'',color:type==='button'?'#ed6637':type==='callout'?'#fff2eb':'#343a42',align:'left',url:type==='button'?'https://softema.cz':''}}
-export function EmailContent({blocks,selected,onSelect,onChange,onMove,onDelete,onDuplicate,dragging,setDragging,onDropAt,preview=false}:{blocks:Block[];selected?:string;onSelect?:(id:string)=>void;onChange?:(b:Block)=>void;onMove?:(id:string,d:number)=>void;onDelete?:(id:string)=>void;onDuplicate?:(id:string)=>void;dragging?:boolean;setDragging?:(d:boolean)=>void;onDropAt?:(e:React.DragEvent,index:number)=>void;preview?:boolean}){return <>{blocks.map((b,i)=><React.Fragment key={b.id}>{onDropAt&&<div className={'drop-zone '+(dragging?'dragging':'')} onDragOver={e=>e.preventDefault()} onDrop={e=>onDropAt(e,i)}/>}<div className={`email-block ${b.type} ${b.id===selected?'selected':''}`} onClick={()=>onSelect?.(b.id)} draggable={!!onSelect} onDragOver={onDropAt?e=>e.preventDefault():undefined} onDrop={onDropAt?e=>{e.stopPropagation();onDropAt(e,i)}:undefined} onDragStart={e=>{e.dataTransfer.setData('text/plain',JSON.stringify({id:b.id}));setDragging?.(true)}} onDragEnd={()=>setDragging?.(false)} style={{textAlign:b.align||'left',color:b.type==='heading'?b.color:undefined,cursor:onSelect?'pointer':'default'}}>{selected===b.id&&onMove&&<div className="block-controls" onClick={e=>e.stopPropagation()}><button title="Posunout nahoru" aria-label="Posunout blok nahoru" disabled={i===0} onClick={()=>onMove(b.id,-1)}><ChevronUp/></button><button title="Posunout dolů" aria-label="Posunout blok dolů" disabled={i===blocks.length-1} onClick={()=>onMove(b.id,1)}><ChevronDown/></button><button title="Duplikovat blok" aria-label="Duplikovat blok" onClick={()=>onDuplicate?.(b.id)}><Copy/></button><button title="Smazat blok" aria-label="Smazat blok" onClick={()=>onDelete?.(b.id)}><Trash2/></button></div>}{b.type==='button'?<span className="email-cta" style={{background:b.color}}>{b.text}</span>:b.type==='divider'?<hr/>:b.type==='callout'?<div style={{background:b.color}}>{b.text}</div>:b.type==='image'?(b.url?<img alt={b.text||'Obrázek e-mailu'} src={b.url} style={{width:'100%',height:'auto',borderRadius:5}}/>:<div className="property-note flex-row justify-center py-8"><ImageIcon size={24}/>Klikněte a nahrajte obrázek</div>):(preview?b.text.replaceAll('{{jmeno}}','Jane').replaceAll('{{firma}}','Novák Studio'):b.text)}</div></React.Fragment>)}{onDropAt&&<div className={'drop-zone '+(dragging?'dragging':'')} onDragOver={e=>e.preventDefault()} onDrop={e=>onDropAt(e,blocks.length)}/>}</>}
-function EmailEditor({name,initialBlocks,onBack,onSave}:{name:string;initialBlocks:Block[];onBack:(b:Block[])=>void;onSave:(b:Block[])=>void}){const [blocks,setB]=useState(initialBlocks);const [selected,setSelected]=useState('headline');const [past,setPast]=useState<Block[][]>([]);const [future,setFuture]=useState<Block[][]>([]);const [device,setDevice]=useState('desktop');const [preview,setPreview]=useState(false);const [test,setTest]=useState(false);const [testAddress,setTestAddress]=useState('marie@softema.cz');const [dragging,setDragging]=useState(false);const [saved,setSaved]=useState(true);const b=blocks.find(b=>b.id===selected);function change(next:Block[]){setPast(p=>[...p.slice(-39),blocks]);setFuture([]);setB(next);setSaved(false)}function update(p:Partial<Block>){if(b)change(blocks.map(x=>x.id===b.id?{...x,...p}:x))}function add(type:string,index=blocks.length-1){const n=makeBlock(type);const next=[...blocks];next.splice(Math.max(0,index),0,n);change(next);setSelected(n.id)}function drop(e:React.DragEvent,index:number){e.preventDefault();setDragging(false);try{const v=JSON.parse(e.dataTransfer.getData('text/plain'));if(v.type)add(v.type,index);else if(v.id){const from=blocks.findIndex(x=>x.id===v.id);if(from<0)return;const next=blocks.filter(x=>x.id!==v.id);next.splice(from<index?index-1:index,0,blocks[from]);change(next);setSelected(v.id)}}catch{}}function move(id:string,d:number){const from=blocks.findIndex(b=>b.id===id);const to=from+d;if(to<0||to>=blocks.length)return;const next=[...blocks];[next[from],next[to]]=[next[to],next[from]];change(next)}function undo(){if(!past.length)return;setFuture(f=>[blocks,...f]);setB(past[past.length-1]);setPast(p=>p.slice(0,-1));setSaved(false)}function redo(){if(!future.length)return;setPast(p=>[...p,blocks]);setB(future[0]);setFuture(f=>f.slice(1));setSaved(false)}return <section className="email-editor"><header className="editor-top"><div className="editor-title"><IconBtn label="Zpět na obsah kampaně" onClick={()=>onBack(blocks)}><ArrowLeft/></IconBtn><div><h2>{name}</h2><small>{saved?'Všechny změny uloženy':'Neuložené změny'} · Editor e-mailu</small></div></div><div className="head-actions"><IconBtn label="Zpět" onClick={undo} disabled={!past.length}><Undo2/></IconBtn><IconBtn label="Znovu" onClick={redo} disabled={!future.length}><Redo2/></IconBtn><Btn onClick={()=>setPreview(true)}><Eye/>Náhled</Btn><Btn onClick={()=>setTest(true)}><Send/>Testovací e-mail</Btn><Btn primary onClick={()=>{onSave(blocks);setSaved(true);onBack(blocks)}}><Check/>Uložit a zavřít</Btn></div></header><div className="editor-layout"><aside className="editor-palette"><h3>Obsahové bloky</h3><div className="block-grid">{blockTypes.map(t=>{const I=t.icon;return <button key={t.id} className="block-tool" draggable onDragStart={e=>{e.dataTransfer.setData('text/plain',JSON.stringify({type:t.id}));setDragging(true)}} onDragEnd={()=>setDragging(false)} onClick={()=>add(t.id)}><I/>{t.label}</button>})}</div><p>Přetáhněte blok do e-mailu nebo ho přidejte kliknutím.</p><div className="sidebar-divider !mx-0"/><h3>Personalizace</h3><p>Oslovte každého příjemce osobně.</p><div className="stack gap-2">{['{{jmeno}}','{{firma}}'].map(t=><Btn key={t} className="!text-xs" onClick={()=>{if(b)update({text:b.text+t});else toast.info('Nejprve vyberte textový blok.')}}>{t}</Btn>)}</div></aside><div className="editor-canvas"><div className="flex-row justify-center mb-5"><div className="segmented"><button aria-label="Náhled na počítači" className={device==='desktop'?'active':''} onClick={()=>setDevice('desktop')}><Monitor size={16}/></button><button aria-label="Náhled na mobilu" className={device==='mobile'?'active':''} onClick={()=>setDevice('mobile')}><Smartphone size={16}/></button></div><span className="small muted">{device==='desktop'?'600 px':'375 px'}</span></div><div className={'email-paper '+(device==='mobile'?'mobile':'')}><EmailContent blocks={blocks} selected={selected} onSelect={setSelected} onMove={move} onDelete={id=>{change(blocks.filter(b=>b.id!==id));setSelected('')}} onDuplicate={id=>{const i=blocks.findIndex(b=>b.id===id);const next=[...blocks];const n={...blocks[i],id:'copy'+Date.now()};next.splice(i+1,0,n);change(next);setSelected(n.id)}} dragging={dragging} setDragging={setDragging} onDropAt={drop}/>{!blocks.length&&<button className="empty full" onClick={()=>add('text',0)}><Plus/>Přidat první blok</button>}</div></div><aside className="editor-properties"><h3>Nastavení bloku</h3>{b?<><Badge tone="gray">{blockTypes.find(t=>t.id===b.type)?.label}</Badge>{b.type!=='divider'&&<Field label={b.type==='image'?'Alternativní text':'Obsah'}><textarea value={b.text} onChange={e=>update({text:e.target.value})}/></Field>}{b.type==='image'&&<Field label="Nahrát obrázek"><input type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];if(f)update({url:URL.createObjectURL(f),text:f.name})}}/></Field>}{b.type==='button'&&<Field label="Odkaz tlačítka"><input type="url" value={b.url||''} onChange={e=>update({url:e.target.value})} placeholder="https://"/></Field>}{['heading','button','callout'].includes(b.type)&&<Field label={b.type==='heading'?'Barva textu':'Barva pozadí'}><div className="flex-row"><input type="color" value={b.color||'#ed6637'} onChange={e=>update({color:e.target.value})}/><code className="small muted">{b.color}</code></div></Field>}{b.type!=='divider'&&<Field label="Zarovnání"><div className="segmented">{(['left','center','right'] as const).map((a,i)=>{const I=[AlignLeft,AlignCenter,AlignRight][i];return <button key={a} aria-label={['Zarovnat vlevo','Zarovnat na střed','Zarovnat vpravo'][i]} className={(b.align||'left')===a?'active':''} onClick={()=>update({align:a})}><I size={17}/></button>})}</div></Field>}<div className="property-note mt">Změny uvidíte ihned v náhledu. Pořadí bloků upravíte přetažením nebo šipkami u vybraného bloku.</div></>:<div className="property-note">Vyberte blok v e-mailu a upravte jeho obsah, barvy a zarovnání.</div>}</aside></div><footer className="editor-bottom"><span>{blocks.length} bloků · Responzivní e-mail</span><span>Softema e-mail editor</span></footer><Modal open={preview} onClose={()=>setPreview(false)} title="Takhle e-mail uvidí příjemce" desc="Ukázková personalizace: Jan Novák · Novák Studio" wide><div className={'email-paper '+(device==='mobile'?'mobile':'')}><EmailContent blocks={blocks} preview/></div></Modal><Modal open={test} onClose={()=>setTest(false)} title="Testovací e-mail" desc="Zkontrolujte adresu příjemce testu."><form className="stack" onSubmit={e=>{e.preventDefault();setTest(false);toast.success('Ukázkový test byl připraven.',{description:'Na adresu '+testAddress+' nebyla odeslána skutečná zpráva.'});setPreview(true)}}><Field label="E-mail pro test"><input type="email" value={testAddress} onChange={e=>setTestAddress(e.target.value)} required/></Field><div className="preview-notice">V prototypu vám místo skutečného odeslání ukážeme náhled.</div><Btn primary type="submit"><Send/>Vyzkoušet testovací e-mail</Btn></form></Modal></section>}
-function CampaignReport({campaign:c}:{campaign:Campaign}){const {go,contacts,setCampaigns}=useHub();const [tab,setTab]=useState('Přehled');const [q,setQ]=useState('');const pct=parseFloat(c.open.replace(',','.'))||42.8;return <div className="page"><button className="back-link" onClick={()=>go('kampane')}><ArrowLeft size={15}/>Všechny kampaně</button><PageHead title={c.name} desc={'Odesláno '+c.date+' · '+c.audience}><Badge>Odesláno</Badge><Btn onClick={()=>{const copy={...c,id:Date.now(),status:'Koncept',name:c.name+' — kopie'};setCampaigns(cs=>[copy,...cs]);go('kampane/'+copy.id)}}><Copy/>Vytvořit kopii</Btn></PageHead><Tabbar value={tab} onChange={setTab} items={['Přehled','Příjemci','Obsah e-mailu']}/>{tab==='Přehled'?<><div className="metric-grid mt"><Metric label="Doručeno" value={fmt(Math.round(c.recipients*.996))}/><Metric label="Otevřelo" value={c.open==='—'?'0 %':c.open}/><Metric label="Prokliklo" value={c.click==='—'?'0 %':c.click}/><Metric label="Odhlášeno" value="0,2 %"/></div><section className="panel"><CardHead title="Otevření a prokliky v čase"/><div className="report-graph"><RevenueChart email/></div></section><div className="two-col mt"><section className="panel"><CardHead title="Nejúspěšnější odkazy"/><Table className="hub-table"><TableHeader><TableRow><TableHead>Odkaz</TableHead><TableHead>Kliknutí</TableHead><TableHead>Podíl</TableHead></TableRow></TableHeader><TableBody>{[['Chci načerpat inspiraci','198','68,5 %'],['Více o našich službách','67','23,2 %'],['Softema.cz','24','8,3 %']].map(r=><TableRow key={r[0]}>{r.map(v=><TableCell key={v}>{v}</TableCell>)}</TableRow>)}</TableBody></Table></section><section className="panel side-box"><h3>Souhrn odeslání</h3><div className="review-row"><span>Odesílatel</span><strong>Softema Creative</strong></div><div className="review-row"><span>Doména</span><strong>mail.softema.cz</strong></div><div className="review-row"><span>Nedoručeno</span><strong>0,4 %</strong></div><div className="review-row"><span>Spam stížnosti</span><strong>0</strong></div></section></div></>:tab==='Příjemci'?<><div className="toolbar"><SearchInput value={q} onChange={setQ} placeholder="Hledat příjemce…"/></div><section className="panel"><Table className="hub-table"><TableHeader><TableRow><TableHead>Kontakt</TableHead><TableHead>Stav doručení</TableHead><TableHead>Poslední aktivita</TableHead><TableHead/></TableRow></TableHeader><TableBody>{contacts.filter(x=>normalize(x.name+' '+x.email).includes(normalize(q))).map((x,i)=><TableRow key={x.id} onClick={()=>go('kontakty/'+x.id)}><TableCell><div className="name-cell"><Avatar name={x.name} color={x.color}/><button className="text-left">{x.name}<small>{x.email}</small></button></div></TableCell><TableCell><Badge tone={i<3?'green':'gray'}>{i<3?'Proklik':i<8?'Otevřeno':'Doručeno'}</Badge></TableCell><TableCell className="muted">25. 9. 2026 · {9+i}:42</TableCell><TableCell><ChevronRight size={14}/></TableCell></TableRow>)}</TableBody></Table></section></>:<div className="mt mx-auto max-w-xl"><div className="email-paper"><EmailContent blocks={c.blocks} preview/></div></div>}</div>}
+/* E-mailing: campaign list with status-specific actions, campaign detail and report. Wizard and editor live in campaign-wizard.tsx. */
+import React, { useMemo, useState } from 'react';
+import { ArrowLeft, CalendarClock, ChevronRight, Copy, Download, Eye, Mail, MoreHorizontal, Pencil, Plus, RotateCcw, Send, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { fmt, fmtDate, fmtDateTime, normalize, percent, plural, periodStart } from '@/lib/hub/format';
+import { audienceLabel, audienceOf, campaignStats } from '@/lib/hub/logic';
+import { makeCampaign, simulateSend } from '@/lib/hub/ops';
+import type { Campaign, CampaignStatus } from '@/lib/hub/types';
+import { useHub } from './state';
+import { Avatar, Badge, Btn, Empty, Metric, PageHead, Pick, SearchInput, Tabbar } from './ui';
+import { Bar, Notice, Pager, Section, download, paginate, toCsv, useConfirm, useRoute } from './kit';
+import { CampaignEditor, CampaignPreview, CampaignWizard, PreviewModal } from './campaign-wizard';
+
+export default function Campaigns() {
+  const { parts } = useRoute();
+  const sub = parts[1];
+  if (!sub) return <CampaignList />;
+  if (sub === 'nova') return <CampaignWizard />;
+  const id = Number(sub);
+  if (parts[2] === 'upravit') return <CampaignWizard id={id} />;
+  if (parts[2] === 'editor') return <CampaignEditor id={id} />;
+  return <CampaignDetail id={id} />;
+}
+
+const STATUS_TABS: [string, string][] = [['all', 'Všechny'], ['Koncept', 'Koncepty'], ['Naplánováno', 'Naplánované'], ['Odesláno', 'Odeslané']];
+const statusTone = (s: CampaignStatus) => (s === 'Odesláno' ? 'green' : s === 'Naplánováno' ? 'blue' : 'gray');
+const when = (c: Campaign) => (c.status === 'Odesláno' && c.sentAt ? `Odesláno ${fmtDateTime(c.sentAt)}` : c.status === 'Naplánováno' && c.scheduledAt ? `Naplánováno na ${fmtDateTime(c.scheduledAt)}` : `Upraveno ${fmtDateTime(c.updatedAt)}`);
+
+/** Status-specific actions shared by the list menu and the detail header. */
+function useCampaignActions() {
+  const { data, workspaceId, mutate, go } = useHub();
+  const [confirmEl, confirm] = useConfirm();
+  const duplicate = (c: Campaign) => {
+    const copy = makeCampaign(data, workspaceId, { name: `${c.name} (kopie)`, subject: c.subject, preheader: c.preheader, sender: c.sender, senderEmail: c.senderEmail, audience: c.audience, extraContactIds: c.extraContactIds, editor: c.editor, blocks: c.blocks, design: c.design, html: c.html, links: c.links });
+    mutate(d => ({ ...d, campaigns: [copy, ...d.campaigns] }));
+    toast.success('Kopie kampaně byla vytvořena jako koncept.');
+    go(`kampane/${copy.id}/upravit`);
+  };
+  const remove = (c: Campaign) => confirm({ title: `Smazat koncept ${c.name}?`, desc: 'Koncept včetně obsahu se nevratně smaže.', confirm: 'Smazat koncept', danger: true, onConfirm: () => { mutate(d => ({ ...d, campaigns: d.campaigns.filter(x => !(x.workspaceId === workspaceId && x.id === c.id)) })); toast.success('Koncept byl smazán.'); go('kampane'); } });
+  const unschedule = (c: Campaign) => { mutate(d => ({ ...d, campaigns: d.campaigns.map(x => (x.workspaceId === workspaceId && x.id === c.id ? { ...x, status: 'Koncept', scheduledAt: undefined, updatedAt: new Date().toISOString() } : x)) })); toast.success('Plán odeslání byl zrušen.'); };
+  const sendNow = (c: Campaign) => confirm({ title: 'Odeslat kampaň hned?', desc: `Simulace: vygenerujeme ukázkové výsledky pro ${plural(audienceOf(data, c).eligible.length, 'příjemce', 'příjemce', 'příjemců')} se souhlasem. Nic se reálně neodešle.`, confirm: 'Odeslat (simulace)', onConfirm: () => { mutate(d => simulateSend(d, workspaceId, c.id).data); toast.success('Kampaň byla odeslána (simulace).'); go('kampane/' + c.id); } });
+  const exportResults = (c: Campaign) => {
+    const byId = new Map(data.contacts.filter(x => x.workspaceId === workspaceId).map(x => [x.id, x]));
+    download(`vysledky-${c.id}.csv`, toCsv([['Kontakt', 'E-mail', 'Doručeno', 'Otevřeno', 'Kliknuto', 'Odkaz', 'Odhlášen'], ...(c.results ?? []).map(r => { const x = byId.get(r.contactId); return [x?.name ?? 'Smazaný kontakt', x?.email ?? '', r.delivered ? 'ano' : 'ne', r.opened ? 'ano' : 'ne', r.clicked ? 'ano' : 'ne', r.link ?? '', r.unsubscribed ? 'ano' : 'ne']; })]));
+  };
+  return { confirmEl, duplicate, remove, unschedule, sendNow, exportResults };
+}
+
+function CampaignMenu({ c, actions }: { c: Campaign; actions: ReturnType<typeof useCampaignActions> }) {
+  const { go } = useHub();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild><button type="button" className="icon-btn" aria-label={`Akce kampaně ${c.name}`} onClick={e => e.stopPropagation()}><MoreHorizontal aria-hidden /></button></DropdownMenuTrigger>
+      <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
+        {c.status === 'Koncept' && <DropdownMenuItem onSelect={() => go(`kampane/${c.id}/upravit`)}><Pencil aria-hidden />Pokračovat v úpravách</DropdownMenuItem>}
+        {c.status === 'Koncept' && <DropdownMenuItem onSelect={() => go(`kampane/${c.id}/editor`)}><Mail aria-hidden />Upravit obsah e-mailu</DropdownMenuItem>}
+        {c.status === 'Naplánováno' && <DropdownMenuItem onSelect={() => actions.sendNow(c)}><Send aria-hidden />Odeslat hned</DropdownMenuItem>}
+        {c.status === 'Naplánováno' && <DropdownMenuItem onSelect={() => actions.unschedule(c)}><RotateCcw aria-hidden />Zrušit plán</DropdownMenuItem>}
+        {c.status === 'Odesláno' && <DropdownMenuItem onSelect={() => go('kampane/' + c.id)}><Eye aria-hidden />Zobrazit report</DropdownMenuItem>}
+        {c.status === 'Odesláno' && <DropdownMenuItem onSelect={() => actions.exportResults(c)}><Download aria-hidden />Export výsledků</DropdownMenuItem>}
+        <DropdownMenuItem onSelect={() => actions.duplicate(c)}><Copy aria-hidden />Duplikovat</DropdownMenuItem>
+        {c.status === 'Koncept' && <><DropdownMenuSeparator /><DropdownMenuItem variant="destructive" onSelect={() => actions.remove(c)}><Trash2 aria-hidden />Smazat koncept</DropdownMenuItem></>}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function CampaignList() {
+  const { w, data, go } = useHub();
+  const { query, setQuery } = useRoute();
+  const status = query.get('stav') ?? 'all';
+  const q = query.get('q') ?? '';
+  const actions = useCampaignActions();
+  const [now] = useState(() => Date.now());
+  const list = useMemo(() => w.campaigns
+    .filter(c => (status === 'all' || c.status === status) && normalize(`${c.name} ${c.subject}`).includes(normalize(q)))
+    .sort((a, b) => (b.sentAt ?? b.scheduledAt ?? b.updatedAt).localeCompare(a.sentAt ?? a.scheduledAt ?? a.updatedAt)), [w.campaigns, status, q]);
+  const { page, pages, slice, from, to } = paginate(list, Number(query.get('strana') || 1), 20);
+  const month = w.campaigns.filter(c => c.status === 'Odesláno' && c.sentAt && +new Date(c.sentAt) >= periodStart(30, now)).map(campaignStats).filter((s): s is NonNullable<typeof s> => !!s);
+  const delivered = month.reduce((s, x) => s + x.delivered, 0);
+  const counts = Object.fromEntries(STATUS_TABS.map(([k]) => [k, k === 'all' ? w.campaigns.length : w.campaigns.filter(c => c.status === k).length]));
+  return (
+    <div className="page">
+      <PageHead title="Kampaně" desc="E-mailové kampaně pracovního prostoru. Odesílání je v prototypu simulované.">
+        <Btn primary onClick={() => go('kampane/nova')}><Plus aria-hidden />Nová kampaň</Btn>
+      </PageHead>
+      <div className="metric-grid">
+        <Metric label="Odesláno za 30 dní" value={fmt(delivered)} desc={plural(month.length, 'kampaň', 'kampaně', 'kampaní')} />
+        <Metric label="Průměrná míra otevření" value={delivered ? percent((month.reduce((s, x) => s + x.opened, 0) / delivered) * 100) : '—'} desc="za 30 dní" />
+        <Metric label="Průměrná míra prokliku" value={delivered ? percent((month.reduce((s, x) => s + x.clicked, 0) / delivered) * 100) : '—'} desc="za 30 dní" />
+        <Metric label="Naplánované" value={fmt(counts['Naplánováno'])} desc={counts['Koncept'] ? plural(counts['Koncept'], 'koncept', 'koncepty', 'konceptů') : 'žádné koncepty'} />
+      </div>
+      <Tabbar value={status} onChange={v => setQuery({ stav: v === 'all' ? undefined : v, strana: undefined })} items={STATUS_TABS.map(([k, l]) => [k, `${l} (${counts[k]})`] as [string, string])} />
+      <div className="toolbar"><SearchInput value={q} onChange={v => setQuery({ q: v || undefined, strana: undefined })} placeholder="Hledat kampaň nebo předmět…" /></div>
+      <section className="panel">
+        {w.campaigns.length === 0 ? (
+          <div className="empty"><h3>Zatím žádné kampaně</h3><p>Vytvořte první kampaň – průvodce vás provede příjemci, obsahem i odesláním.</p><Btn primary onClick={() => go('kampane/nova')}><Plus aria-hidden />Vytvořit kampaň</Btn></div>
+        ) : (
+          <>
+            <div className="table-scroll">
+              <table className="hub-table data-table">
+                <thead><tr><th>Kampaň</th><th>Stav</th><th className="col-opt">Příjemci</th><th className="num">Otevření</th><th className="num col-opt">Prokliky</th><th aria-label="Akce" /></tr></thead>
+                <tbody>
+                  {slice.map(c => { const s = campaignStats(c); const a = s ? null : audienceOf(data, c); return (
+                    <tr key={c.id} onClick={() => go(c.status === 'Koncept' ? `kampane/${c.id}/upravit` : 'kampane/' + c.id)}>
+                      <td><div className="name-cell"><span className="mail-box"><Mail size={15} aria-hidden /></span><button type="button" onClick={e => { e.stopPropagation(); go(c.status === 'Koncept' ? `kampane/${c.id}/upravit` : 'kampane/' + c.id); }}>{c.name}<small>{when(c)}</small></button></div></td>
+                      <td><Badge tone={statusTone(c.status)}>{c.status}</Badge></td>
+                      <td className="col-opt muted">{s ? fmt(s.recipients) : fmt(a!.eligible.length)}<small className="block">{audienceLabel(data, c)}</small></td>
+                      <td className="num">{s ? percent(s.openRate) : '—'}</td>
+                      <td className="num col-opt">{s ? percent(s.clickRate) : '—'}</td>
+                      <td className="col-actions" onClick={e => e.stopPropagation()}><CampaignMenu c={c} actions={actions} /></td>
+                    </tr>
+                  ); })}
+                </tbody>
+              </table>
+            </div>
+            {!list.length && <Empty text="Žádná kampaň neodpovídá filtru." />}
+            <Pager page={page} pages={pages} total={list.length} from={from} to={to} onPage={p => setQuery({ strana: p > 1 ? String(p) : undefined })} noun="kampaní" />
+          </>
+        )}
+      </section>
+      {actions.confirmEl}
+    </div>
+  );
+}
+
+function CampaignDetail({ id }: { id: number }) {
+  const { w, data, go } = useHub();
+  const c = w.campaigns.find(x => x.id === id);
+  const actions = useCampaignActions();
+  const [preview, setPreview] = useState(false);
+  if (!c) return <div className="page"><section className="panel empty"><h3>Kampaň nenalezena</h3><p>V tomto pracovním prostoru kampaň neexistuje nebo byla smazána.</p><Btn primary onClick={() => go('kampane')}>Zpět na kampaně</Btn></section></div>;
+  if (c.status === 'Odesláno') return <Report key={c.id} c={c} actions={actions} />;
+  const a = audienceOf(data, c);
+  return (
+    <div className="page">
+      <button type="button" className="back-link" onClick={() => go('kampane')}><ArrowLeft size={15} aria-hidden />Všechny kampaně</button>
+      <PageHead title={c.name} desc={when(c)}>
+        <Badge tone={statusTone(c.status)}>{c.status}</Badge>
+        {c.status === 'Koncept' ? <Btn primary onClick={() => go(`kampane/${c.id}/upravit`)}><Pencil aria-hidden />Pokračovat v úpravách</Btn> : <>
+          <Btn onClick={() => actions.unschedule(c)}><RotateCcw aria-hidden />Zrušit plán</Btn>
+          <Btn primary onClick={() => actions.sendNow(c)}><Send aria-hidden />Odeslat hned</Btn>
+        </>}
+        <CampaignMenu c={c} actions={actions} />
+      </PageHead>
+      {c.status === 'Naplánováno' && <Notice><CalendarClock size={14} aria-hidden className="sr-only" />Kampaň se „odešle“ (simulace) {fmtDateTime(c.scheduledAt!)}, nebo při prvním otevření aplikace po tomto čase.</Notice>}
+      <div className="split mt-4">
+        <Section title="Souhrn">
+          <div className="sec-body">
+            <div className="review-row"><span>Předmět</span><strong>{c.subject || '—'}</strong></div>
+            <div className="review-row"><span>Preheader</span><strong>{c.preheader || '—'}</strong></div>
+            <div className="review-row"><span>Odesílatel</span><strong>{c.sender} &lt;{c.senderEmail}&gt;</strong></div>
+            <div className="review-row"><span>Příjemci</span><strong>{audienceLabel(data, c)} · {fmt(a.eligible.length)} se souhlasem</strong></div>
+            <div className="review-row"><span>Editor</span><strong>{c.editor === 'unlayer' ? 'Unlayer' : 'Vestavěný'}</strong></div>
+            <div className="flex-row mt-4"><Btn onClick={() => setPreview(true)}><Eye aria-hidden />Náhled</Btn></div>
+          </div>
+        </Section>
+        <div className="review-preview"><CampaignPreview c={c} device="mobile" /></div>
+      </div>
+      <PreviewModal c={c} open={preview} onClose={() => setPreview(false)} />
+      {actions.confirmEl}
+    </div>
+  );
+}
+
+type ResultFilter = 'all' | 'opened' | 'clicked' | 'unopened' | 'bounced' | 'unsub';
+const FILTERS: [ResultFilter, string][] = [['all', 'Všichni'], ['opened', 'Otevřeli'], ['clicked', 'Klikli'], ['unopened', 'Neotevřeli'], ['bounced', 'Nedoručeno'], ['unsub', 'Odhlásili se']];
+
+function Report({ c, actions }: { c: Campaign; actions: ReturnType<typeof useCampaignActions> }) {
+  const { w, data, workspaceId, mutate, go } = useHub();
+  const [tab, setTab] = useState('overview');
+  const [filter, setFilter] = useState<ResultFilter>('all');
+  const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
+  const s = campaignStats(c)!;
+  const byId = useMemo(() => new Map(w.contacts.map(x => [x.id, x])), [w.contacts]);
+  const links = Object.entries((c.results ?? []).reduce<Record<string, number>>((m, r) => { if (r.clicked) m[r.link ?? 'Odkaz'] = (m[r.link ?? 'Odkaz'] ?? 0) + 1; return m; }, {})).sort((a, b) => b[1] - a[1]);
+  const rows = (c.results ?? []).filter(r => (filter === 'all' || (filter === 'opened' && r.opened) || (filter === 'clicked' && r.clicked) || (filter === 'unopened' && r.delivered && !r.opened) || (filter === 'bounced' && !r.delivered) || (filter === 'unsub' && r.unsubscribed))
+    && normalize(`${byId.get(r.contactId)?.name ?? ''} ${byId.get(r.contactId)?.email ?? ''}`).includes(normalize(q)));
+  const pg = paginate(rows, page, 25);
+  const unopened = (c.results ?? []).filter(r => r.delivered && !r.opened && byId.has(r.contactId)).map(r => r.contactId);
+  const resend = () => {
+    const copy = makeCampaign(data, workspaceId, { name: `${c.name} – neotevřeli`, subject: c.subject, preheader: c.preheader, sender: c.sender, senderEmail: c.senderEmail, audience: { type: 'manual' }, extraContactIds: unopened, editor: c.editor, blocks: c.blocks, design: c.design, html: c.html, links: c.links });
+    mutate(d => ({ ...d, campaigns: [copy, ...d.campaigns] }));
+    toast.success(`Koncept pro ${plural(unopened.length, 'kontakt', 'kontakty', 'kontaktů')}, kteří e-mail neotevřeli.`);
+    go(`kampane/${copy.id}/upravit?krok=2`);
+  };
+  return (
+    <div className="page">
+      <button type="button" className="back-link" onClick={() => go('kampane')}><ArrowLeft size={15} aria-hidden />Všechny kampaně</button>
+      <PageHead title={c.name} desc={`${when(c)} · ${audienceLabel(data, c)} · výsledky jsou simulované`}>
+        <Badge tone="green">Odesláno</Badge>
+        <Btn onClick={() => actions.exportResults(c)}><Download aria-hidden />Export</Btn>
+        <Btn onClick={() => actions.duplicate(c)}><Copy aria-hidden />Duplikovat</Btn>
+      </PageHead>
+      <Tabbar value={tab} onChange={setTab} items={[['overview', 'Přehled'], ['recipients', `Příjemci (${fmt(s.recipients)})`], ['content', 'Obsah e-mailu']]} />
+      {tab === 'overview' && (
+        <>
+          <div className="metric-grid mt">
+            <Metric label="Doručeno" value={fmt(s.delivered)} desc={`${percent((s.delivered / Math.max(1, s.recipients)) * 100)} z ${fmt(s.recipients)}`} />
+            <Metric label="Míra otevření" value={percent(s.openRate)} desc={plural(s.opened, 'otevření', 'otevření', 'otevření')} />
+            <Metric label="Míra prokliku" value={percent(s.clickRate)} desc={plural(s.clicked, 'proklik', 'prokliky', 'prokliků')} />
+            <Metric label="Odhlášení" value={fmt(s.unsubscribed)} desc={`nedoručeno ${fmt(s.bounced)}`} />
+          </div>
+          <div className="split">
+            <Section title="Trychtýř">
+              <div className="sec-body funnel">
+                {[['Odesláno', s.recipients], ['Doručeno', s.delivered], ['Otevřeno', s.opened], ['Kliknuto', s.clicked]].map(([l, v]) => (
+                  <div key={l as string} className="funnel-row"><span>{l}</span><Bar value={((v as number) / Math.max(1, s.recipients)) * 100} label={l as string} /><strong>{fmt(v as number)}</strong></div>
+                ))}
+              </div>
+            </Section>
+            <Section title="Odkazy" desc="Podle prokliků">
+              <ul className="sec-body row-list">
+                {links.map(([l, n]) => <li key={l} className="kv"><span>{l}</span><strong>{fmt(n)} · {percent((n / Math.max(1, s.clicked)) * 100)}</strong></li>)}
+                {!links.length && <li className="muted">Zatím žádné prokliky.</li>}
+              </ul>
+            </Section>
+          </div>
+          <Section title="Další krok" className="mt-4">
+            <div className="sec-body flex-row wrap">
+              <Btn onClick={resend} disabled={!unopened.length}><Send aria-hidden />Poslat znovu neotevřeným ({fmt(unopened.length)})</Btn>
+              <Btn onClick={() => { setTab('recipients'); setFilter('clicked'); }}>Zobrazit, kdo klikl<ChevronRight aria-hidden /></Btn>
+            </div>
+          </Section>
+        </>
+      )}
+      {tab === 'recipients' && (
+        <>
+          <div className="toolbar"><SearchInput value={q} onChange={v => { setQ(v); setPage(1); }} placeholder="Hledat příjemce…" /><Pick value={filter} onChange={v => { setFilter(v as ResultFilter); setPage(1); }} options={FILTERS} label="Filtr výsledku" /></div>
+          <section className="panel">
+            <div className="table-scroll">
+              <table className="hub-table data-table">
+                <thead><tr><th>Kontakt</th><th>Výsledek</th><th className="col-opt">Odkaz</th><th aria-hidden /></tr></thead>
+                <tbody>
+                  {pg.slice.map(r => { const x = byId.get(r.contactId); const st = !r.delivered ? 'Nedoručeno' : r.unsubscribed ? 'Odhlásil(a) se' : r.clicked ? 'Kliknul(a)' : r.opened ? 'Otevřeno' : 'Doručeno'; return (
+                    <tr key={r.contactId} onClick={() => x && go('kontakty/' + x.id)}>
+                      <td><div className="name-cell">{x ? <><Avatar name={x.name} color={x.color} /><button type="button">{x.name}<small>{x.email}</small></button></> : <span className="muted">Smazaný kontakt</span>}</div></td>
+                      <td><Badge tone={st === 'Kliknul(a)' ? 'orange' : st === 'Otevřeno' ? 'blue' : st === 'Doručeno' ? 'gray' : 'red'}>{st}</Badge></td>
+                      <td className="col-opt muted">{r.link ?? '—'}</td>
+                      <td className="col-go"><ChevronRight size={16} aria-hidden className="muted" /></td>
+                    </tr>
+                  ); })}
+                </tbody>
+              </table>
+            </div>
+            {!rows.length && <Empty text="Žádný příjemce neodpovídá filtru." />}
+            <Pager page={pg.page} pages={pg.pages} total={rows.length} from={pg.from} to={pg.to} onPage={setPage} noun="příjemců" />
+          </section>
+        </>
+      )}
+      {tab === 'content' && <div className="content-preview mt"><p className="muted small">Předmět: {c.subject} · Odesílatel: {c.sender} &lt;{c.senderEmail}&gt; · odesláno {c.sentAt ? fmtDate(c.sentAt) : ''}</p><CampaignPreview c={c} /></div>}
+      {actions.confirmEl}
+    </div>
+  );
+}

@@ -4,10 +4,10 @@ import { heading, isMobile, openHub, trackPageErrors } from './helpers';
 // [sidebar label, page heading, hash route]. AI agenti is intentionally not covered.
 const modules: [string, string, string][] = [
   ['Kontakty', 'Kontakty', 'kontakty'],
-  ['Kampaně', 'E-mailové kampaně', 'kampane'],
+  ['Kampaně', 'Kampaně', 'kampane'],
   ['Automatizace', 'Automatizace', 'automatizace'],
   ['Platby', 'Platby', 'platby'],
-  ['Kurzy a komunita', 'Kurzy a komunita', 'kurzy'],
+  ['Kurzy a produkty', 'Kurzy a komunita', 'kurzy'],
   ['Webináře', 'Webináře', 'webinare'],
   ['Chatbot', 'Váš webový chatbot', 'chatbot'],
   ['Nastavení', 'Nastavení', 'nastaveni'],
@@ -37,25 +37,38 @@ test('mobile menu opens a module', async ({ page }, info) => {
   noErrors();
 });
 
+test('dashboard sources link to the filtered contact list', async ({ page }) => {
+  const noErrors = trackPageErrors(page);
+  await openHub(page, 'prehled');
+  const sources = page.locator('.dash-sources');
+  const total = (await sources.locator('.src-donut-center strong').textContent())!.trim();
+  const first = sources.locator('.src-row').first();
+  const count = (await first.locator('.src-count').textContent())!.trim();
+  expect(Number(total.replace(/\s/g, ''))).toBeGreaterThan(0);
+  await first.click();
+  await expect(page).toHaveURL(/#kontakty\?zdroj=.+&novi=30$/);
+  await expect(page.locator('.pager')).toContainText(`z ${count} kontaktů`);
+  noErrors();
+});
+
 test('contact list → detail → back', async ({ page }) => {
   const noErrors = trackPageErrors(page);
   await openHub(page, 'kontakty');
+  // search ignores diacritics
+  await page.getByRole('textbox', { name: /Hledat jméno/ }).fill('jan novak');
   const openJan = () => page.getByRole('cell').getByRole('button', { name: /^Jan Novák/ }).click();
   const detail = page.getByRole('heading', { level: 2, name: 'Jan Novák' });
 
   await openJan();
   await expect(detail).toBeVisible();
   await expect(page).toHaveURL(/#kontakty\/1$/);
-  await expect(page.getByText('Zaplacena faktura 202609028')).toBeVisible();
+  await expect(page.getByText(/^Vystavena faktura \d+/).first()).toBeVisible();
 
   await page.getByRole('button', { name: 'Zpět na kontakty' }).click();
   await expect(heading(page, 'Kontakty')).toBeVisible();
   await expect(page).toHaveURL(/#kontakty$/);
-
-  await openJan();
-  await expect(detail).toBeVisible();
   await page.goBack();
-  await expect(heading(page, 'Kontakty')).toBeVisible();
+  await expect(detail).toBeVisible();
   noErrors();
 });
 
@@ -83,38 +96,118 @@ test('contact custom fields: add, validate, edit, remove', async ({ page }) => {
   await dialog.getByLabel('Hodnota').fill('www.novakstudio.cz');
   await dialog.getByRole('button', { name: 'Uložit změny' }).click();
   await expect(rows.last()).toContainText('www.novakstudio.cz');
+  // stored in the browser: survives a reload
+  await page.reload();
+  await page.waitForLoadState('networkidle');
+  await expect(rows.last()).toContainText('www.novakstudio.cz');
   await rows.last().click();
   await dialog.getByRole('button', { name: 'Odebrat pole' }).click();
   await expect(rows).toHaveCount(4);
-
-  await page.getByRole('button', { name: 'Zpět na kontakty' }).click();
-  await page.getByRole('cell').getByRole('button', { name: /^Petra Svobodová/ }).click();
-  await expect(box.getByText('Zatím tu nejsou žádná vlastní pole.', { exact: false })).toBeVisible();
   noErrors();
 });
 
-test('new campaign → wizard → editor → back', async ({ page }) => {
+test('workspaces keep their own contacts', async ({ page }, info) => {
+  test.skip(isMobile(info), 'desktop sidebar');
+  const noErrors = trackPageErrors(page);
+  await openHub(page, 'kontakty/1');
+  await page.getByRole('button', { name: 'Upravit kontakt' }).click();
+  await page.getByRole('dialog').getByLabel('Firma').fill('Novák Studio s.r.o.');
+  await page.getByRole('dialog').getByRole('button', { name: 'Uložit změny' }).click();
+  await expect(page.getByText('Novák Studio s.r.o.').first()).toBeVisible();
+
+  await page.locator('.workspace-switch').click();
+  await page.getByRole('menuitem', { name: /4legs/ }).click();
+  await openHub(page, 'kontakty/1');
+  await expect(page.getByRole('heading', { name: 'Kontakt nenalezen' })).toBeVisible();
+  await openHub(page, 'kontakty');
+  await page.getByRole('textbox', { name: /Hledat jméno/ }).fill('adam benes');
+  await expect(page.getByRole('cell').getByRole('button', { name: /^Adam Beneš/ })).toBeVisible();
+  noErrors();
+});
+
+test('segment builder counts live and saves', async ({ page }) => {
+  const noErrors = trackPageErrors(page);
+  await openHub(page, 'kontakty/segmenty/novy');
+  await page.getByLabel('Název segmentu').fill('Brno a okolí');
+  await page.getByRole('combobox', { name: 'Pole pravidla 1' }).click();
+  await page.getByRole('option', { name: 'Město' }).click();
+  await page.getByRole('textbox', { name: 'Hodnota pravidla 1' }).fill('brno');
+  const count = page.locator('.seg-count strong');
+  await expect(count).not.toHaveText('0');
+  const n = (await count.textContent())!.trim();
+  await page.getByRole('button', { name: 'Vytvořit segment' }).click();
+  await expect(page).toHaveURL(/#kontakty\/segmenty\/seg-/);
+  await page.getByRole('button', { name: 'Zpět na segmenty' }).click();
+  await expect(page.getByRole('row').filter({ hasText: 'Brno a okolí' })).toContainText(n);
+  noErrors();
+});
+
+test('CSV import maps, validates and deduplicates', async ({ page }) => {
+  const noErrors = trackPageErrors(page);
+  await openHub(page, 'kontakty/import');
+  await page.getByRole('button', { name: 'Načíst ukázková data' }).click();
+  await page.getByRole('button', { name: 'Pokračovat' }).click();
+  await page.getByRole('button', { name: 'Zkontrolovat data' }).click();
+  await expect(page.locator('.import-stats > div').first()).toContainText('2');
+  await expect(page.getByText('Řádek 4: Neplatný e-mail', { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: /^Importovat 2/ }).click();
+  await expect(page.getByRole('heading', { name: 'Import je hotový' })).toBeVisible();
+  await page.getByRole('button', { name: 'Zobrazit importované kontakty' }).click();
+  await expect(page.getByRole('cell').getByRole('button', { name: /^Jana Ukázková/ })).toBeVisible();
+  // the same file again creates nothing new
+  await openHub(page, 'kontakty/import');
+  await page.getByRole('button', { name: 'Načíst ukázková data' }).click();
+  await page.getByRole('button', { name: 'Pokračovat' }).click();
+  await page.getByRole('button', { name: 'Zkontrolovat data' }).click();
+  await expect(page.locator('.import-stats > div').first()).toContainText('0');
+  await expect(page.locator('.import-stats > div').nth(1)).toContainText('2');
+  noErrors();
+});
+
+test('new campaign → recipients → block editor → schedule', async ({ page }) => {
   const noErrors = trackPageErrors(page);
   await openHub(page, 'kampane');
-  await page.getByRole('button', { name: 'Nová kampaň' }).click();
-  await expect(heading(page, 'Nová e-mailová kampaň')).toBeVisible();
-  await expect(page).toHaveURL(/#kampane\/nova$/);
+  await page.getByRole('button', { name: 'Nová kampaň' }).first().click();
+  await expect(heading(page, 'Nová kampaň')).toBeVisible();
+  await page.getByLabel('Název kampaně').fill('Testovací podzimní kampaň');
+  await page.getByLabel('Předmět e-mailu').fill('{{jmeno}}, podzimní novinky');
+  await page.getByRole('button', { name: 'Uložit a pokračovat' }).click();
+  await expect(page).toHaveURL(/#kampane\/\d+\/upravit\?krok=2$/);
 
+  await page.getByRole('button', { name: /Segment: VIP klienti/ }).click();
+  const vip = (await page.locator('.audience-card.selected .count').textContent())!.trim();
+  await expect(page.locator('.seg-count strong').first()).toHaveText(vip);
   await page.getByRole('button', { name: 'Pokračovat' }).click();
-  await expect(page.getByRole('heading', { name: 'Komu dnes napíšeme?' })).toBeVisible();
-  await page.getByRole('button', { name: 'Pokračovat' }).click();
-  const contentStep = page.getByRole('heading', { name: 'E-mail, který bude radost číst.' });
-  await expect(contentStep).toBeVisible();
 
-  await page.getByRole('button', { name: 'Otevřít editor e-mailu' }).click();
-  await expect(page.getByRole('button', { name: 'Uložit a zavřít' })).toBeVisible();
+  await page.getByRole('button', { name: 'Přepnout editor' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Přepnout' }).click();
+  await page.getByRole('button', { name: 'Otevřít editor' }).click();
   await expect(page.locator('.editor-canvas .email-block')).toHaveCount(7);
+  await page.getByRole('button', { name: 'Blok Nadpis' }).click();
+  await page.locator('.editor-properties textarea').fill('Nový nadpis z testu');
+  await page.getByRole('button', { name: 'Zpět (undo)' }).click();
+  await expect(page.locator('.editor-canvas .email-block.heading')).not.toHaveText('Nový nadpis z testu');
+  await page.getByRole('button', { name: 'Znovu (redo)' }).click();
+  await expect(page.locator('.editor-canvas .email-block.heading')).toHaveText('Nový nadpis z testu');
+  await page.getByRole('button', { name: 'Hotovo' }).click();
 
-  await page.getByRole('button', { name: 'Uložit a zavřít' }).click();
-  await expect(contentStep).toBeVisible();
-  await page.getByRole('button', { name: 'Všechny kampaně' }).click();
-  await expect(heading(page, 'E-mailové kampaně')).toBeVisible();
-  await expect(page.getByRole('row').filter({ hasText: 'Podzimní newsletter' })).toContainText('Koncept');
+  await expect(page.getByRole('heading', { name: 'Kontrola před odesláním' })).toBeVisible();
+  await page.getByRole('button', { name: 'Odeslat nebo naplánovat' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Naplánovat odeslání' }).click();
+  await expect(page).toHaveURL(/#kampane\/\d+$/);
+  await openHub(page, 'kampane');
+  await expect(page.getByRole('row').filter({ hasText: 'Testovací podzimní kampaň' })).toContainText('Naplánováno');
+  noErrors();
+});
+
+test('pipeline moves a deal between stages', async ({ page }) => {
+  const noErrors = trackPageErrors(page);
+  await openHub(page, 'kontakty/pipeline');
+  const won = page.locator('.kanban-col').filter({ has: page.getByRole('heading', { name: 'Vyhráno' }) });
+  const before = await won.locator('.deal-card').count();
+  await page.locator('.kanban-col').first().getByRole('button', { name: /^Akce obchodu/ }).first().click();
+  await page.getByRole('menuitem', { name: 'Vyhráno' }).click();
+  await expect(won.locator('.deal-card')).toHaveCount(before + 1);
   noErrors();
 });
 

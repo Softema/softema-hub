@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Bot, ArrowRight, ArrowUpRight, Check, ChevronRight, Workflow, Users, Mail, Wallet, GraduationCap, Video, MessagesSquare, LayoutDashboard, Menu, X, Play, Plus, Search, Bell, SlidersHorizontal, MousePointer2, Sparkles, CircleCheck, Building2, Layers, HeartHandshake, Clock3 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
-import { navItems } from './data';
+import { appRoutes } from './data';
 import './marketing.css';
 
 export function Brand({ light = false }: { light?: boolean }) {
@@ -72,7 +72,7 @@ export function MarketingFooter() {
 
 export function LandingPage() {
   useEffect(() => {
-    const preserveAppLinks = () => { const hash = window.location.hash.slice(1); if (navItems.some(([id]) => hash === id || hash.startsWith(id + '/'))) window.location.replace('/aplikace' + window.location.hash); };
+    const preserveAppLinks = () => { const hash = window.location.hash.slice(1); if (appRoutes.some(id => hash === id || hash.startsWith(id + '/'))) window.location.replace('/aplikace' + window.location.hash); };
     preserveAppLinks(); window.addEventListener('hashchange', preserveAppLinks); return () => window.removeEventListener('hashchange', preserveAppLinks);
   }, []);
   return <div className="marketing"><MarketingHeader /><main id="obsah"><section className="m-hero"><div className="m-hero-copy"><a href="/funkce" className="m-hero-pill"><span><Workflow size={14} />Všechno důležité. Konečně spolu.</span><ArrowRight size={14} /></a><h1>Méně přepínání.<br /><span>Více výsledků.</span></h1><p>Kontakty, kampaně i automatizace v jednom českém Hubu.<br className="m-desktop-break" /> Pro týmy, které chtějí dělat marketing, ne hledat informace.</p><div className="m-button-row"><a href="/registrace" className="m-btn m-primary">Vytvořit účet<ArrowRight size={18} /></a><a href="/aplikace" className="m-btn m-secondary"><Play size={15} />Prohlédnout aplikaci</a></div><div className="m-hero-notes"><span><Check size={14} />Přehledně a česky</span><span><Check size={14} />Ukázka bez registrace</span></div></div><ProductPreview /></section><div className="m-toolbelt"><span>CELÝ VÁŠ MARKETING POD JEDNOU STŘECHOU</span><div>{modules.slice(0,6).map(({ icon: Icon, label, id }) => <a key={id} href={'/funkce#' + id}><Icon size={20} />{label.replace(' a CRM', '').replace(' a faktury', '').replace(' a komunita', '')}</a>)}</div></div>

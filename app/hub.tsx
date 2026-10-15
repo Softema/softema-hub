@@ -1,37 +1,240 @@
 'use client';
-import React,{useState,useEffect} from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import {Bot,LayoutDashboard,Users,Mail,Workflow,Wallet,GraduationCap,Video,MessagesSquare,Settings,Search,ChevronsUpDown,ChevronRight,Bell,Check,ArrowUpRight,FlaskConical,CircleHelp,Menu} from 'lucide-react';
-import {Sidebar,SidebarProvider,SidebarContent,SidebarMenu,SidebarMenuItem,SidebarMenuButton,useSidebar} from '@/components/ui/sidebar';
-import {DropdownMenu,DropdownMenuTrigger,DropdownMenuContent,DropdownMenuItem,DropdownMenuLabel} from '@/components/ui/dropdown-menu';
-import {Command,CommandInput,CommandList,CommandEmpty,CommandGroup,CommandItem} from '@/components/ui/command';
-import {Toaster} from '@/components/ui/sonner';
-import {AreaChart,Area,XAxis,YAxis,CartesianGrid,Tooltip} from 'recharts';
-import {HubProvider,useHub} from './state';
-import {navItems,fmt,money,chartRows} from './data';
-import {ChartBox} from './chart-box';
+import { ArrowUpRight, Bell, Check, ChevronRight, ChevronsUpDown, CircleHelp, GraduationCap, LayoutDashboard, Mail, Menu, MessagesSquare, Search, Settings, Users, UsersRound, Video, Wallet, Workflow } from 'lucide-react';
+import { Sidebar, SidebarContent, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, useSidebar } from '@/components/ui/sidebar';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Toaster } from '@/components/ui/sonner';
+import { demoWorkspaces } from '@/lib/domain/tenancy';
+import { fmt, plural, relTime } from '@/lib/hub/format';
+import { HubProvider, useHub } from './state';
+import { hiddenRoutes, navItems } from './data';
+import { ThemeMenu } from './theme';
+import { ShellContext } from './shell-context';
+import { hubEvents } from './events';
+import { usePref } from './prefs';
+import { parseRoute } from './hash-route';
+import { Avatar, Btn, IconBtn, Modal } from './ui';
 import Dashboard from './dashboard';
-import {Popover,PopoverTrigger,PopoverContent} from '@/components/ui/popover';
-import {ThemeMenu} from './theme';
-import {ShellContext} from './shell-context';
-import {hubEvents} from './events';
-import {Btn,Avatar,IconBtn,Modal} from './ui';
 import Contacts from './contacts';
 import Campaigns from './campaigns';
-import {Automations,Payments,Learning,Webinars,Chatbot,SettingsPage} from './modules';
-import './product.css';
+import { Automations, Chatbot, Learning, Payments, SettingsPage, Webinars } from './modules';
 import AIAgents from './ai-agents';
-import {AIProvider} from './ai-state';
-import {demoWorkspaces} from '@/lib/domain/tenancy';
+import { AIProvider } from './ai-state';
+import './product.css';
 import './theme-legacy.css';
 import './shell.css';
-const icons=[LayoutDashboard,Users,Mail,Workflow,Bot,Wallet,GraduationCap,Video,MessagesSquare,Settings];
-function Navigation(){const {route,go,workspace,setWorkspace}=useHub();const {setOpenMobile}=useSidebar();function nav(r:string){go(r);setOpenMobile(false)}return <Sidebar className="hub-sidebar"><SidebarContent><a href="#prehled" className="brand" aria-label="Softema Hub — přehled"><span className="brand-logo"><Workflow/></span>softema<span className="hub-word">hub</span></a><DropdownMenu><DropdownMenuTrigger asChild><button className="workspace-switch"><span className="workspace-icon">{workspace==='Softema Creative'?'S':'4'}</span><span><strong>{workspace}</strong><small>{workspace==='Softema Creative'?'Interní prostor agentury':'Klientský prostor'}</small></span><ChevronsUpDown size={13} className="ml-auto muted"/></button></DropdownMenuTrigger><DropdownMenuContent align="start" className="w-56"><DropdownMenuLabel>Softema · klientské prostory</DropdownMenuLabel>{demoWorkspaces.map(item=>{const w=item.name;return <DropdownMenuItem key={w} onSelect={()=>{setWorkspace(w);setOpenMobile(false)}}><span className="workspace-icon">{w[0]}</span>{w}{w===workspace&&<Check size={14} className="ml-auto"/>}</DropdownMenuItem>})}</DropdownMenuContent></DropdownMenu><div className="nav-section">Pracovní prostor</div><SidebarMenu className="hub-nav">{navItems.slice(0,6).map(([id,label],i)=>{const I=icons[i];return <SidebarMenuItem key={id}><SidebarMenuButton isActive={route.split('/')[0]===id} onClick={()=>nav(id)}><I/><span>{label}</span>{id==='kontakty'&&<span className="nav-count">{fmt(workspace==='Softema Creative'?3842:1450)}</span>}</SidebarMenuButton></SidebarMenuItem>})}</SidebarMenu><div className="sidebar-divider"/><div className="nav-section">Vzdělávání a podpora</div><SidebarMenu className="hub-nav">{navItems.slice(6,9).map(([id,label],i)=>{const I=icons[i+6];return <SidebarMenuItem key={id}><SidebarMenuButton isActive={route.split('/')[0]===id} onClick={()=>nav(id)}><I/><span>{label}</span></SidebarMenuButton></SidebarMenuItem>})}</SidebarMenu><div className="sidebar-bottom"><SidebarMenu className="hub-nav"><SidebarMenuItem><SidebarMenuButton isActive={route.startsWith('nastaveni')} onClick={()=>nav('nastaveni')}><Settings/><span>Nastavení</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu><Link href="/" className="hub-website-link"><ArrowUpRight size={14}/>Zpět na web Softema Hub</Link><button className="profile" onClick={()=>nav('nastaveni/profil')}><Avatar name="Marie Smolková" color="orange"/><span><strong>Marie Smolková</strong><small>Správce pracovního prostoru</small></span><ChevronsUpDown size={13} className="ml-auto muted"/></button></div></SidebarContent></Sidebar>}
+import './modules.css';
+
+const ICONS: Record<string, typeof Users> = { prehled: LayoutDashboard, kontakty: Users, kampane: Mail, automatizace: Workflow, platby: Wallet, kurzy: GraduationCap, komunita: UsersRound, webinare: Video, chatbot: MessagesSquare, nastaveni: Settings };
+const GROUPS: [string, string[]][] = [['Pracovní prostor', ['prehled', 'kontakty', 'kampane', 'automatizace', 'platby']], ['Vzdělávání a komunita', ['kurzy', 'komunita', 'webinare', 'chatbot']]];
+const LABEL = Object.fromEntries([...navItems, ...hiddenRoutes]) as Record<string, string>;
+const SUB: Record<string, string> = { nova: 'Nová kampaň', sablony: 'Šablony', segmenty: 'Segmenty', pipeline: 'Pipeline', souhlasy: 'Souhlasy', import: 'Import', faktury: 'Faktury', predplatne: 'Předplatné', transakce: 'Transakce', odkazy: 'Platební odkazy', kupony: 'Kupóny', produkty: 'Digitální produkty', moderace: 'Moderace', profil: 'Můj profil', tym: 'Tým', domeny: 'E-mailové domény', integrace: 'Integrace', data: 'Data a obnova' };
+
+function Navigation() {
+  const { route, go, workspaceId, setWorkspace, data, profile, contacts } = useHub();
+  const { setOpenMobile } = useSidebar();
+  const current = parseRoute(route).parts[0] ?? 'prehled';
+  const nav = (r: string) => { go(r); setOpenMobile(false); };
+  const wsName = (id: string) => data.settings.find(s => s.workspaceId === id)?.name ?? demoWorkspaces.find(w => w.id === id)?.name ?? '';
+  const wsKind = (id: string) => data.settings.find(s => s.workspaceId === id)?.kind ?? '';
+  const item = (id: string) => { const I = ICONS[id]; return (
+    <SidebarMenuItem key={id}>
+      <SidebarMenuButton isActive={current === id} onClick={() => nav(id)}>
+        <I /><span>{LABEL[id]}</span>{id === 'kontakty' && <span className="nav-count">{fmt(contacts.length)}</span>}
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  ); };
+  return (
+    <Sidebar className="hub-sidebar">
+      <SidebarContent>
+        <a href="#prehled" className="brand" aria-label="Softema Hub — přehled"><span className="brand-logo"><Workflow /></span>softema<span className="hub-word">hub</span></a>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button type="button" className="workspace-switch" aria-label={`Pracovní prostor: ${wsName(workspaceId)}. Změnit`}>
+              <span className="workspace-icon">{wsName(workspaceId).slice(0, 1).toUpperCase()}</span>
+              <span><strong>{wsName(workspaceId)}</strong><small>{wsKind(workspaceId)}</small></span>
+              <ChevronsUpDown size={13} className="ml-auto muted" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-60">
+            <DropdownMenuLabel>Softema · pracovní prostory</DropdownMenuLabel>
+            {demoWorkspaces.map(x => (
+              <DropdownMenuItem key={x.id} onSelect={() => { setWorkspace(x.id); setOpenMobile(false); }}>
+                <span className="workspace-icon">{wsName(x.id).slice(0, 1).toUpperCase()}</span>{wsName(x.id)}{x.id === workspaceId && <Check size={14} className="ml-auto" />}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        {GROUPS.map(([label, ids], k) => (
+          <React.Fragment key={label}>
+            {k > 0 && <div className="sidebar-divider" />}
+            <div className="nav-section">{label}</div>
+            <SidebarMenu className="hub-nav">{ids.map(item)}</SidebarMenu>
+          </React.Fragment>
+        ))}
+        <div className="sidebar-bottom">
+          <SidebarMenu className="hub-nav">{item('nastaveni')}</SidebarMenu>
+          <Link href="/" className="hub-website-link"><ArrowUpRight size={14} />Zpět na web Softema Hub</Link>
+          <button type="button" className="profile" onClick={() => nav('nastaveni/profil')}>
+            <Avatar name={profile.name} color={profile.color} />
+            <span><strong>{profile.name}</strong><small>{profile.title}</small></span>
+            <ChevronsUpDown size={13} className="ml-auto muted" />
+          </button>
+        </div>
+      </SidebarContent>
+    </Sidebar>
+  );
+}
+
 // Phone navigation: the four most used modules plus "Více", which opens the full sidebar sheet.
-const mobileTabs=[['prehled','Přehled',LayoutDashboard],['kontakty','Kontakty',Users],['kampane','Kampaně',Mail],['automatizace','Automatizace',Workflow]] as const;
-function MobileTabs(){const {route,go}=useHub();const {openMobile,setOpenMobile}=useSidebar();const current=route.split('/')[0];return <nav className="mobile-tabs" aria-label="Hlavní moduly">{mobileTabs.map(([id,label,I])=><button key={id} type="button" aria-current={current===id?'page':undefined} onClick={()=>go(id)}><I aria-hidden/><span>{label}</span></button>)}<button type="button" aria-label="Více – otevřít navigaci" aria-expanded={openMobile} onClick={()=>setOpenMobile(true)}><Menu aria-hidden/><span>Více</span></button></nav>}
-const unreadLabel=(n:number)=>n===1?'1 nepřečtené':n>=2&&n<=4?`${n} nepřečtená`:`${n} nepřečtených`;
-function Notifications({open,onOpenChange}:{open:boolean;onOpenChange:(v:boolean)=>void}){const {go,contacts,campaigns}=useHub();const [read,setRead]=useState<string[]>([]);const events=hubEvents(contacts,campaigns);const unread=events.filter(e=>e.unread&&!read.includes(e.id)).length;function openEvent(id:string,to:string){setRead(r=>r.includes(id)?r:[...r,id]);onOpenChange(false);go(to)}return <Popover open={open} onOpenChange={onOpenChange}><PopoverTrigger asChild><button type="button" className="icon-btn notif-trigger" aria-label={unread?`Oznámení, ${unreadLabel(unread)}`:'Oznámení'}><Bell aria-hidden/>{unread>0&&<i className="notification-dot" aria-hidden/>}</button></PopoverTrigger><PopoverContent align="end" sideOffset={8} collisionPadding={8} className="notif-panel" aria-label="Oznámení"><header className="notif-head"><div><h2>Oznámení</h2><p>{unread?unreadLabel(unread):'Vše přečteno'}</p></div><button type="button" onClick={()=>setRead(events.map(e=>e.id))} disabled={!unread}>Označit vše jako přečtené</button></header><ul className="notif-list">{events.map(e=>{const I=e.icon;const isUnread=e.unread&&!read.includes(e.id);return <li key={e.id}><button type="button" className={'notif-item'+(isUnread?' unread':'')} onClick={()=>openEvent(e.id,e.to)}><span className="notif-icon"><I size={16} aria-hidden/></span><span><span className="notif-title">{isUnread&&<span className="sr-only">Nepřečteno: </span>}{e.who&&<b>{e.who} </b>}{e.what}</span><span className="notif-desc">{e.desc}</span></span><span className="notif-time" title={e.full}><span aria-hidden>{e.time}</span><span className="sr-only">{e.full}</span></span></button></li>})}</ul><p className="notif-foot">Ukázková oznámení prototypu, nic se neodesílá.</p></PopoverContent></Popover>}
-function Frame(){const {route,go,workspace,contacts,campaigns}=useHub();const [search,setSearch]=useState(false);const [notice,setNotice]=useState(false);const [help,setHelp]=useState(false);const active=navItems.find(n=>n[0]===route.split('/')[0]);useEffect(()=>{function key(e:KeyboardEvent){if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault();setSearch(s=>!s)}}window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key)},[]);return <ShellContext.Provider value={{openNotifications:()=>setNotice(true)}}><SidebarProvider style={{'--sidebar-width':'240px'} as React.CSSProperties}><Navigation/><main className="main-shell"><header className="topbar"><div className="breadcrumb"><button type="button" className="topbar-home" onClick={()=>go('prehled')} aria-label="Přehled"><Workflow aria-hidden/></button><span className="workspace-crumb">{workspace}</span><ChevronRight size={13} className="workspace-crumb"/><span>{active?.[1]||'Přehled'}</span>{route.includes('/')&&<><ChevronRight size={13}/><span>{route.includes('nova')?'Nová kampaň':'Detail'}</span></>}</div><div className="topbar-right"><button type="button" className="global-search" onClick={()=>setSearch(true)} aria-label="Hledat v aplikaci" aria-keyshortcuts="Control+K Meta+K"><Search size={16} aria-hidden/><span>Hledat kontakty, kampaně…</span><kbd>Ctrl K</kbd></button><IconBtn label="Nápověda" onClick={()=>setHelp(true)}><CircleHelp/></IconBtn><ThemeMenu/><Notifications open={notice} onOpenChange={setNotice}/><button type="button" className="topbar-profile" onClick={()=>go('nastaveni/profil')} aria-label="Můj profil"><Avatar name="Marie Smolková" size="sm"/></button></div></header><div key={workspace}>{route.startsWith('kontakty')?<Contacts/>:route.startsWith('kampane')?<Campaigns/>:route.startsWith('automatizace')?<Automations/>:route.startsWith('ai-agenti')?<AIAgents/>:route.startsWith('platby')?<Payments/>:route.startsWith('kurzy')?<Learning/>:route.startsWith('webinare')?<Webinars/>:route.startsWith('chatbot')?<Chatbot/>:route.startsWith('nastaveni')?<SettingsPage/>:<Dashboard/>}</div></main><MobileTabs/><Modal open={search} onClose={()=>setSearch(false)} title="Co hledáte?" desc="Kontakty, kampaně a moduly v aktuálním pracovním prostoru."><Command><CommandInput placeholder="Napište jméno, kampaň nebo modul…"/><CommandList><CommandEmpty>Žádné výsledky.</CommandEmpty><CommandGroup heading="Kontakty">{contacts.map(c=><CommandItem key={c.id} onSelect={()=>{go('kontakty/'+c.id);setSearch(false)}}><Avatar name={c.name} color={c.color} size="sm"/>{c.name}<span className="muted small ml-auto">{c.company}</span></CommandItem>)}</CommandGroup><CommandGroup heading="Kampaně">{campaigns.map(c=><CommandItem key={c.id} onSelect={()=>{go('kampane/'+c.id);setSearch(false)}}><Mail size={15}/>{c.name}</CommandItem>)}</CommandGroup><CommandGroup heading="Moduly">{navItems.map(([r,l])=><CommandItem key={r} onSelect={()=>{go(r);setSearch(false)}}>{l}</CommandItem>)}</CommandGroup></CommandList></Command></Modal><Modal open={help} onClose={()=>setHelp(false)} title="Vítejte v Softema Hub" desc="Vše pro vaše kontakty, kampaně a komunitu."><div className="stack"><p>Projděte si jednotlivé moduly v levé navigaci. V CRM klikněte na kontakt, v kampaních vytvořte nový e-mail a vyzkoušejte editor přetažením bloků.</p><div className="preview-notice"><FlaskConical size={18}/>Toto je interaktivní prototyp s ukázkovými daty. E-maily ani platby se neodesílají. Změny se po obnovení stránky vrátí na začátek.</div><Btn primary onClick={()=>{go('kampane/nova');setHelp(false)}}>Vyzkoušet novou kampaň<ChevronRight/></Btn></div></Modal><Toaster position="bottom-right" richColors closeButton mobileOffset={{bottom:84}}/></SidebarProvider></ShellContext.Provider>}
-export function RevenueChart({period='30',email=false}:{period?:string;email?:boolean}){const data=chartRows.map((x,i)=>({...x,v:email?Math.round(x.v/45):period==='7'?Math.round(x.v*.7):period==='90'?Math.round(x.v*2.3):x.v,p:email?Math.round(x.p/45):period==='90'?x.p*2:x.p,d:period==='7'?`${19+Math.floor(i/2)}. 9.`:period==='90'?['1. 7.','8. 7.','15. 7.','22. 7.','1. 8.','8. 8.','15. 8.','22. 8.','1. 9.','8. 9.','15. 9.','22. 9.','25. 9.'][i]:x.d}));return <ChartBox><AreaChart data={data} margin={{top:12,right:12,left:0,bottom:0}}><defs><linearGradient id="orangefill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#ef946e" stopOpacity={.22}/><stop offset="100%" stopColor="#ef946e" stopOpacity={.015}/></linearGradient></defs><CartesianGrid strokeDasharray="3 5" vertical={false} stroke="#eaecef"/><XAxis dataKey="d" tickLine={false} axisLine={false} minTickGap={30} tick={{fill:'#a0a6af',fontSize:10}} dy={9}/><YAxis tickLine={false} axisLine={false} width={51} tick={{fill:'#a0a6af',fontSize:10}} tickFormatter={v=>email?String(v):`${v/1000} tis.`}/><Tooltip contentStyle={{background:'var(--surface)',color:'var(--ink)',border:'1px solid var(--line)',borderRadius:8,fontSize:13,boxShadow:'var(--shadow-pop)'}} formatter={(v,n)=>[email?fmt(Number(v)):money(Number(v)),n==='v'?'Aktuální období':'Předchozí období']}/><Area dataKey="p" type="monotone" className="series-prev" stroke="#c3cbd3" strokeWidth={1.6} fill="transparent" strokeDasharray="5 4"/><Area dataKey="v" type="monotone" stroke="#ee7b4b" strokeWidth={2.5} fill="url(#orangefill)" activeDot={{r:5,stroke:'#fff',strokeWidth:3}}/></AreaChart></ChartBox>}
-export default function Hub(){return <HubProvider><AIProvider><Frame/></AIProvider></HubProvider>}
+const MOBILE_TABS = ['prehled', 'kontakty', 'kampane', 'automatizace'];
+function MobileTabs() {
+  const { route, go } = useHub();
+  const { openMobile, setOpenMobile } = useSidebar();
+  const current = parseRoute(route).parts[0] ?? 'prehled';
+  return (
+    <nav className="mobile-tabs" aria-label="Hlavní moduly">
+      {MOBILE_TABS.map(id => { const I = ICONS[id]; return <button key={id} type="button" aria-current={current === id ? 'page' : undefined} onClick={() => go(id)}><I aria-hidden /><span>{LABEL[id]}</span></button>; })}
+      <button type="button" aria-label="Více – otevřít navigaci" aria-expanded={openMobile} onClick={() => setOpenMobile(true)}><Menu aria-hidden /><span>Více</span></button>
+    </nav>
+  );
+}
+
+const UNREAD_WINDOW = 3 * 86_400_000;
+function Notifications({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+  const { go, data, workspaceId } = useHub();
+  const [read, setRead] = usePref<string[]>(`notifications-read:${workspaceId}`, []);
+  const [now] = useState(() => Date.now());
+  const events = useMemo(() => hubEvents(data, workspaceId, now), [data, workspaceId, now]);
+  const isUnread = (id: string, date: string) => !read.includes(id) && now - +new Date(date) < UNREAD_WINDOW;
+  const unread = events.filter(e => isUnread(e.id, e.date)).length;
+  const label = (n: number) => plural(n, 'nepřečtené', 'nepřečtená', 'nepřečtených');
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger asChild>
+        <button type="button" className="icon-btn notif-trigger" aria-label={unread ? `Oznámení, ${label(unread)}` : 'Oznámení'}><Bell aria-hidden />{unread > 0 && <i className="notification-dot" aria-hidden />}</button>
+      </PopoverTrigger>
+      <PopoverContent align="end" sideOffset={8} collisionPadding={8} className="notif-panel" aria-label="Oznámení">
+        <header className="notif-head">
+          <div><h2>Oznámení</h2><p>{unread ? label(unread) : 'Vše přečteno'}</p></div>
+          <button type="button" onClick={() => setRead(events.map(e => e.id))} disabled={!unread}>Označit vše jako přečtené</button>
+        </header>
+        {events.length ? (
+          <ul className="notif-list">
+            {events.map(e => { const I = e.icon; const unreadItem = isUnread(e.id, e.date); return (
+              <li key={e.id}>
+                <button type="button" className={'notif-item' + (unreadItem ? ' unread' : '')} onClick={() => { if (!read.includes(e.id)) setRead([...read, e.id]); onOpenChange(false); go(e.to); }}>
+                  <span className="notif-icon"><I size={16} aria-hidden /></span>
+                  <span><span className="notif-title">{unreadItem && <span className="sr-only">Nepřečteno: </span>}{e.who && <b>{e.who} </b>}{e.what}</span><span className="notif-desc">{e.desc}</span></span>
+                  <span className="notif-time">{relTime(e.date)}</span>
+                </button>
+              </li>
+            ); })}
+          </ul>
+        ) : <p className="notif-foot">Zatím žádná oznámení.</p>}
+        <p className="notif-foot">Oznámení vznikají z dat v tomto prohlížeči; nic se neodesílá.</p>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function SearchDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { go, w } = useHub();
+  const pickRoute = (r: string) => { go(r); onClose(); };
+  return (
+    <Modal open={open} onClose={onClose} title="Co hledáte?" desc="Kontakty, kampaně, kurzy, webináře a moduly v aktuálním pracovním prostoru.">
+      <Command>
+        <CommandInput placeholder="Napište jméno, kampaň nebo modul…" />
+        <CommandList>
+          <CommandEmpty>Žádné výsledky.</CommandEmpty>
+          <CommandGroup heading="Kontakty">{w.contacts.map(c => <CommandItem key={c.id} value={`kontakt ${c.name} ${c.email} ${c.company}`} onSelect={() => pickRoute('kontakty/' + c.id)}><Avatar name={c.name} color={c.color} size="sm" />{c.name}<span className="muted small ml-auto">{c.company || c.email}</span></CommandItem>)}</CommandGroup>
+          <CommandGroup heading="Kampaně">{w.campaigns.map(c => <CommandItem key={c.id} value={`kampaň ${c.name}`} onSelect={() => pickRoute('kampane/' + c.id)}><Mail size={15} />{c.name}<span className="muted small ml-auto">{c.status}</span></CommandItem>)}</CommandGroup>
+          <CommandGroup heading="Kurzy a webináře">{w.courses.map(c => <CommandItem key={c.id} value={`kurz ${c.title}`} onSelect={() => pickRoute('kurzy/' + c.id)}><GraduationCap size={15} />{c.title}</CommandItem>)}{w.webinars.map(x => <CommandItem key={x.id} value={`webinář ${x.title}`} onSelect={() => pickRoute('webinare/' + x.id)}><Video size={15} />{x.title}</CommandItem>)}</CommandGroup>
+          <CommandGroup heading="Moduly">{navItems.map(([r, l]) => <CommandItem key={r} value={`modul ${l}`} onSelect={() => pickRoute(r)}>{l}</CommandItem>)}</CommandGroup>
+        </CommandList>
+      </Command>
+    </Modal>
+  );
+}
+
+function NotFound() {
+  const { go } = useHub();
+  return <div className="page"><section className="panel empty"><h3>Stránka nenalezena</h3><p>Odkaz je neplatný nebo záznam v tomto pracovním prostoru neexistuje.</p><Btn primary onClick={() => go('prehled')}>Zpět na přehled</Btn></section></div>;
+}
+
+function Loading() {
+  return <div className="page" aria-busy="true" aria-live="polite"><div className="hub-loading"><span className="sr-only">Načítám data uložená v tomto prohlížeči…</span><i /><i /><i /></div></div>;
+}
+
+function Screen() {
+  const { route, ready } = useHub();
+  if (!ready) return <Loading />;
+  const mod = parseRoute(route).parts[0] ?? 'prehled';
+  switch (mod) {
+    case 'prehled': return <Dashboard />;
+    case 'kontakty': return <Contacts />;
+    case 'kampane': return <Campaigns />;
+    case 'automatizace': return <Automations />;
+    case 'platby': return <Payments />;
+    case 'kurzy': case 'komunita': return <Learning />;
+    case 'webinare': return <Webinars />;
+    case 'chatbot': return <Chatbot />;
+    case 'nastaveni': return <SettingsPage />;
+    case 'ai-agenti': return <AIAgents />;
+    default: return <NotFound />;
+  }
+}
+
+function Frame() {
+  const { route, go, workspace, workspaceId, profile } = useHub();
+  const [search, setSearch] = useState(false);
+  const [notice, setNotice] = useState(false);
+  const [help, setHelp] = useState(false);
+  const { parts } = parseRoute(route);
+  const mod = parts[0] ?? 'prehled';
+  const sub = parts[1];
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setSearch(s => !s); } };
+    window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
+  }, []);
+  return (
+    <ShellContext.Provider value={{ openNotifications: () => setNotice(true) }}>
+      <SidebarProvider style={{ '--sidebar-width': '240px' } as React.CSSProperties}>
+        <Navigation />
+        <main className="main-shell">
+          <header className="topbar">
+            <div className="breadcrumb">
+              <button type="button" className="topbar-home" onClick={() => go('prehled')} aria-label="Přehled"><Workflow aria-hidden /></button>
+              <span className="workspace-crumb">{workspace}</span><ChevronRight size={13} className="workspace-crumb" />
+              <span>{LABEL[mod] ?? 'Přehled'}</span>
+              {sub && <><ChevronRight size={13} /><span>{SUB[sub] ?? 'Detail'}</span></>}
+            </div>
+            <div className="topbar-right">
+              <button type="button" className="global-search" onClick={() => setSearch(true)} aria-label="Hledat v aplikaci" aria-keyshortcuts="Control+K Meta+K"><Search size={16} aria-hidden /><span>Hledat kontakty, kampaně…</span><kbd>Ctrl K</kbd></button>
+              <IconBtn label="Nápověda" onClick={() => setHelp(true)}><CircleHelp /></IconBtn>
+              <ThemeMenu />
+              <Notifications open={notice} onOpenChange={setNotice} />
+              <button type="button" className="topbar-profile" onClick={() => go('nastaveni/profil')} aria-label="Můj profil"><Avatar name={profile.name} color={profile.color} size="sm" /></button>
+            </div>
+          </header>
+          <div key={workspaceId}><Screen /></div>
+        </main>
+        <MobileTabs />
+        <SearchDialog open={search} onClose={() => setSearch(false)} />
+        <Modal open={help} onClose={() => setHelp(false)} title="Vítejte v Softema Hub" desc="Kontakty, kampaně, vzdělávání a komunita na jednom místě.">
+          <div className="stack">
+            <p>Moduly najdete v levé navigaci, na telefonu ve spodní liště. Vyhledávání otevřete zkratkou Ctrl K.</p>
+            <div className="preview-notice">Toto je frontendový prototyp s ukázkovými daty. Změny se ukládají jen v tomto prohlížeči; e-maily, platby ani registrace se skutečně neodesílají. Ukázková data obnovíte v Nastavení → Data a obnova.</div>
+            <Btn primary onClick={() => { go('kampane/nova'); setHelp(false); }}>Vyzkoušet novou kampaň<ChevronRight /></Btn>
+          </div>
+        </Modal>
+        <Toaster position="bottom-right" richColors closeButton mobileOffset={{ bottom: 84 }} />
+      </SidebarProvider>
+    </ShellContext.Provider>
+  );
+}
+
+export default function Hub() { return <HubProvider><AIProvider><Frame /></AIProvider></HubProvider>; }
