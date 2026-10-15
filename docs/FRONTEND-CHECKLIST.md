@@ -104,25 +104,33 @@ Průběžně se aktualizuje. Platí pro větev `frontend/complete`.
 
 ## Průběh a navázání
 
-Commity na `frontend/complete`:
+Větev `frontend/complete` (lokálně, bez push). Moduly jdou po sobě v samostatných commitech:
 
 1. datová vrstva, dashboard, CRM a e-mailing,
-2. kurzy a produkty,
+2. kurzy,
 3. webináře,
 4. automatizace,
 5. platby,
 6. komunita,
 7. chatbot,
-8. nastavení.
+8. nastavení,
+9. testy a dokumentace.
 
-Kontroly k poslednímu commitu: `tsc` bez chyb, ESLint 0 chyb, smoke testy 37 prošlo a 5 přeskočeno (proti `next dev` na :3000).
+### Výsledky kontrol (poslední stav)
 
-Zbývá:
+| Kontrola | Výsledek |
+| --- | --- |
+| `tsc --noEmit` | bez chyb |
+| ESLint (celý projekt) | 0 chyb, 8 varování (6× `<img>` pro data URL, 2× nepoužité proměnné v původním `marketing.tsx`) |
+| `node --test tests/foundation.test.mjs tests/hub.test.mjs` | 16/16 prošlo |
+| `next build` | prošel, všechny stránky statické |
+| Smoke testy (`e2e/smoke.spec.ts`) proti produkčnímu buildu, včetně `E2E_UNLAYER=1` | 38 prošlo, 6 přeskočeno (testy jen pro desktop nebo jen pro mobil) |
+| Vizuální testy (`e2e/visual.spec.ts`) | běží, ale liší se od původních referenčních snímků (nový vzhled). Reference se přepíšou až po schválení (`pnpm test:e2e:reference`). |
+| Ruční průchod | desktop 1440 a mobil 390, světlé i tmavé téma, oba pracovní prostory |
 
-- [ ] ověřit Unlayer v prohlížeči (načtení, uložení designu, náhled),
-- [ ] projít tmavý režim a mobil u nových obrazovek,
-- [ ] přidat unit testy `lib/hub` (store, deduplikace, segmenty, validace scénáře),
-- [ ] aktualizovat `visual.spec.ts` na nové routy (referenční snímky až po schválení),
-- [ ] aktualizovat CLAUDE.md a README (perzistence, nové soubory),
-- [ ] spustit `pnpm build`,
-- [ ] napsat závěrečné předání.
+### Otevřené body a rozhodnutí pro zadavatele
+
+- Schválit nový vzhled, potom přepsat referenční snímky.
+- Unlayer: rozhodnout o účtu a `projectId`. Bez účtu je vidět branding Unlayer, chybí prémiové funkce a rozhraní editoru je anglicky (locale `cs` se bez účtu neprojevilo).
+- Graf otevření v reportu a výsledky kampaní jsou simulace. Skutečná data dodá tracking s backendem.
+- Vše označené 🔌 potřebuje backend nebo integraci: Resend, Stripe/Fakturoid, Mux/LiveKit, S3/R2, Claude API, Better-Auth, RLS, BullMQ.
