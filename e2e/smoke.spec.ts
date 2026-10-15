@@ -253,6 +253,38 @@ test('student preview marks lessons done and keeps progress', async ({ page }) =
   noErrors();
 });
 
+test('webinar registration creates one contact and no duplicates', async ({ page }) => {
+  const noErrors = trackPageErrors(page);
+  await openHub(page, 'webinare/w-ai/stranka');
+  await page.getByLabel('Jméno a příjmení').fill('Zuzana Testovací');
+  await page.getByLabel('E-mail', { exact: true }).fill('zuzana.testovaci@posta.example');
+  await page.getByRole('button', { name: 'Registrovat se zdarma' }).click();
+  await expect(page.getByRole('heading', { name: 'Registrace je potvrzená' })).toBeVisible();
+  await page.getByRole('button', { name: 'Registrovat další osobu' }).click();
+  await page.getByLabel('Jméno a příjmení').fill('Zuzana Testovací');
+  await page.getByLabel('E-mail', { exact: true }).fill('Zuzana.Testovaci@posta.example');
+  await page.getByRole('button', { name: 'Registrovat se zdarma' }).click();
+  await expect(page.getByRole('heading', { name: 'Už jste registrovaní' })).toBeVisible();
+
+  await openHub(page, 'kontakty?q=zuzana');
+  await expect(page.getByRole('cell').getByRole('button', { name: /^Zuzana Testovací/ })).toHaveCount(1);
+  await page.getByRole('cell').getByRole('button', { name: /^Zuzana Testovací/ }).click();
+  await expect(page.getByText('Registrace na webinář').first()).toBeVisible();
+  noErrors();
+});
+
+test('cancelled webinar closes its registration page', async ({ page }) => {
+  const noErrors = trackPageErrors(page);
+  await openHub(page, 'webinare/w-mail');
+  await page.getByRole('button', { name: /^Akce webináře/ }).click();
+  await page.getByRole('menuitem', { name: 'Zrušit webinář' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Zrušit webinář' }).click();
+  await expect(page.getByText('Zrušeno', { exact: true }).first()).toBeVisible();
+  await openHub(page, 'webinare/w-mail/stranka');
+  await expect(page.getByRole('heading', { name: 'Webinář byl zrušen' })).toBeVisible();
+  noErrors();
+});
+
 test('public pages render', async ({ page }, info) => {
   test.skip(isMobile(info), 'desktop only');
   const noErrors = trackPageErrors(page);
