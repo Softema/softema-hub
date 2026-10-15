@@ -2,14 +2,27 @@
 
 Playwright (Chromium) ověřuje hlavní prokliky a vzhled prototypu. Server se nespouští automaticky, aplikaci je potřeba mít spuštěnou předem: `pnpm dev`, nebo `pnpm build` a `pnpm start`. Výchozí adresa je `http://localhost:3000`, jinou nastavíte proměnnou `E2E_BASE_URL`.
 
-Projekty `desktop` (1440×900) a `mobile` (390×844):
+Projekty `desktop` (1440×900) a `mobile` (390×844). Každý test dostane nový kontext prohlížeče, a tedy prázdné úložiště a čerstvá ukázková data.
 
-- `visual.spec.ts`: snímky dashboardu, kontaktů, detailu kontaktu, průvodce kampaní, reportu kampaně a editoru.
-- `smoke.spec.ts`: navigace, seznam → detail kontaktu → zpět, nová kampaň → editor → návrat a veřejné stránky.
+- `smoke.spec.ts` prochází všechny moduly:
+  - navigace a zdroje na dashboardu;
+  - kontakty: seznam → detail → zpět, vlastní pole a perzistence po obnovení stránky, oddělení prostorů, segmenty, import CSV, pipeline;
+  - kampaně: průvodce → editor bloků (undo/redo) → naplánování;
+  - kurzy (struktura, náhled studenta) a webináře (registrace bez duplicit, zrušení);
+  - automatizace (šablona, aktivace, spouštěč z CRM, validace) a faktury;
+  - komunita, chatbot (lead do CRM), nastavení a integrace bez API klíčů;
+  - veřejné stránky.
+- `visual.spec.ts`: snímky dashboardu, kontaktů, detailu kontaktu, průvodce kampaní, reportu kampaně a editoru bloků. Ukázková data se generují relativně k času prvního spuštění, proto test fixuje hodiny na 15. 10. 2026 10:00 (Europe/Prague).
 
 ```sh
 pnpm test:e2e             # smoke testy + porovnání se snímky
 pnpm test:e2e:reference   # přepíše referenční snímky; jen po schválené změně vzhledu
 ```
 
-Referenční snímky v `__screenshots__/` pocházejí z původního Vinext prototypu (archivní větev `archive/sites-vinext`). Next.js verze se s nimi shoduje na pixel. Jsou pořízené na Windows (`-win32`) se systémovým písmem (Inter se nenačítá), takže porovnání má smysl jen na stejném OS a ve stejném prohlížeči. V CI se proto nespouští. Výsledky selhání: `playwright-report/` a `test-results/` (neverzují se).
+Referenční snímky v `__screenshots__/` pocházejí z původního prototypu před přepracováním vzhledu. Nový vzhled zatím schválený není, takže `visual.spec.ts` proti nim selhává záměrně. Po schválení je přepíše `pnpm test:e2e:reference`.
+
+Snímky jsou pořízené na Windows (`-win32`), takže porovnání má smysl jen na stejném OS a ve stejném prohlížeči. V CI se proto nespouští.
+
+V `next dev` skrývá `openHub()` odznak vývojového overlaye Next.js, protože by na mobilu zakrýval spodní navigaci.
+
+Výsledky selhání jsou v `playwright-report/` a `test-results/` (neverzují se).

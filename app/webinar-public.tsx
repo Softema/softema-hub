@@ -58,6 +58,7 @@ export function RegistrationPage({ id }: { id: string }) {
     <Frame x={x} label="Náhled registrační stránky">
       <div className="landing">
         <div className="landing-hero">
+          <h1 className="sr-only">{x.title}</h1>
           <Art accent={x.accent} image={x.image} eyebrow={x.kind === 'live' ? 'Živý webinář zdarma' : 'Webinář ze záznamu'} title={x.title} />
           <div className="landing-meta">
             <span><CalendarClock size={16} aria-hidden />{x.kind === 'live' ? fmtDateTime(x.startsAt) : `Každý den ${x.sessions.join(' a ')}`}</span>
