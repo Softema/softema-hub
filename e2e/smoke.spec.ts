@@ -345,6 +345,25 @@ test('invoice: create → send → pay shows on the contact and in transactions'
   noErrors();
 });
 
+test('community: post, moderate and check access', async ({ page }) => {
+  const noErrors = trackPageErrors(page);
+  await openHub(page, 'komunita/g-club');
+  await page.getByLabel('Nový příspěvek').fill('Testovací příspěvek pro členy klubu');
+  await page.getByRole('button', { name: 'Zveřejnit' }).click();
+  await expect(page.locator('.post').filter({ hasText: 'Testovací příspěvek pro členy klubu' })).toHaveCount(1);
+
+  await openHub(page, 'komunita/moderace');
+  await page.getByRole('button', { name: 'Skrýt příspěvek' }).click();
+  await expect(page.getByText('Vyřešeno', { exact: true })).toBeVisible();
+  await expect(page.getByText('Žádné otevřené nahlášení', { exact: false })).toBeVisible();
+
+  // a visitor does not get into the paid group
+  await openHub(page, 'komunita/g-club/pristup');
+  await expect(page.getByText('Nemá přístup: Nepřihlášený návštěvník')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Koupit členství/ })).toBeVisible();
+  noErrors();
+});
+
 test('public pages render', async ({ page }, info) => {
   test.skip(isMobile(info), 'desktop only');
   const noErrors = trackPageErrors(page);

@@ -21,7 +21,8 @@ import Dashboard from './dashboard';
 import Contacts from './contacts';
 import Campaigns from './campaigns';
 import Courses from './courses';
-import { Chatbot, Learning, SettingsPage } from './modules';
+import { Chatbot, SettingsPage } from './modules';
+import Community from './community';
 import Payments from './payments';
 import Automations from './automations';
 import Webinars from './webinars';
@@ -184,7 +185,7 @@ function Screen() {
     case 'automatizace': return <Automations />;
     case 'platby': return <Payments />;
     case 'kurzy': return <Courses />;
-    case 'komunita': return <Learning />;
+    case 'komunita': return <Community />;
     case 'webinare': return <Webinars />;
     case 'chatbot': return <Chatbot />;
     case 'nastaveni': return <SettingsPage />;

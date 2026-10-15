@@ -26,7 +26,12 @@ const slug = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCa
 
 export function seedClock(now: Date) {
   const at = (days: number, hour = 10, minute = 0) => { const d = new Date(now); d.setDate(d.getDate() + days); d.setHours(hour, minute, 0, 0); return d.toISOString(); };
-  return { at, ago: (days: number, hour?: number, minute?: number) => at(-days, hour, minute) };
+  // "ago" never returns a future instant: today's times later than now move a few minutes/hours back.
+  const ago = (days: number, hour?: number, minute?: number) => {
+    const t = at(-days, hour, minute);
+    return +new Date(t) <= +now ? t : new Date(+now - ((((hour ?? 10) * 60 + (minute ?? 0)) % 170) + 7) * 60_000).toISOString();
+  };
+  return { at, ago };
 }
 
 /* ---------- name pools (fictional combinations) ---------- */
