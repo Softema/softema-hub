@@ -364,6 +364,21 @@ test('community: post, moderate and check access', async ({ page }) => {
   noErrors();
 });
 
+test('chatbot answers from the knowledge base and saves a lead to CRM', async ({ page }) => {
+  const noErrors = trackPageErrors(page);
+  await openHub(page, 'chatbot');
+  const chat = page.locator('.chat-widget');
+  const say = async (t: string) => { await chat.getByLabel('Zpráva pro chatbota').fill(t); await chat.getByRole('button', { name: 'Odeslat' }).click(); };
+  await say('Kolik stojí konzultace?');
+  await expect(chat.locator('.chat-message').nth(2)).toContainText('2 900 Kč');
+  await say('Jana Chatová');
+  await say('jana.chatova@posta.example');
+  await expect(chat).toContainText('kolegové se vám brzy ozvou');
+  await openHub(page, 'kontakty?q=chatova');
+  await expect(page.getByRole('cell').getByRole('button', { name: /^Jana Chatová/ })).toBeVisible();
+  noErrors();
+});
+
 test('public pages render', async ({ page }, info) => {
   test.skip(isMobile(info), 'desktop only');
   const noErrors = trackPageErrors(page);
