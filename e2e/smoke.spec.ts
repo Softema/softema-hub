@@ -413,6 +413,25 @@ test('integrations never accept something that looks like an API key', async ({ 
   noErrors();
 });
 
+// Unlayer loads from editor.unlayer.com (third-party CDN); run with E2E_UNLAYER=1 when the network is available.
+test('Unlayer editor loads and stores design + HTML', async ({ page }, info) => {
+  test.skip(!process.env.E2E_UNLAYER || isMobile(info), 'opt-in: needs network access to editor.unlayer.com');
+  test.setTimeout(90_000);
+  const noErrors = trackPageErrors(page);
+  await openHub(page, 'kampane/nova');
+  await page.getByLabel('Název kampaně').fill('Unlayer test');
+  await page.getByLabel('Předmět e-mailu').fill('Test');
+  await page.getByRole('button', { name: 'Uložit a pokračovat' }).click();
+  const id = page.url().match(/kampane\/(\d+)/)![1];
+  await openHub(page, `kampane/${id}/editor`);
+  await expect(page.locator('.editor-loading')).toHaveCount(0, { timeout: 45_000 });
+  await expect(page.locator('.editor-fallback')).toHaveCount(0);
+  await expect.poll(async () => page.evaluate(cid => { const d = JSON.parse(localStorage.getItem('softema-hub:data') ?? '{}').data; const c = d?.campaigns.find((x: { id: number }) => String(x.id) === cid); return !!c?.design && (c?.html ?? '').length > 1000; }, id), { timeout: 15_000 }).toBe(true);
+  await page.getByRole('button', { name: 'Náhled' }).click();
+  await expect(page.locator('iframe.mail-frame')).toBeVisible();
+  noErrors();
+});
+
 test('public pages render', async ({ page }, info) => {
   test.skip(isMobile(info), 'desktop only');
   const noErrors = trackPageErrors(page);
