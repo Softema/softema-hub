@@ -356,7 +356,7 @@ input.sr-only { width: 1px !important; height: 1px !important; padding: 0 !impor
 .toggle-row label { display: flex; flex-direction: column; gap: 2px; font-size: 14px; font-weight: 500; color: var(--ink); cursor: pointer; }
 .toggle-row small { font-size: 13px; font-weight: 400; color: var(--ink-3); }
 .toggle-row + .toggle-row { border-top: 1px solid var(--line-soft); }
-.row-item button.row-main { text-align: left; }
+.row-item button.row-main, .mini-row button.row-main { text-align: left; }
 .row-item button.row-main:hover strong { color: var(--brand-ink); }
 .file-btn:focus-within { outline: 2px solid var(--brand-ink); outline-offset: 2px; }
 .image-picker { display: flex; flex-direction: column; gap: var(--sp-2); }
@@ -602,3 +602,4 @@ blockquote.post-text { margin: 0; padding: var(--sp-3) var(--sp-4); border-left:
   .lesson-actions { width: 100%; justify-content: flex-end; }
   .card-grid { grid-template-columns: 1fr; }
 }
+@media (max-width: 767px) { .inv-row { grid-template-columns: 1fr 1fr 32px; } .inv-row > .field:first-child { grid-column: 1 / -1; } }

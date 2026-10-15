@@ -16,7 +16,7 @@ jobs:
           node-version: 22
       - run: npx --yes pnpm@11.25.0 install --frozen-lockfile
       - run: node node_modules/typescript/bin/tsc --noEmit --incremental false
-      - run: node --test tests/foundation.test.mjs
+      - run: node --test tests/foundation.test.mjs tests/hub.test.mjs
       - run: npx --yes pnpm@11.25.0 build
       # Lint is not a gate yet: the original app/ code has known findings.
       # Playwright screenshots are Windows-specific and run locally only.

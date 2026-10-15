@@ -72,7 +72,12 @@ export default function UnlayerEditor({ design, starter, dark, onChange, onReady
       }}
       onReady={unlayer => {
         ready.current = true;
+        // Listeners first: loading a design fires "design:loaded" and the stored HTML must exist even without edits.
+        const push = () => unlayer.exportHtml(d => latest.current.onChange({ design: d.design, html: d.html }));
+        unlayer.addEventListener('design:updated', push);
+        unlayer.addEventListener('design:loaded', push);
         try { unlayer.loadDesign((design ?? designFromBlocks(starter)) as Design); } catch { unlayer.loadBlank(); }
+        setTimeout(push, 800);
         unlayer.registerCallback('image', (file: { attachments: File[] }, done: (r: { progress?: number; url?: string; error?: boolean | string }) => void) => {
           const f = file.attachments?.[0];
           if (!f) return done({ error: true });
@@ -82,9 +87,6 @@ export default function UnlayerEditor({ design, starter, dark, onChange, onReady
           r.onerror = () => done({ error: true });
           r.readAsDataURL(f);
         });
-        const push = () => unlayer.exportHtml(d => latest.current.onChange({ design: d.design, html: d.html }));
-        unlayer.addEventListener('design:updated', push);
-        unlayer.addEventListener('design:loaded', push);
         latest.current.onReady();
       }}
     />

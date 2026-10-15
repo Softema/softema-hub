@@ -3,7 +3,7 @@
  * start in a browser, relative to that moment; afterwards the store keeps the user's data.
  * Generated e-mail addresses use the reserved `.example` TLD.
  */
-import { demoWorkspaces } from '@/lib/domain/tenancy';
+import { demoWorkspaces } from '../domain/tenancy';
 import type {
   Activity, Campaign, ChatbotConfig, CommunityGroup, Contact, Consent, ConsentState, Coupon, Course, CourseModule, Deal, DealStage,
   DigitalProduct, Enrollment, HubData, Invoice, Lesson, Lifecycle, Membership, PaymentLink, Post, Purchase, Registration,

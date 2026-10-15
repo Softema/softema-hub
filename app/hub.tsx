@@ -8,9 +8,10 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Toaster } from '@/components/ui/sonner';
 import { demoWorkspaces } from '@/lib/domain/tenancy';
-import { fmt, plural, relTime } from '@/lib/hub/format';
+import { fmt, normalize, plural, relTime } from '@/lib/hub/format';
 import { HubProvider, useHub } from './state';
 import { hiddenRoutes, navItems } from './data';
+import type { NotificationPrefs } from '@/lib/hub/types';
 import { ThemeMenu } from './theme';
 import { ShellContext } from './shell-context';
 import { hubEvents } from './events';
@@ -111,11 +112,17 @@ function MobileTabs() {
 }
 
 const UNREAD_WINDOW = 3 * 86_400_000;
+/** Event kinds follow the notification preferences in Nastavení → Notifikace. */
+const allowedEvent = (prefs: Partial<NotificationPrefs> | undefined, id: string) => {
+  const key: keyof NotificationPrefs | null = id.startsWith('tx-') || id === 'overdue' ? 'payments' : id.startsWith('ct-') ? 'newContacts' : id.startsWith('rg-') ? 'webinars' : id.startsWith('cp-') || id.startsWith('cs-') ? 'campaigns' : id.startsWith('rp-') ? 'community' : null;
+  return !key || prefs?.[key] !== false;
+};
 function Notifications({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
-  const { go, data, workspaceId } = useHub();
+  const { go, data, workspaceId, settings } = useHub();
   const [read, setRead] = usePref<string[]>(`notifications-read:${workspaceId}`, []);
   const [now] = useState(() => Date.now());
-  const events = useMemo(() => hubEvents(data, workspaceId, now), [data, workspaceId, now]);
+  const prefs = settings.notifications;
+  const events = useMemo(() => hubEvents(data, workspaceId, now).filter(e => allowedEvent(prefs, e.id)), [data, workspaceId, now, prefs]);
   const isUnread = (id: string, date: string) => !read.includes(id) && now - +new Date(date) < UNREAD_WINDOW;
   const unread = events.filter(e => isUnread(e.id, e.date)).length;
   const label = (n: number) => plural(n, 'nepřečtené', 'nepřečtená', 'nepřečtených');
@@ -152,14 +159,15 @@ function SearchDialog({ open, onClose }: { open: boolean; onClose: () => void })
   const { go, w } = useHub();
   const pickRoute = (r: string) => { go(r); onClose(); };
   return (
-    <Modal open={open} onClose={onClose} title="Co hledáte?" desc="Kontakty, kampaně, kurzy, webináře a moduly v aktuálním pracovním prostoru.">
-      <Command>
+    <Modal open={open} onClose={onClose} title="Co hledáte?" desc="Kontakty, kampaně, kurzy, webináře, scénáře, skupiny, faktury a moduly v aktuálním prostoru. Diakritiku psát nemusíte.">
+      <Command filter={(value, search) => (normalize(value).includes(normalize(search.trim())) ? 1 : 0)}>
         <CommandInput placeholder="Napište jméno, kampaň nebo modul…" />
         <CommandList>
           <CommandEmpty>Žádné výsledky.</CommandEmpty>
           <CommandGroup heading="Kontakty">{w.contacts.map(c => <CommandItem key={c.id} value={`kontakt ${c.name} ${c.email} ${c.company}`} onSelect={() => pickRoute('kontakty/' + c.id)}><Avatar name={c.name} color={c.color} size="sm" />{c.name}<span className="muted small ml-auto">{c.company || c.email}</span></CommandItem>)}</CommandGroup>
           <CommandGroup heading="Kampaně">{w.campaigns.map(c => <CommandItem key={c.id} value={`kampaň ${c.name}`} onSelect={() => pickRoute('kampane/' + c.id)}><Mail size={15} />{c.name}<span className="muted small ml-auto">{c.status}</span></CommandItem>)}</CommandGroup>
           <CommandGroup heading="Kurzy a webináře">{w.courses.map(c => <CommandItem key={c.id} value={`kurz ${c.title}`} onSelect={() => pickRoute('kurzy/' + c.id)}><GraduationCap size={15} />{c.title}</CommandItem>)}{w.webinars.map(x => <CommandItem key={x.id} value={`webinář ${x.title}`} onSelect={() => pickRoute('webinare/' + x.id)}><Video size={15} />{x.title}</CommandItem>)}</CommandGroup>
+          <CommandGroup heading="Další">{w.workflows.map(f => <CommandItem key={f.id} value={`scénář automatizace ${f.name}`} onSelect={() => pickRoute('automatizace/' + f.id)}><Workflow size={15} />{f.name}<span className="muted small ml-auto">Automatizace</span></CommandItem>)}{w.groups.map(g => <CommandItem key={g.id} value={`skupina komunita ${g.name}`} onSelect={() => pickRoute('komunita/' + g.id)}><UsersRound size={15} />{g.name}<span className="muted small ml-auto">Komunita</span></CommandItem>)}{w.products.map(p => <CommandItem key={p.id} value={`produkt ${p.title}`} onSelect={() => pickRoute('kurzy/produkty/' + p.id)}><GraduationCap size={15} />{p.title}<span className="muted small ml-auto">Produkt</span></CommandItem>)}{w.invoices.map(i => <CommandItem key={i.id} value={`faktura ${i.number}`} onSelect={() => pickRoute('platby/faktury/' + i.id)}><Wallet size={15} />Faktura {i.number}</CommandItem>)}</CommandGroup>
           <CommandGroup heading="Moduly">{navItems.map(([r, l]) => <CommandItem key={r} value={`modul ${l}`} onSelect={() => pickRoute(r)}>{l}</CommandItem>)}</CommandGroup>
         </CommandList>
       </Command>
