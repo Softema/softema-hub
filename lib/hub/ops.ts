@@ -7,6 +7,7 @@ import type { Campaign, ConsentState, Contact, HubData, Lifecycle, Registration,
 import { normalize, newId } from './format';
 import { audienceOf, newActivity } from './logic';
 import { defaultBlocks } from './seed';
+import { fireTrigger } from './flow';
 
 const nowIso = () => new Date().toISOString();
 export const nextContactIdIn = (d: HubData) => Math.max(0, ...d.contacts.map(c => c.id)) + 1;
@@ -38,10 +39,12 @@ export function upsertContactByEmail(d: HubData, ws: string, input: NewContactIn
       const date = nowIso(); consent = { ...consent, state: input.consent, source: input.consentSource ?? input.source, date, history: [...consent.history, { date, state: input.consent, source: input.consentSource ?? input.source }] };
     }
     const contact = { ...existing, tags, consent, phone: existing.phone || input.phone || '' };
-    return { data: { ...d, contacts: d.contacts.map(c => (c === existing ? contact : c)) }, contact, created: false };
+    const added = tags.filter(t => !existing.tags.includes(t));
+    const data = added.reduce((acc, t) => fireTrigger(acc, ws, 'tag_added', [contact.id], t), { ...d, contacts: d.contacts.map(c => (c === existing ? contact : c)) });
+    return { data, contact, created: false };
   }
   const contact = makeContact(d, ws, input);
-  return { data: { ...d, contacts: [contact, ...d.contacts] }, contact, created: true };
+  return { data: afterContactCreated({ ...d, contacts: [contact, ...d.contacts] }, ws, contact), contact, created: true };
 }
 
 export function setConsent(d: HubData, ws: string, ids: number[], state: ConsentState, source: string, doubleOptIn?: boolean): HubData {
@@ -52,6 +55,11 @@ export function setConsent(d: HubData, ws: string, ids: number[], state: Consent
       ? { ...c, consent: { ...c.consent, state, source, date, doubleOptIn: doubleOptIn ?? (state === 'Udělen' ? c.consent.doubleOptIn : false), history: [...c.consent.history, { date, state, source }] } }
       : c)),
   };
+}
+
+/** Automation triggers for a newly created contact: "new contact" and "tag added" for each initial tag. */
+export function afterContactCreated(d: HubData, ws: string, c: Contact): HubData {
+  return c.tags.reduce((acc, t) => fireTrigger(acc, ws, 'tag_added', [c.id], t), fireTrigger(d, ws, 'contact_created', [c.id], c.source));
 }
 
 /** Removes contacts and their CRM records. Accounting records (invoices, payments) stay for legal reasons and show "Smazaný kontakt". */
@@ -164,7 +172,7 @@ export function registerForWebinar(d: HubData, ws: string, webinarId: string, in
   const existing = up.data.registrations.find(r => r.workspaceId === ws && r.webinarId === webinarId && r.contactId === up.contact.id);
   if (existing) return { data: up.data, contact: up.contact, registration: existing, createdContact: up.created, duplicate: true };
   const registration: Registration = { id: newId('rg'), workspaceId: ws, webinarId, contactId: up.contact.id, registeredAt: nowIso(), source: input.session ? `${input.source} · ${input.session}` : input.source, attended: null, watchMinutes: 0, replay: false };
-  return { data: { ...up.data, registrations: [registration, ...up.data.registrations] }, contact: up.contact, registration, createdContact: up.created, duplicate: false };
+  return { data: fireTrigger({ ...up.data, registrations: [registration, ...up.data.registrations] }, ws, 'webinar_registered', [up.contact.id], webinar?.title ?? ''), contact: up.contact, registration, createdContact: up.created, duplicate: false };
 }
 
 export const logActivity = (d: HubData, ...args: Parameters<typeof newActivity>): HubData => ({ ...d, activities: [newActivity(...args), ...d.activities] });

@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { DAY, fmt, fmtDate, daysSince, plural } from '@/lib/hub/format';
 import { courseLessons, progressOf } from '@/lib/hub/logic';
 import { logActivity } from '@/lib/hub/ops';
+import { fireTrigger } from '@/lib/hub/flow';
 import type { Course, Enrollment, Lesson } from '@/lib/hub/types';
 import { useHub } from './state';
 import { Btn, Pick } from './ui';
@@ -55,7 +56,7 @@ function Player({ c }: { c: Course }) {
       const next = { ...d, enrollments: d.enrollments.map(x => (x.workspaceId === workspaceId && x.id === e.id ? { ...x, completedLessonIds: ids, lastActivityAt: new Date().toISOString(), status: finished ? 'Dokončeno' as const : x.status === 'Dokončeno' ? 'Aktivní' as const : x.status } : x)) };
       if (done) return next;
       const withLesson = logActivity(next, workspaceId, e.contactId, 'lesson', `Dokončena lekce ${current.title}`, c.title, `kurzy/${c.id}/studenti`);
-      return finished ? logActivity(withLesson, workspaceId, e.contactId, 'course', `Dokončen kurz ${c.title}`, 'Všechny lekce hotové', `kurzy/${c.id}/studenti`) : withLesson;
+      return finished ? fireTrigger(logActivity(withLesson, workspaceId, e.contactId, 'course', `Dokončen kurz ${c.title}`, 'Všechny lekce hotové', `kurzy/${c.id}/studenti`), workspaceId, 'course_completed', [e.contactId], c.title) : withLesson;
     });
     if (!done) toast.success(finished ? 'Kurz je dokončený. Gratulujeme!' : 'Lekce je označená jako dokončená.');
   };

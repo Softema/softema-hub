@@ -413,6 +413,46 @@ input.sr-only { width: 1px !important; height: 1px !important; padding: 0 !impor
 .quiz .check-row.bad { background: var(--tone-red-bg); color: var(--tone-red-fg); }
 @media (max-width: 1100px) { .player { grid-template-columns: 1fr; } .player-nav { position: static; max-height: none; } }
 
+/* ===== Automations (React Flow) ===== */
+.flow-builder { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: var(--sp-4); align-items: start; }
+.flow-canvas { height: calc(100dvh - 260px); min-height: 520px; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--surface-2); }
+.flow-canvas .react-flow { --xy-background-color: var(--surface-2); --xy-edge-stroke: var(--line-strong); --xy-edge-stroke-width: 1.5; --xy-handle-background-color: var(--surface); --xy-handle-border-color: var(--line-strong); --xy-controls-button-background-color: var(--surface); --xy-controls-button-color: var(--ink-2); --xy-controls-button-border-color: var(--line); --xy-attribution-background-color: transparent; }
+.flow-side { position: sticky; top: 88px; max-height: calc(100dvh - 110px); overflow-y: auto; }
+.fnode { position: relative; width: 260px; padding: var(--sp-3) var(--sp-4) var(--sp-4); border: 1px solid var(--line); border-radius: var(--r-card); background: var(--surface); color: var(--ink); font-size: 13px; box-shadow: 0 2px 6px rgb(16 24 40 / .05); }
+.fnode.sel { border-color: var(--brand-chart); box-shadow: 0 0 0 3px var(--brand-soft); }
+.fnode.bad { border-color: var(--negative); }
+.fnode-head { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); font-size: 12px; font-weight: 500; color: var(--ink-3); }
+.fnode-icon { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; background: var(--surface-3); color: var(--ink-2); }
+.fnode.kind-trigger .fnode-icon { background: var(--brand-soft); color: var(--brand-ink); }
+.fnode.kind-condition .fnode-icon { background: var(--tone-purple-bg); color: var(--tone-purple-fg); }
+.fnode.kind-email .fnode-icon { background: var(--tone-blue-bg); color: var(--tone-blue-fg); }
+.fnode.kind-end .fnode-icon { background: var(--tone-green-bg); color: var(--tone-green-fg); }
+.fnode-count { margin-left: auto; padding: 0 6px; border-radius: 999px; background: var(--brand); color: #fff; font-size: 11px; font-weight: 600; }
+.fnode-warn { margin-left: auto; color: var(--negative); }
+.fnode-count + .fnode-warn { margin-left: 0; }
+.fnode strong { display: block; font-size: 14px; line-height: 1.35; font-weight: 600; }
+.fnode small { display: block; margin-top: 2px; color: var(--ink-3); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fnode-branch { position: absolute; bottom: -22px; font-size: 11px; font-weight: 600; color: var(--ink-3); transform: translateX(-50%); }
+.fnode-branch.yes { left: 25%; color: var(--positive); }
+.fnode-branch.no { left: 75%; color: var(--negative); }
+.flow-add-wrap { position: absolute; left: 50%; bottom: -46px; transform: translateX(-50%); }
+.flow-add-wrap.yes { left: 25%; }
+.flow-add-wrap.no { left: 75%; }
+.flow-add { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--surface); color: var(--ink-3); cursor: pointer; }
+.flow-add svg { width: 16px; height: 16px; }
+.flow-add:hover, .flow-add:focus-visible { border-color: var(--brand-chart); color: var(--brand-ink); }
+.flow-add.small { width: 22px; height: 22px; }
+.flow-add.small svg { width: 13px; height: 13px; }
+.fedge-label { position: absolute; pointer-events: all; }
+.flow-issues { display: flex; align-items: flex-start; gap: var(--sp-3); margin-bottom: var(--sp-4); padding: var(--sp-3) var(--sp-4); border: 1px solid var(--line); border-radius: var(--r-card); background: var(--surface); font-size: 14px; }
+.flow-issues ul { flex: 1; display: flex; flex-direction: column; gap: var(--sp-1); margin: 0; padding: 0; list-style: none; }
+.flow-issues li button { display: flex; align-items: center; gap: var(--sp-2); text-align: left; color: var(--tone-red-fg); }
+.flow-issues li button:not(:disabled):hover { text-decoration: underline; }
+.flow-issues p { flex: 1; display: flex; align-items: center; gap: var(--sp-2); color: var(--ink-2); }
+.flow-settings-panel h2 { display: flex; align-items: center; gap: var(--sp-2); }
+.tpl-pick { display: flex; flex-direction: column; }
+@media (max-width: 1100px) { .flow-builder { grid-template-columns: 1fr; } .flow-side { position: static; max-height: none; } .flow-canvas { height: 62vh; min-height: 420px; } }
+
 /* ===== Webinars ===== */
 .form-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .wrap-seg { flex-wrap: wrap; }

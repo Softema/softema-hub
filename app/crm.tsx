@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { fmt, fmtDate, fmtDateTime, isEmail, money, newId, normalize, percent, plural } from '@/lib/hub/format';
 import { canEmail, segmentContext, segmentMembers } from '@/lib/hub/logic';
-import { findByEmail, logActivity, makeContact, nextContactIdIn, setConsent } from '@/lib/hub/ops';
+import { afterContactCreated, findByEmail, logActivity, makeContact, nextContactIdIn, setConsent } from '@/lib/hub/ops';
 import { DEAL_STAGES, type ConsentState, type Contact, type Deal, type DealStage, type Lifecycle, type Segment, type SegmentField, type SegmentRule } from '@/lib/hub/types';
 import { useHub, useUnsavedGuard } from './state';
 import { Avatar, Badge, Btn, Field, IconBtn, Metric, PageHead, Pick } from './ui';
@@ -397,7 +397,7 @@ export function ImportWizard() {
         const c = makeContact(next, workspaceId, { name: r.name, email: r.email, phone: r.phone, company: r.company, city: r.city, stage: r.stage ?? 'Lead', source: 'Import', tags: [...r.tags, ...extra], consent: opts.consent === 'given' ? 'Udělen' : 'Bez souhlasu', consentSource: opts.consent === 'given' ? `${source} (doložený souhlas)` : source, customFields: r.custom, owner: settings.team[0]?.name }, id++);
         add.push(c); ids.push(c.id); created++;
       }
-      next = { ...next, contacts: [...add, ...next.contacts] };
+      next = add.reduce((acc, c) => afterContactCreated(acc, workspaceId, c), { ...next, contacts: [...add, ...next.contacts] });
       if (opts.dupes === 'update') {
         const byId = new Map(existing.map(r => [r.existingId!, r]));
         next = { ...next, contacts: next.contacts.map(c => { const r = c.workspaceId === workspaceId ? byId.get(c.id) : undefined; if (!r) return c; updated++; ids.push(c.id); return { ...c, phone: c.phone || r.phone, company: c.company || r.company, city: c.city || r.city, tags: [...new Set([...c.tags, ...r.tags, ...extra])], customFields: [...c.customFields, ...r.custom.filter(f => !c.customFields.some(x => normalize(x.name) === normalize(f.name))).map(f => ({ id: newId('cf'), ...f }))] }; }) };

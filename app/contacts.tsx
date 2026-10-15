@@ -5,7 +5,8 @@ import { ChevronRight, Download, ListChecks, Mail, Plus, Tag, Trash2, Upload, Wo
 import { toast } from 'sonner';
 import { Checkbox } from '@/components/ui/checkbox';
 import { fmt, fmtDate, isEmail, normalize, periodStart, plural } from '@/lib/hub/format';
-import { deleteContacts, makeCampaign, makeContact, enrollInWorkflow, findByEmail } from '@/lib/hub/ops';
+import { afterContactCreated, deleteContacts, makeCampaign, makeContact, enrollInWorkflow, findByEmail } from '@/lib/hub/ops';
+import { fireTrigger } from '@/lib/hub/flow';
 import type { ConsentState, Contact, Lifecycle } from '@/lib/hub/types';
 import { useHub } from './state';
 import { CONSENTS, CrmHead, STAGES, consentTone, stageTone } from './crm-shared';
@@ -172,7 +173,7 @@ export function CreateContact({ open, onClose, onCreated }: { open: boolean; onC
     const dup = findByEmail(data, workspaceId, v.email);
     if (dup) return setError(`Kontakt s tímto e-mailem už existuje: ${dup.name}.`);
     const c = makeContact(data, workspaceId, { ...v, source: 'Ruční zadání', tags: v.tags.split(',').map(t => t.trim()).filter(Boolean), consentSource: v.consent === 'Udělen' ? 'Ručně zaznamenaný souhlas' : 'Ruční zadání', owner: settings.team[0]?.name });
-    mutate(d => ({ ...d, contacts: [c, ...d.contacts] }));
+    mutate(d => afterContactCreated({ ...d, contacts: [c, ...d.contacts] }, workspaceId, c));
     toast.success('Kontakt byl vytvořen.');
     close();
     if (onCreated) onCreated(c); else go('kontakty/' + c.id);
@@ -211,7 +212,8 @@ function TagDialog({ open, onClose, contacts, tags, mode }: { open: boolean; onC
     const t = tag.trim(); if (!t) return setError('Zadejte nebo vyberte štítek.');
     const ids = new Set(contacts.map(c => c.id));
     const existing = tags.find(x => normalize(x) === normalize(t)) ?? t;
-    mutate(d => ({ ...d, contacts: d.contacts.map(c => (c.workspaceId === workspaceId && ids.has(c.id) ? { ...c, tags: mode === 'add' ? [...new Set([...c.tags, existing])] : c.tags.filter(x => normalize(x) !== normalize(t)) } : c)) }));
+    const changed = contacts.filter(c => (mode === 'add' ? !c.tags.includes(existing) : c.tags.some(x => normalize(x) === normalize(t)))).map(c => c.id);
+    mutate(d => fireTrigger({ ...d, contacts: d.contacts.map(c => (c.workspaceId === workspaceId && ids.has(c.id) ? { ...c, tags: mode === 'add' ? [...new Set([...c.tags, existing])] : c.tags.filter(x => normalize(x) !== normalize(t)) } : c)) }, workspaceId, mode === 'add' ? 'tag_added' : 'tag_removed', changed, mode === 'add' ? existing : t));
     toast.success(mode === 'add' ? `Štítek „${existing}“ přidán k ${plural(ids.size, 'kontaktu', 'kontaktům', 'kontaktům')}.` : `Štítek „${t}“ odebrán.`);
     setTag(''); setError(''); onClose();
   };

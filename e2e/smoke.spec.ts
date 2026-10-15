@@ -285,6 +285,43 @@ test('cancelled webinar closes its registration page', async ({ page }) => {
   noErrors();
 });
 
+test('automation: template → activate → CRM tag enrols → insert step with validation', async ({ page }) => {
+  const noErrors = trackPageErrors(page);
+  await openHub(page, 'automatizace');
+  await page.getByRole('button', { name: 'Nový scénář' }).first().click();
+  await page.getByLabel('Název scénáře').fill('Testovací přivítání');
+  await page.getByRole('button', { name: 'Vytvořit scénář' }).click();
+  await expect(heading(page, 'Testovací přivítání')).toBeVisible();
+  await expect(page.locator('.fnode')).toHaveCount(6);
+  await page.getByRole('button', { name: 'Aktivovat' }).click();
+  await expect(page.getByText('Aktivní', { exact: true }).first()).toBeVisible();
+  const url = page.url();
+
+  // a tag added in the CRM fires the trigger
+  await openHub(page, 'kontakty/10');
+  await page.getByRole('button', { name: '+ Přidat', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Nový štítek' }).fill('Newsletter');
+  await page.getByRole('button', { name: 'Přidat', exact: true }).click();
+  await expect(page.getByText('Vstup do automatizace Testovací přivítání')).toBeVisible();
+
+  // insert a step on an edge; the empty step blocks saving an active workflow until it is filled in
+  await page.goto(url);
+  await page.waitForLoadState('networkidle');
+  await page.getByRole('button', { name: 'Vložit krok sem' }).first().click();
+  await page.getByRole('menuitem', { name: 'Notifikace týmu' }).click();
+  await expect(page.getByRole('button', { name: /1 chyba/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Uložit' }).click();
+  await expect(page.locator('.flow-issues')).toContainText('vyplňte příjemce');
+  await page.locator('.flow-side').getByLabel('Komu').fill('tym@softema.example');
+  await expect(page.getByRole('button', { name: 'Bez chyb' })).toBeVisible();
+  await page.getByRole('button', { name: 'Uložit' }).click();
+  await expect(page.locator('.fnode')).toHaveCount(7);
+  await page.reload();
+  await page.waitForLoadState('networkidle');
+  await expect(page.locator('.fnode')).toHaveCount(7);
+  noErrors();
+});
+
 test('public pages render', async ({ page }, info) => {
   test.skip(isMobile(info), 'desktop only');
   const noErrors = trackPageErrors(page);
