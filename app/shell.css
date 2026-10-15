@@ -14,6 +14,9 @@
   /* brand: --brand carries white text (4.75:1); --brand-ink is orange text on surface/soft (≥ 5.3:1) */
   --brand: #c9481a; --brand-hover: #b53f15; --brand-soft: #fdefe7; --brand-soft-hover: #fbe4d8; --brand-ink: #ad3f15; --brand-chart: #d4511e;
   --positive: #1a7f4b; --negative: #b42318;
+  /* primary actions: #eb6536 carries dark text (5.5:1); white would be only 3.3:1. Hover stays ≥ 4.5:1 with the same text. */
+  --brand-primary: #eb6536; --brand-primary-hover: #dd5829; --brand-primary-ink: #15181d;
+  --primary: var(--brand-primary); --primary-foreground: var(--brand-primary-ink);
   /* status tones (badge text ≥ 5.8:1 on its background) */
   --tone-green-bg: #eaf6ef; --tone-green-fg: #1f6b4b;
   --tone-blue-bg: #edf2ff; --tone-blue-fg: #3a5ba6;
@@ -49,7 +52,7 @@
   --chart-grid: #262b33; --chart-axis: #3a414c; --chart-prev: #8f97a3;
   --shadow-pop: 0 10px 30px rgb(0 0 0 / .45), 0 0 0 1px var(--line);
   --accent: #262b33; --accent-foreground: var(--ink);
-  --primary: #c9481a; --primary-foreground: #fff; --secondary: var(--surface-2); --secondary-foreground: var(--ink);
+  --primary: var(--brand-primary); --primary-foreground: var(--brand-primary-ink); --secondary: var(--surface-2); --secondary-foreground: var(--ink);
   --destructive: #f6877d; --ring: #ef7d4c;
 }
 body { background: var(--canvas); color: var(--ink); }
@@ -80,9 +83,11 @@ input::placeholder, textarea::placeholder { color: var(--ink-3); }
 /* Primary and secondary buttons */
 .hub-btn { background: var(--surface); border-color: var(--line-strong); color: var(--ink); }
 .hub-btn:hover { background: var(--surface-2); border-color: var(--ink-4); }
-.hub-btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; box-shadow: none; }
-.hub-btn.primary:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
-.hub-btn:disabled { opacity: .55; }
+.hub-btn.primary { background: var(--brand-primary); border-color: var(--brand-primary); color: var(--brand-primary-ink); font-weight: 600; box-shadow: none; }
+.hub-btn.primary:hover { background: var(--brand-primary-hover); border-color: var(--brand-primary-hover); }
+.hub-btn.primary:focus-visible { outline: 2px solid var(--brand-ink); outline-offset: 2px; }
+.hub-btn:disabled { opacity: .5; }
+.hub-btn.primary:disabled { opacity: 1; background: var(--surface-3); border-color: var(--line); color: var(--ink-3); }
 
 /* ===== KPI cards (Metric) ===== */
 .metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-4); margin-bottom: var(--sp-6); }
