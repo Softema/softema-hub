@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { fmt, fmtDate, fmtDateTime, money, newId, normalize, plural, relTime } from '@/lib/hub/format';
 import { logActivity } from '@/lib/hub/ops';
+import { newInvoice, payInvoice } from '@/lib/hub/payments';
 import type { CommunityGroup, Contact, GroupAccess, Membership, Post } from '@/lib/hub/types';
 import { useHub, useUnsavedGuard } from './state';
 import { Avatar, Badge, Btn, Field, Metric, Modal, PageHead, Pick } from './ui';
@@ -328,7 +329,19 @@ function GroupSettings({ g }: { g: CommunityGroup }) {
 
 /* ---------- access preview ---------- */
 function AccessPreview({ g }: { g: CommunityGroup }) {
-  const { w } = useHub();
+  const { w, workspaceId, mutate, go } = useHub();
+  /** Simulated Stripe checkout: paid invoice + subscription + active membership. */
+  const buy = (c: Contact) => {
+    mutate(d => {
+      const inv = { ...newInvoice(d, workspaceId, c.id, [{ id: newId('it'), name: `Členství ${g.name} (měsíčně)`, qty: 1, price: g.price }]), status: 'Odeslaná' as const };
+      let next = payInvoice({ ...d, invoices: [inv, ...d.invoices] }, workspaceId, inv.id, 'Karta');
+      next = { ...next, subscriptions: [{ id: newId('sub'), workspaceId, contactId: c.id, plan: g.name, price: g.price, interval: 'měsíčně', status: 'Aktivní', startedAt: new Date().toISOString(), nextPaymentAt: new Date(Date.now() + 30 * 86_400_000).toISOString() }, ...next.subscriptions] };
+      const existing = next.memberships.find(m => m.workspaceId === workspaceId && m.groupId === g.id && m.contactId === c.id);
+      next = existing ? { ...next, memberships: next.memberships.map(m => (m === existing ? { ...m, status: 'Aktivní' } : m)) } : { ...next, memberships: [...next.memberships, { id: newId('mb'), workspaceId, groupId: g.id, contactId: c.id, role: 'Člen', status: 'Aktivní', joinedAt: new Date().toISOString() }] };
+      return logActivity(next, workspaceId, c.id, 'community', `Vstup do skupiny ${g.name}`, 'Zaplacené členství (simulace)', 'komunita/' + g.id);
+    });
+    toast.success('Členství je zaplacené (simulace).', { description: 'Vznikla faktura, platba, předplatné a členství.' });
+  };
   const { query, setQuery } = useRoute();
   const contacts = useMemo(() => new Map(w.contacts.map(c => [c.id, c])), [w.contacts]);
   const sample = [...new Set([...w.memberships.filter(m => m.groupId === g.id).map(m => m.contactId).slice(0, 25), ...w.contacts.slice(0, 15).map(c => c.id)])];
@@ -353,8 +366,10 @@ function AccessPreview({ g }: { g: CommunityGroup }) {
       ) : (
         <section className="panel player-locked">
           <Lock size={28} aria-hidden /><h2>{g.name}</h2><p>{g.description}</p>
-          {g.access === 'Placená' && <Btn primary onClick={() => toast.info('Členství se zaplatí přes Stripe Checkout po napojení plateb.')}>Koupit členství za {money(g.price)} / měsíc</Btn>}
-          {g.access === 'Součást kurzu' && <Btn primary onClick={() => toast.info('Přístup získá po zápisu do kurzu.')}>Zobrazit kurz</Btn>}
+          {g.access === 'Placená' && (c
+            ? <Btn primary onClick={() => buy(c)}>Koupit členství za {money(g.price)} / měsíc (simulace)</Btn>
+            : <p className="small muted">Členství si koupí přihlášený klient. Vyberte nahoře kontakt.</p>)}
+          {g.access === 'Součást kurzu' && g.courseId && <Btn primary onClick={() => go(`kurzy/${g.courseId}/nahled${c ? `?student=${c.id}` : ''}`)}>Zobrazit kurz</Btn>}
           {g.access === 'Na pozvání' && <p className="small muted">O přístup je potřeba požádat moderátora.</p>}
         </section>
       )}
