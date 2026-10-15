@@ -87,19 +87,19 @@ test('contact custom fields: add, validate, edit, remove', async ({ page }) => {
   await dialog.getByRole('button', { name: 'Přidat pole' }).click();
   await expect(dialog.getByRole('alert')).toContainText('už u tohoto kontaktu existuje');
   await dialog.getByLabel('Název pole').fill('Web');
-  await dialog.getByLabel('Hodnota').fill('novakstudio.cz');
+  await dialog.getByLabel('Hodnota').fill('novakstudio.example');
   await dialog.getByRole('button', { name: 'Přidat pole' }).click();
   await expect(rows).toHaveCount(5);
-  await expect(rows.last()).toContainText('novakstudio.cz');
+  await expect(rows.last()).toContainText('novakstudio.example');
 
   await rows.last().click();
-  await dialog.getByLabel('Hodnota').fill('www.novakstudio.cz');
+  await dialog.getByLabel('Hodnota').fill('www.novakstudio.example');
   await dialog.getByRole('button', { name: 'Uložit změny' }).click();
-  await expect(rows.last()).toContainText('www.novakstudio.cz');
+  await expect(rows.last()).toContainText('www.novakstudio.example');
   // stored in the browser: survives a reload
   await page.reload();
   await page.waitForLoadState('networkidle');
-  await expect(rows.last()).toContainText('www.novakstudio.cz');
+  await expect(rows.last()).toContainText('www.novakstudio.example');
   await rows.last().click();
   await dialog.getByRole('button', { name: 'Odebrat pole' }).click();
   await expect(rows).toHaveCount(4);
@@ -319,6 +319,29 @@ test('automation: template → activate → CRM tag enrols → insert step with 
   await page.reload();
   await page.waitForLoadState('networkidle');
   await expect(page.locator('.fnode')).toHaveCount(7);
+  noErrors();
+});
+
+test('invoice: create → send → pay shows on the contact and in transactions', async ({ page }) => {
+  const noErrors = trackPageErrors(page);
+  await openHub(page, 'kontakty/1');
+  await page.getByRole('tab', { name: /^Platby/ }).click();
+  await page.getByRole('button', { name: 'Nová faktura' }).click();
+  await expect(heading(page, 'Nová faktura')).toBeVisible();
+  await page.getByRole('button', { name: 'Uložit a odeslat' }).click();
+  await expect(page.locator('.form-error')).toContainText('Každá položka potřebuje název');
+  await page.getByLabel('Název položky 1').fill('Audit kampaní');
+  await page.getByLabel('Cena položky 1').fill('7400');
+  await page.getByRole('button', { name: 'Uložit a odeslat' }).click();
+  await expect(page.getByText('Odeslaná', { exact: true }).first()).toBeVisible();
+  await page.getByRole('button', { name: 'Označit jako zaplacenou' }).first().click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Označit jako zaplacenou' }).click();
+  await expect(page.getByText('Zaplacená', { exact: true }).first()).toBeVisible();
+
+  await openHub(page, 'platby/transakce?q=audit');
+  await expect(page.getByRole('row').filter({ hasText: 'Audit kampaní' })).toContainText('Úspěšná');
+  await openHub(page, 'kontakty/1');
+  await expect(page.getByText(/^Zaplacena faktura \d+/).first()).toBeVisible();
   noErrors();
 });
 

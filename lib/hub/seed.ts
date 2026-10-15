@@ -67,28 +67,28 @@ const SOFTEMA: Profile = {
   ws: WS_SOFTEMA, seed: 7, idStart: 1, count: 168, owner: 'Marie Smolková', b2b: 0.75, domain: c => `${slug(c)}.example`,
   tags: ['Newsletter', 'VIP', 'Webinář', 'Kurz', 'B2B', 'E-shop', 'Lead magnet'],
   named: [
-    { name: 'Jan Novák', email: 'jan.novak@novakstudio.cz', company: 'Novák Studio', stage: 'Klient', tags: ['VIP', 'Newsletter'], source: 'Webinář', color: 'blue', city: 'Olomouc', consent: 'Udělen', createdDays: 22, custom: [['Obor', 'Grafické studio a branding'], ['Počet zaměstnanců', '8'], ['Preferovaný kanál', 'E-mail, dopoledne'], ['Fakturace', 'Měsíčně, splatnost 14 dní']], notes: ['Zájem o rozšíření spolupráce na e-mailing. Ozvat se s návrhem začátkem října.'] },
-    { name: 'Petra Svobodová', email: 'petra@bloomdesign.cz', company: 'Bloom Design', stage: 'Klient', tags: ['Newsletter', 'Kurz'], source: 'Formulář', color: 'pink', city: 'Brno', consent: 'Udělen', createdDays: 64 },
-    { name: 'Tomáš Dvořák', email: 'tomas@dvorakpartners.cz', company: 'Dvořák & Partners', stage: 'Zájemce', tags: ['Webinář', 'B2B'], source: 'Webinář', color: 'green', city: 'Praha', consent: 'Udělen', createdDays: 0 },
-    { name: 'Lucie Procházková', email: 'lucie@atelierlp.cz', company: 'Ateliér LP', stage: 'Klient', tags: ['VIP', 'Kurz'], source: 'Doporučení', color: 'orange', city: 'Brno', consent: 'Udělen', createdDays: 120, custom: [['Obor', 'Architektura interiérů'], ['Město', 'Brno'], ['Zájem o', 'Kurz Marketing od základů']] },
-    { name: 'Martin Černý', email: 'martin@cernydigital.cz', company: 'Černý Digital', stage: 'Zájemce', tags: ['Newsletter'], source: 'Chatbot', color: 'purple', city: 'Ostrava', consent: 'Udělen', createdDays: 12 },
-    { name: 'Kateřina Veselá', email: 'katerina@kavarnakafe.cz', company: 'Kavárna Kafe', stage: 'Klient', tags: ['Newsletter', 'B2B'], source: 'Formulář', color: 'blue', city: 'Olomouc', consent: 'Udělen', createdDays: 200 },
-    { name: 'Pavel Horák', email: 'pavel@horakstavby.cz', company: 'Horák Stavby', stage: 'Klient', tags: ['VIP', 'B2B'], source: 'Import', color: 'green', city: 'Přerov', consent: 'Udělen', createdDays: 310, custom: [['Obor', 'Stavebnictví'], ['Počet poboček', '3'], ['Rozpočet na marketing', '25 000 Kč / měsíc']] },
-    { name: 'Anna Němcová', email: 'anna@annaceramics.cz', company: 'Anna Ceramics', stage: 'Zájemce', tags: ['Kurz', 'Newsletter'], source: 'Webinář', color: 'pink', city: 'Zlín', consent: 'Udělen', createdDays: 40 },
-    { name: 'David Pokorný', email: 'david@pokr.cz', company: 'POKR Creative', stage: 'Klient', tags: ['Newsletter'], source: 'Doporučení', color: 'purple', city: 'Praha', consent: 'Udělen', createdDays: 150 },
-    { name: 'Tereza Malá', email: 'tereza@malastudio.cz', company: 'Malá Studio', stage: 'Zájemce', tags: ['B2B'], source: 'Import', color: 'orange', city: 'Olomouc', consent: 'Odvolán', createdDays: 260 },
-    { name: 'Michal Král', email: 'michal@kraltech.cz', company: 'Král Technologies', stage: 'Lead', tags: ['Webinář'], source: 'Chatbot', color: 'blue', city: 'Hradec Králové', consent: 'Čeká na potvrzení', createdDays: 5 },
-    { name: 'Barbora Fialová', email: 'bara@fialovakvetina.cz', company: 'Fialová květina', stage: 'Klient', tags: ['Kurz', 'Newsletter'], source: 'Formulář', color: 'pink', city: 'Prostějov', consent: 'Udělen', createdDays: 90 },
+    { name: 'Jan Novák', email: 'jan.novak@novakstudio.example', company: 'Novák Studio', stage: 'Klient', tags: ['VIP', 'Newsletter'], source: 'Webinář', color: 'blue', city: 'Olomouc', consent: 'Udělen', createdDays: 22, custom: [['Obor', 'Grafické studio a branding'], ['Počet zaměstnanců', '8'], ['Preferovaný kanál', 'E-mail, dopoledne'], ['Fakturace', 'Měsíčně, splatnost 14 dní']], notes: ['Zájem o rozšíření spolupráce na e-mailing. Ozvat se s návrhem začátkem října.'] },
+    { name: 'Petra Svobodová', email: 'petra@bloomdesign.example', company: 'Bloom Design', stage: 'Klient', tags: ['Newsletter', 'Kurz'], source: 'Formulář', color: 'pink', city: 'Brno', consent: 'Udělen', createdDays: 64 },
+    { name: 'Tomáš Dvořák', email: 'tomas@dvorakpartners.example', company: 'Dvořák & Partners', stage: 'Zájemce', tags: ['Webinář', 'B2B'], source: 'Webinář', color: 'green', city: 'Praha', consent: 'Udělen', createdDays: 0 },
+    { name: 'Lucie Procházková', email: 'lucie@atelierlp.example', company: 'Ateliér LP', stage: 'Klient', tags: ['VIP', 'Kurz'], source: 'Doporučení', color: 'orange', city: 'Brno', consent: 'Udělen', createdDays: 120, custom: [['Obor', 'Architektura interiérů'], ['Město', 'Brno'], ['Zájem o', 'Kurz Marketing od základů']] },
+    { name: 'Martin Černý', email: 'martin@cernydigital.example', company: 'Černý Digital', stage: 'Zájemce', tags: ['Newsletter'], source: 'Chatbot', color: 'purple', city: 'Ostrava', consent: 'Udělen', createdDays: 12 },
+    { name: 'Kateřina Veselá', email: 'katerina@kavarnakafe.example', company: 'Kavárna Kafe', stage: 'Klient', tags: ['Newsletter', 'B2B'], source: 'Formulář', color: 'blue', city: 'Olomouc', consent: 'Udělen', createdDays: 200 },
+    { name: 'Pavel Horák', email: 'pavel@horakstavby.example', company: 'Horák Stavby', stage: 'Klient', tags: ['VIP', 'B2B'], source: 'Import', color: 'green', city: 'Přerov', consent: 'Udělen', createdDays: 310, custom: [['Obor', 'Stavebnictví'], ['Počet poboček', '3'], ['Rozpočet na marketing', '25 000 Kč / měsíc']] },
+    { name: 'Anna Němcová', email: 'anna@annaceramics.example', company: 'Anna Ceramics', stage: 'Zájemce', tags: ['Kurz', 'Newsletter'], source: 'Webinář', color: 'pink', city: 'Zlín', consent: 'Udělen', createdDays: 40 },
+    { name: 'David Pokorný', email: 'david@pokr.example', company: 'POKR Creative', stage: 'Klient', tags: ['Newsletter'], source: 'Doporučení', color: 'purple', city: 'Praha', consent: 'Udělen', createdDays: 150 },
+    { name: 'Tereza Malá', email: 'tereza@malastudio.example', company: 'Malá Studio', stage: 'Zájemce', tags: ['B2B'], source: 'Import', color: 'orange', city: 'Olomouc', consent: 'Odvolán', createdDays: 260 },
+    { name: 'Michal Král', email: 'michal@kraltech.example', company: 'Král Technologies', stage: 'Lead', tags: ['Webinář'], source: 'Chatbot', color: 'blue', city: 'Hradec Králové', consent: 'Čeká na potvrzení', createdDays: 5 },
+    { name: 'Barbora Fialová', email: 'bara@fialovakvetina.example', company: 'Fialová květina', stage: 'Klient', tags: ['Kurz', 'Newsletter'], source: 'Formulář', color: 'pink', city: 'Prostějov', consent: 'Udělen', createdDays: 90 },
   ],
 };
 const LEGS: Profile = {
   ws: WS_4LEGS, seed: 41, idStart: 1001, count: 92, owner: 'Marie Smolková', b2b: 0.08, domain: () => 'posta.example',
   tags: ['Newsletter', 'Psí krmivo', 'Kočky', 'Věrnostní program', 'VIP', 'Akce'],
   named: [
-    { name: 'Adam Beneš', email: 'adam@example.cz', company: '', stage: 'Klient', tags: ['Newsletter', 'Psí krmivo'], source: 'Formulář', color: 'blue', city: 'Brno', consent: 'Udělen', createdDays: 30, custom: [['Mazlíček', 'Pes – labradorský retrívr'], ['Věrnostní program', 'Zlatá úroveň']] },
-    { name: 'Eva Konečná', email: 'eva@example.cz', company: '', stage: 'Klient', tags: ['Newsletter', 'Kočky'], source: 'Kampaň', color: 'pink', city: 'Praha', consent: 'Udělen', createdDays: 75 },
-    { name: 'Ondřej Urban', email: 'ondrej@example.cz', company: '', stage: 'Zájemce', tags: ['Newsletter'], source: 'Chatbot', color: 'green', city: 'Olomouc', consent: 'Udělen', createdDays: 3 },
-    { name: 'Klára Marková', email: 'klara@example.cz', company: '', stage: 'Klient', tags: ['Věrnostní program', 'Kočky'], source: 'Formulář', color: 'orange', city: 'Zlín', consent: 'Udělen', createdDays: 140 },
+    { name: 'Adam Beneš', email: 'adam@posta.example', company: '', stage: 'Klient', tags: ['Newsletter', 'Psí krmivo'], source: 'Formulář', color: 'blue', city: 'Brno', consent: 'Udělen', createdDays: 30, custom: [['Mazlíček', 'Pes – labradorský retrívr'], ['Věrnostní program', 'Zlatá úroveň']] },
+    { name: 'Eva Konečná', email: 'eva@posta.example', company: '', stage: 'Klient', tags: ['Newsletter', 'Kočky'], source: 'Kampaň', color: 'pink', city: 'Praha', consent: 'Udělen', createdDays: 75 },
+    { name: 'Ondřej Urban', email: 'ondrej@posta.example', company: '', stage: 'Zájemce', tags: ['Newsletter'], source: 'Chatbot', color: 'green', city: 'Olomouc', consent: 'Udělen', createdDays: 3 },
+    { name: 'Klára Marková', email: 'klara@posta.example', company: '', stage: 'Klient', tags: ['Věrnostní program', 'Kočky'], source: 'Formulář', color: 'orange', city: 'Zlín', consent: 'Udělen', createdDays: 140 },
   ],
 };
 
@@ -252,7 +252,7 @@ export function createSeed(now = new Date()): HubData {
   const data: HubData = {
     contacts: [], segments: [], deals: [], activities: [], campaigns: [], workflows: [], invoices: [], transactions: [], subscriptions: [], paymentLinks: [], coupons: [],
     courses: [], enrollments: [], products: [], purchases: [], groups: [], memberships: [], posts: [], webinars: [], registrations: [], chatbots: [], settings: [],
-    profile: { name: 'Marie Smolková', email: 'marie@softema.cz', phone: '+420 731 555 210', title: 'Správce pracovního prostoru', color: 'orange', twoFactor: true } satisfies UserProfile,
+    profile: { name: 'Marie Smolková', email: 'marie@softema.example', phone: '+420 731 555 210', title: 'Správce pracovního prostoru', color: 'orange', twoFactor: true } satisfies UserProfile,
   };
   for (const p of [SOFTEMA, LEGS]) {
     const ws = p.ws; const soft = ws === WS_SOFTEMA; const r = prng(p.seed + 1000);
@@ -434,15 +434,15 @@ function makeSettings(ws: string, now: Date): WorkspaceSettings {
   return {
     id: `set-${ws.slice(-2)}`, workspaceId: ws, name: soft ? 'Softema Creative' : '4legs.cz', kind: soft ? 'Interní prostor agentury' : 'Klientský prostor',
     brandColor: soft ? '#c9481a' : '#2f7d6d',
-    company: soft ? { legalName: 'Softema Creative s.r.o.', ico: '00000001', dic: 'CZ00000001', vatPayer: true, address: 'Ukázková 12, 779 00 Olomouc', email: 'fakturace@softema.cz' } : { legalName: '4legs.cz (ukázkový klient)', ico: '00000002', dic: '', vatPayer: false, address: 'Ukázková 3, 602 00 Brno', email: 'info@4legs.cz' },
+    company: soft ? { legalName: 'Softema Creative s.r.o.', ico: '00000001', dic: 'CZ00000001', vatPayer: true, address: 'Ukázková 12, 779 00 Olomouc', email: 'fakturace@softema.example' } : { legalName: '4legs.cz (ukázkový klient)', ico: '00000002', dic: '', vatPayer: false, address: 'Ukázková 3, 602 00 Brno', email: 'info@4legs.example' },
     timezone: 'Europe/Prague', currency: 'CZK',
     team: soft ? [
-      { id: 'tm-1', name: 'Marie Smolková', email: 'marie@softema.cz', role: 'workspace_admin', status: 'Aktivní', color: 'orange' },
-      { id: 'tm-2', name: 'Denis Vrána', email: 'denis@softema.cz', role: 'agency_admin', status: 'Aktivní', color: 'blue' },
-      { id: 'tm-3', name: 'Tereza Novotná', email: 'tereza@softema.cz', role: 'member', status: 'Aktivní', color: 'pink' },
+      { id: 'tm-1', name: 'Marie Smolková', email: 'marie@softema.example', role: 'workspace_admin', status: 'Aktivní', color: 'orange' },
+      { id: 'tm-2', name: 'Denis Vrána', email: 'denis@softema.example', role: 'agency_admin', status: 'Aktivní', color: 'blue' },
+      { id: 'tm-3', name: 'Tereza Novotná', email: 'tereza@softema.example', role: 'member', status: 'Aktivní', color: 'pink' },
     ] : [
-      { id: 'tm-1', name: 'Marie Smolková', email: 'marie@softema.cz', role: 'workspace_admin', status: 'Aktivní', color: 'orange' },
-      { id: 'tm-4', name: 'Klient 4legs', email: 'majitel@4legs.cz', role: 'member', status: 'Pozvánka odeslána', color: 'green' },
+      { id: 'tm-1', name: 'Marie Smolková', email: 'marie@softema.example', role: 'workspace_admin', status: 'Aktivní', color: 'orange' },
+      { id: 'tm-4', name: 'Klient 4legs', email: 'majitel@4legs.example', role: 'member', status: 'Pozvánka odeslána', color: 'green' },
     ],
     domains: [{ id: 'dom-1', domain, status: soft ? 'Ověřeno' : 'Čeká na DNS', records: rec(soft), addedAt: ago(soft ? 300 : 4) }],
     senders: [{ id: 'snd-1', name: soft ? 'Softema Creative' : '4legs.cz', email: soft ? 'ahoj@mail.softema.cz' : 'novinky@mail.4legs.cz', isDefault: true }],
