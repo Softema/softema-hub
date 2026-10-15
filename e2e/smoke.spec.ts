@@ -361,7 +361,18 @@ test('community: post, moderate and check access', async ({ page }) => {
   // a visitor does not get into the paid group
   await openHub(page, 'komunita/g-club/pristup');
   await expect(page.getByText('Nemá přístup: Nepřihlášený návštěvník')).toBeVisible();
-  await expect(page.getByRole('button', { name: /Koupit členství/ })).toBeVisible();
+  await expect(page.getByText('Členství si koupí přihlášený klient', { exact: false })).toBeVisible();
+  // a contact without membership buys it (simulation) and gets access
+  const outsider = await page.evaluate(() => {
+    const d = JSON.parse(localStorage.getItem('softema-hub:data') ?? '{}').data;
+    const g = d.groups.find((x: { id: string }) => x.id === 'g-club');
+    const members = new Set(d.memberships.filter((m: { groupId: string }) => m.groupId === 'g-club').map((m: { contactId: number }) => m.contactId));
+    return d.contacts.find((c: { workspaceId: string; id: number }) => c.workspaceId === g.workspaceId && !members.has(c.id)).id as number;
+  });
+  await openHub(page, `komunita/g-club/pristup?kontakt=${outsider}`);
+  await expect(page.getByText('Nemá přístup: Vyžaduje placené členství.')).toBeVisible();
+  await page.getByRole('button', { name: /Koupit členství/ }).click();
+  await expect(page.getByText('Má přístup: Aktivní placené členství.')).toBeVisible();
   noErrors();
 });
 
