@@ -2,11 +2,12 @@
 /* Settings: profile, workspace & company, branding & client portal, team & roles, sending domains & senders,
    integrations (no secrets in the browser), notifications and "Data a obnova" (export, reset demo data). */
 import React, { useState } from 'react';
-import { Check, Copy, Database, Download, Globe, ImagePlus, KeyRound, Mail, MoreHorizontal, Plus, RefreshCcw, RotateCcw, ShieldCheck, Trash2, UserPlus } from 'lucide-react';
+import { Check, Copy, Database, Download, Globe, ImagePlus, KeyRound, Mail, MoreHorizontal, Plus, RefreshCcw, RotateCcw, ShieldCheck, Trash2, Upload, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { fmt, fmtDate, fmtDateTime, isEmail, newId } from '@/lib/hub/format';
-import { hubStore, SCHEMA_VERSION } from '@/lib/hub/store';
+import { demoWorkspaces } from '@/lib/domain/tenancy';
+import { hubStore, parseExport, SCHEMA_VERSION } from '@/lib/hub/store';
 import type { DnsRecord, IntegrationKey, Role, SendingDomain, TeamMember, UserProfile, WorkspaceSettings } from '@/lib/hub/types';
 import { useHub, useUnsavedGuard } from './state';
 import { Avatar, Badge, Btn, Field, IconBtn, Modal, PageHead, Pick } from './ui';
@@ -375,6 +376,20 @@ function DataReset() {
   const { data, workspaceId, settings, go } = useHub();
   const [confirmEl, confirm] = useConfirm();
   const [info, setInfo] = useState(() => hubStore.info());
+  const [importError, setImportError] = useState('');
+  const importFile = async (f: File) => {
+    setImportError('');
+    if (f.size > 10_000_000) return setImportError('Soubor je větší než 10 MB.');
+    const text = await f.text();
+    const known = demoWorkspaces.map(x => x.id);
+    let names: string[];
+    try { const { data: d, workspaces } = parseExport(text, known); names = workspaces.map(id => d.settings.find(s => s.workspaceId === id)?.name ?? id); }
+    catch (e) { return setImportError((e as Error).message); }
+    confirm({ title: `Importovat ${f.name}?`, confirm: 'Importovat', danger: true, desc: `Data ${names.length > 1 ? 'prostorů' : 'prostoru'} ${names.join(' a ')} se nahradí obsahem souboru. Ostatní prostory zůstanou beze změny. Dosavadní stav se uloží jako záloha v tomto prohlížeči.`, onConfirm: () => {
+      try { hubStore.importData(text, known); setInfo(hubStore.info()); toast.success('Data byla importována.', { description: names.join(', ') }); }
+      catch (e) { setImportError((e as Error).message); }
+    } });
+  };
   const exportData = (all: boolean) => {
     const payload = all ? data : Object.fromEntries(Object.entries(data).map(([k, v]) => [k, Array.isArray(v) ? v.filter((x: { workspaceId?: string }) => x.workspaceId === workspaceId) : v]));
     download(`softema-hub-${all ? 'vse' : settings.name.toLowerCase().replace(/\W+/g, '-')}-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({ version: SCHEMA_VERSION, exportedAt: new Date().toISOString(), data: payload }, null, 2), 'application/json');
@@ -389,7 +404,13 @@ function DataReset() {
           <div className="kv"><span>Ukázková data vytvořena</span><strong>{info.createdAt ? fmtDateTime(info.createdAt) : '—'}</strong></div>
           <div className="kv"><span>Velikost</span><strong>{fmt(Math.round(info.bytes / 1024))} kB</strong></div>
           {info.saveError && <Notice tone="warn">{info.saveError}</Notice>}
-          <div className="flex-row wrap"><Btn onClick={() => exportData(false)}><Download aria-hidden />Export prostoru (JSON)</Btn><Btn onClick={() => exportData(true)}><Database aria-hidden />Export všech prostorů</Btn></div>
+          <div className="flex-row wrap">
+            <Btn onClick={() => exportData(false)}><Download aria-hidden />Export prostoru (JSON)</Btn>
+            <Btn onClick={() => exportData(true)}><Database aria-hidden />Export všech prostorů</Btn>
+            <label className="hub-btn file-btn"><input type="file" accept="application/json,.json" className="sr-only" onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void importFile(f); }} /><Upload aria-hidden />Import ze zálohy (JSON)</label>
+          </div>
+          <FormError>{importError}</FormError>
+          <small className="muted">Import nahradí jen prostory obsažené v souboru. Ostatní prostory zůstanou beze změny a dosavadní stav se uloží jako záloha v prohlížeči.</small>
         </div>
       </Section>
       <Section title="Obnovit ukázková data" desc="Pro začátek review nebo po testování. Změny nelze vrátit – případně si je nejdřív exportujte.">

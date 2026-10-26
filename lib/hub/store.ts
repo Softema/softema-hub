@@ -122,7 +122,41 @@ export const hubStore = {
   },
   info() { flush(); return { createdAt, loadIssue, saveError, bytes: storage()?.getItem(STORAGE_KEY)?.length ?? 0 }; },
   consumeLoadIssue() { const m = loadIssue; loadIssue = null; return m; },
+  /**
+   * Imports a JSON export (Settings → Data). Only the workspaces contained in the file are replaced, others stay;
+   * the profile is replaced only by an export of all workspaces. The current data are first copied to IMPORT_BACKUP_KEY.
+   * Throws an Error with a user-facing message when the file is not a valid export.
+   */
+  importData(text: string, known: string[]): { workspaces: string[] } {
+    const { data, workspaces } = parseExport(text, known);
+    const cur = hubStore.getSnapshot();
+    try { storage()?.setItem(IMPORT_BACKUP_KEY, JSON.stringify({ version: SCHEMA_VERSION, createdAt, data: cur } satisfies Envelope)); } catch { /* quota: import still proceeds */ }
+    const next = { ...cur } as HubData;
+    for (const k of COLLECTIONS) {
+      const keep = (cur[k] as { workspaceId: string }[]).filter(x => !workspaces.includes(x.workspaceId));
+      const add = (data[k] as { workspaceId: string }[]).filter(x => workspaces.includes(x.workspaceId));
+      (next as unknown as Record<string, unknown[]>)[k] = [...keep, ...add];
+    }
+    if (known.every(w => workspaces.includes(w))) next.profile = data.profile;
+    hubStore.set(next); flush();
+    return { workspaces };
+  },
 };
+
+export const IMPORT_BACKUP_KEY = 'softema-hub:data-before-import';
+/** Validates an export file and returns its data (migrated to the current version) and the workspaces it contains. */
+export function parseExport(text: string, known: string[]): { data: HubData; workspaces: string[] } {
+  let raw: unknown;
+  try { raw = JSON.parse(text); } catch { throw new Error('Soubor není platný JSON.'); }
+  const parsed = envelope.omit({ createdAt: true }).safeParse(raw);
+  if (!parsed.success) throw new Error('Soubor není export Softema Hubu (chybí očekávaná data).');
+  if (parsed.data.version > SCHEMA_VERSION) throw new Error(`Export je z novější verze aplikace (formát ${parsed.data.version}).`);
+  const data = migrate(parsed.data);
+  if (!data) throw new Error(`Nepodporovaná verze formátu ${parsed.data.version}.`);
+  const workspaces = known.filter(w => data.settings.some(s => s.workspaceId === w));
+  if (!workspaces.length) throw new Error('Export neobsahuje žádný známý pracovní prostor.');
+  return { data, workspaces };
+}
 
 /* ---------- typed collection helpers (always scoped to one workspace) ---------- */
 export function scoped<K extends CollectionKey>(data: HubData, key: K, workspaceId: string): ItemOf<K>[] {

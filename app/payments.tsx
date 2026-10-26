@@ -20,11 +20,11 @@ export default function Payments() {
   const { parts } = useRoute();
   const [, sub, id] = parts;
   if (sub === 'faktury' && id) return <InvoiceDetail key={id} id={id} />;
-  const tab = sub ?? 'prehled';
+  const tab = sub && ['faktury', 'transakce', 'predplatne', 'odkazy', 'kupony'].includes(sub) ? sub : 'prehled';
   return (
     <div className="page">
       <PageHead title="Platby" desc="Faktury, platby, předplatné a platební odkazy. V prototypu se nic neúčtuje – Stripe a Fakturoid se napojí s backendem." />
-      <PayNav active={sub ? `platby/${sub}` : 'platby'} />
+      <PayNav active={tab === 'prehled' ? 'platby' : `platby/${tab}`} />
       {tab === 'prehled' && <Overview />}
       {tab === 'faktury' && <Invoices />}
       {tab === 'transakce' && <Transactions />}

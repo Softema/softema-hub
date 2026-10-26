@@ -28,7 +28,7 @@ export default function Chatbot() {
 function ChatbotEditor({ bot }: { bot: ChatbotConfig }) {
   const { patch } = useHub();
   const { parts } = useRoute();
-  const tab = parts[1] ?? 'vzhled';
+  const tab = ['znalosti', 'chovani', 'instalace'].includes(parts[1] ?? '') ? parts[1] : 'vzhled';
   const [draft, setDraft] = useState(bot);
   const [error, setError] = useState('');
   const settingsOnly = (c: ChatbotConfig) => JSON.stringify({ ...c, sources: undefined });

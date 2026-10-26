@@ -25,7 +25,7 @@ export default function Webinars() {
   if (!id) return <WebinarList />;
   if (sub === 'stranka') return <RegistrationPage key={id} id={id} />;
   if (sub === 'mistnost') return <WebinarRoom key={id} id={id} />;
-  return <WebinarDetail key={id} id={id} tab={sub ?? 'prehled'} />;
+  return <WebinarDetail key={id} id={id} tab={sub && ['registrace', 'upravit', 'pripominky'].includes(sub) ? sub : 'prehled'} />;
 }
 
 const FILTERS: [string, string][] = [['upcoming', 'Nadcházející'], ['evergreen', 'Evergreen'], ['past', 'Proběhlé'], ['draft', 'Koncepty'], ['cancelled', 'Zrušené'], ['all', 'Všechny']];

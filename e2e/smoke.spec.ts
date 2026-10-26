@@ -506,6 +506,67 @@ test('recipients dialog keeps the selection while searching; scheduling rejects 
   noErrors();
 });
 
+test('campaign draft survives a reload and reopens with its recipients; browser back/forward', async ({ page }) => {
+  const noErrors = trackPageErrors(page);
+  await openHub(page, 'kampane/nova');
+  await page.getByLabel('Název kampaně').fill('Koncept na později');
+  await page.getByLabel('Předmět e-mailu').fill('Předmět konceptu');
+  await page.getByRole('button', { name: 'Uložit a pokračovat' }).click();
+  await expect(page).toHaveURL(/#kampane\/\d+\/upravit\?krok=2$/);
+  const id = page.url().match(/kampane\/(\d+)/)![1];
+  await page.getByRole('button', { name: /Segment: VIP klienti/ }).click();
+  await page.reload();
+  await page.waitForLoadState('networkidle');
+  await expect(page.locator('.audience-card.selected')).toContainText('VIP klienti');
+  await openHub(page, 'kampane');
+  await page.getByRole('row').filter({ hasText: 'Koncept na později' }).getByRole('button', { name: /Koncept na později/ }).first().click();
+  await expect(page).toHaveURL(new RegExp(`#kampane/${id}`));
+  await page.goBack();
+  await expect(page).toHaveURL(/#kampane$/);
+  await page.goForward();
+  await expect(page).toHaveURL(new RegExp(`#kampane/${id}`));
+  await openHub(page, `kampane/${id}/upravit?krok=1`);
+  await expect(page.getByLabel('Předmět e-mailu')).toHaveValue('Předmět konceptu');
+  noErrors();
+});
+
+test('data export imports into a fresh browser without touching the other workspace', async ({ page, browser }, info) => {
+  test.skip(isMobile(info), 'desktop only');
+  const noErrors = trackPageErrors(page);
+  await openHub(page, 'nastaveni/prostor');
+  await page.getByLabel('Název prostoru').fill('Prostor z exportu');
+  await page.getByRole('button', { name: 'Uložit', exact: true }).click();
+  await openHub(page, 'nastaveni/data');
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export prostoru (JSON)' }).click();
+  const file = await (await download).path();
+
+  const other = await browser.newPage();
+  await openHub(other, 'nastaveni/data');
+  await other.locator('label', { hasText: 'Import ze zálohy' }).locator('input[type=file]').setInputFiles(file!);
+  await other.getByRole('dialog').getByRole('button', { name: 'Importovat' }).click();
+  await expect(other.locator('.workspace-switch')).toContainText('Prostor z exportu');
+  const names = await other.evaluate(() => JSON.parse(localStorage.getItem('softema-hub:data') ?? '{}').data.settings.map((s: { name: string }) => s.name));
+  expect(names).toContain('4legs.cz');
+  await other.close();
+  noErrors();
+});
+
+test('Unlayer unavailable: the built-in editor takes over', async ({ page }, info) => {
+  test.skip(isMobile(info), 'desktop only');
+  const noErrors = trackPageErrors(page);
+  await page.route(/unlayer\.com/, route => route.abort());
+  await openHub(page, 'kampane/nova');
+  await page.getByLabel('Název kampaně').fill('Bez Unlayeru');
+  await page.getByLabel('Předmět e-mailu').fill('Test');
+  await page.getByRole('button', { name: 'Uložit a pokračovat' }).click();
+  const id = page.url().match(/kampane\/(\d+)/)![1];
+  await openHub(page, `kampane/${id}/editor`);
+  await expect(page.locator('.editor-fallback')).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('.editor-fallback')).toContainText(/Unlayer/);
+  noErrors();
+});
+
 test('public pages render', async ({ page }, info) => {
   test.skip(isMobile(info), 'desktop only');
   const noErrors = trackPageErrors(page);

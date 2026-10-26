@@ -81,7 +81,8 @@ test('store: invalid stored data are moved to a backup key', () => {
 
 test('store: v1 data migrate likes to reactions and posts into a forum category', () => {
   const d = fresh();
-  const v1 = { ...d, groups: d.groups.map(({ categories, ...g }) => g), posts: d.posts.map(({ reactions, myReaction, categoryId, ...p }, i) => ({ ...p, likes: 4, likedByMe: i === 0 })) };
+  const without = (x, ...keys) => { const c = { ...x }; for (const k of keys) delete c[k]; return c; };
+  const v1 = { ...d, groups: d.groups.map(g => without(g, 'categories')), posts: d.posts.map((p, i) => ({ ...without(p, 'reactions', 'myReaction', 'categoryId'), likes: 4, likedByMe: i === 0 })) };
   const m = migrateV1(v1);
   for (const g of m.groups) assert.ok(g.categories.length > 0, g.id);
   for (const p of m.posts) {
@@ -91,6 +92,25 @@ test('store: v1 data migrate likes to reactions and posts into a forum category'
   }
   assert.equal(m.posts[0].myReaction, 'like');
   assert.equal(m.posts[1].myReaction, undefined);
+});
+
+test('store: importing a one-workspace export replaces only that workspace and keeps a backup', () => {
+  hubStore.reset();
+  const known = [WS_SOFTEMA, WS_4LEGS];
+  const cur = hubStore.getSnapshot();
+  // export of 4legs with one renamed contact
+  const only = Object.fromEntries(Object.entries(cur).map(([k, v]) => [k, Array.isArray(v) ? v.filter(x => x.workspaceId === WS_4LEGS) : v]));
+  only.contacts = only.contacts.map(c => (c.id === 1001 ? { ...c, name: 'Z importu' } : c));
+  // a local change in Softema must survive the import
+  hubStore.update(d => ({ ...d, contacts: d.contacts.map(c => (c.id === 1 ? { ...c, name: 'Lokální změna' } : c)) }));
+  const r = hubStore.importData(JSON.stringify({ version: SCHEMA_VERSION, exportedAt: 'x', data: only }), known);
+  assert.deepEqual(r.workspaces, [WS_4LEGS]);
+  const after = hubStore.getSnapshot();
+  assert.equal(after.contacts.find(c => c.id === 1001).name, 'Z importu');
+  assert.equal(after.contacts.find(c => c.id === 1).name, 'Lokální změna');
+  assert.ok(mem.get('softema-hub:data-before-import'), 'backup written');
+  assert.throws(() => hubStore.importData('{"version":2,"data":{}}', known), /export Softema Hubu/);
+  assert.throws(() => hubStore.importData('nope', known), /JSON/);
 });
 
 test('ops: contacts are deduplicated by e-mail (case-insensitive) per workspace', () => {

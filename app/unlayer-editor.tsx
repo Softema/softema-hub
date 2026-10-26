@@ -53,8 +53,14 @@ export default function UnlayerEditor({ design, starter, dark, onChange, onReady
 
   useEffect(() => {
     // The script comes from a third-party CDN; without a response we fall back to the built-in editor.
-    const t = setTimeout(() => { if (!ready.current) latest.current.onFail('Editor Unlayer se nepodařilo načíst do 20 sekund.'); }, 20_000);
-    return () => clearTimeout(t);
+    const fail = (reason: string) => { if (!ready.current) { ready.current = true; latest.current.onFail(reason); } };
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) fail('Prohlížeč je offline, editor Unlayer se nenačte.');
+    const t = setTimeout(() => fail('Editor Unlayer se nepodařilo načíst do 20 sekund.'), 20_000);
+    // A blocked or unreachable CDN shows up as an error event of the script element (does not bubble, hence capture).
+    // The failed element is removed so that "Zkusit Unlayer znovu" downloads the script again.
+    const onError = (e: Event) => { if (e.target instanceof HTMLScriptElement && e.target.src.includes('unlayer.com')) { e.target.remove(); fail('Skript editoru Unlayer se nepodařilo stáhnout (síť nebo blokovaný obsah).'); } };
+    window.addEventListener('error', onError, true);
+    return () => { clearTimeout(t); window.removeEventListener('error', onError, true); };
   }, []);
 
   return (

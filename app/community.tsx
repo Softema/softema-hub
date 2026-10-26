@@ -26,7 +26,7 @@ export default function Community() {
   const [, a, b] = parts;
   if (a === 'moderace') return <Moderation />;
   if (!a) return <GroupList />;
-  return <GroupPage key={a} id={a} tab={b ?? 'feed'} />;
+  return <GroupPage key={a} id={a} tab={b && ['clenove', 'nastaveni', 'pristup'].includes(b) ? b : 'feed'} />;
 }
 
 function CommunityNav({ active }: { active: string }) {
