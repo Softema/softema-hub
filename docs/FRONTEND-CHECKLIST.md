@@ -125,7 +125,7 @@ Větev `frontend/complete` (je i na `origin`; commity z kontroly před předán�
 | ESLint (celý projekt) | 0 chyb, varování jen `<img>` pro data URL a 2 nepoužité proměnné v původním `marketing.tsx` |
 | `node --test tests/foundation.test.mjs tests/hub.test.mjs` | 18/18 prošlo (včetně migrace dat a importu) |
 | Smoke testy proti produkčnímu buildu (`E2E_UNLAYER=1`) | 45 prošlo, 9 přeskočeno: testy jen pro desktop nebo jen pro mobil (Unlayer, nastavení se sidebarem, nativní výběr data na mobilu, veřejné stránky, export/import, výpadek CDN) |
-| `scripts/ui-audit.mjs` (62 obrazovek × 2 prostory × 1920/1440/1024/390 px × světlé/tmavé téma) | viz předávací zpráva; žádné nezachycené chyby, horizontální přetečení ani chybějící popisky. Zbývá jen přijatá odchylka níže |
+| `scripts/ui-audit.mjs` proti produkčnímu buildu (59 obrazovek × 2 prostory × 1920/1440/1024/390 px × světlé/tmavé téma = 944 otevření) | 0 nezachycených chyb, 0 chyb v konzoli, 0 horizontálních přetečení. axe hlásí jen přijatou odchylku níže (kontrast primárních tlačítek). Detail kontaktu a editor e-mailu mají hlavní nadpis jako `h2` (známá drobnost, bez dopadu na ovládání). |
 | Vizuální testy (`e2e/visual.spec.ts`) | liší se od referencí z původního prototypu (nový vzhled, bílý text primárních tlačítek, nové funkce). Reference se nepřepisují bez schválení. Aktuální vzhled je v `docs/screenshots/`. |
 
 **Přijatá odchylka:** primární tlačítka mají na přání zadavatele bílý text na #eb6536 (kontrast 3,3 : 1). axe to hlásí jako nedostatečný kontrast u textu menšího než 18,7 px tučně.
