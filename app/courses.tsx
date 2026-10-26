@@ -55,7 +55,7 @@ function CourseList() {
         <div className="card-grid">
           {list.map(c => { const s = stats(c); return (
             <article key={c.id} className="panel course-card">
-              <button type="button" className="course-card-link" onClick={() => go('kurzy/' + c.id)} aria-label={`Otevřít kurz ${c.title}`}><Art accent={c.accent} image={c.image} eyebrow={c.subtitle} title={c.title} /></button>
+              <button type="button" className="course-card-link" onClick={() => go('kurzy/' + c.id)} tabIndex={-1} aria-hidden><Art accent={c.accent} image={c.image} eyebrow={c.subtitle} title={c.title} /></button>
               <div className="course-card-body">
                 <div className="flex-row spread"><Badge tone={c.status === 'Publikováno' ? 'green' : 'gray'}>{c.status}</Badge><span className="small muted">{priceLabel(c)}</span></div>
                 <h3><button type="button" onClick={() => go('kurzy/' + c.id)}>{c.title}</button></h3>

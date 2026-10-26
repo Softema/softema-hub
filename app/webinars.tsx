@@ -95,7 +95,7 @@ function WebinarList() {
       <div className="card-grid">
         {list.map(x => { const s = webinarState(x, now); const st = stats(x); return (
           <article key={x.id} className="panel course-card">
-            <button type="button" className="course-card-link" onClick={() => go('webinare/' + x.id)} aria-label={`Otevřít webinář ${x.title}`}><Art accent={x.accent} image={x.image} eyebrow={x.kind === 'live' ? 'Živý webinář' : 'Evergreen'} title={x.title} /></button>
+            <button type="button" className="course-card-link" onClick={() => go('webinare/' + x.id)} tabIndex={-1} aria-hidden><Art accent={x.accent} image={x.image} eyebrow={x.kind === 'live' ? 'Živý webinář' : 'Evergreen'} title={x.title} /></button>
             <div className="course-card-body">
               <div className="flex-row spread"><Badge tone={stateTone(s)}>{s}</Badge><WebinarMenu w={x} regs={st.regs} actions={actions} /></div>
               <h3><button type="button" onClick={() => go('webinare/' + x.id)}>{x.title}</button></h3>

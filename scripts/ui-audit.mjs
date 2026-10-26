@@ -3,7 +3,7 @@
 // Optional screenshots for a handover. Needs a running app (pnpm dev or pnpm start).
 //
 //   node scripts/ui-audit.mjs [--base http://localhost:3000] [--widths 1920,1440,1024,390] [--themes light,dark]
-//                             [--shots docs/screenshots] [--shot-widths 1440,390] [--only kontakty]
+//                             [--shots docs/screenshots] [--shot-widths 1440,390] [--shot-filter '^(prehled|kontakty)$'] [--only kontakty]
 //
 // Output: a JSON report in test-results/ui-audit.json and a short summary on stdout. Exit code 1 on findings.
 import { chromium } from '@playwright/test';
@@ -18,6 +18,8 @@ const THEMES = (args.themes ?? 'light,dark').split(',');
 const SHOTS = args.shots;
 const SHOT_WIDTHS = new Set((args['shot-widths'] ?? '1440,390').split(',').map(Number));
 const ONLY = args.only;
+// Screenshots only for routes matching this regular expression (all when omitted).
+const SHOT_FILTER = args['shot-filter'] ? new RegExp(args['shot-filter']) : null;
 const WORKSPACES = ['20000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000002'];
 // Rules that need a backend or are false positives for this layout.
 const AXE_DISABLED = ['region', 'landmark-unique', 'landmark-one-main', 'page-has-heading-one', 'scrollable-region-focusable'];
@@ -84,9 +86,9 @@ for (const theme of THEMES) for (const width of WIDTHS) for (const ws of WORKSPA
     const violations = axe.violations.filter(v => v.impact === 'serious' || v.impact === 'critical').map(v => ({ id: v.id, n: v.nodes.length, targets: v.nodes.slice(0, 3).map(n => n.target.join(' ')) }));
     const item = { theme, width, ws: ws.slice(-1), route, h1, errors: [...errors], overflow: overflow.page > 1 || overflow.items.length ? overflow : undefined, violations: violations.length ? violations : undefined };
     report.push(item);
-    if (SHOTS && SHOT_WIDTHS.has(width) && ws === WORKSPACES[0]) {
+    if (SHOTS && SHOT_WIDTHS.has(width) && ws === WORKSPACES[0] && (!SHOT_FILTER || SHOT_FILTER.test(route))) {
       mkdirSync(SHOTS, { recursive: true });
-      await page.screenshot({ path: join(SHOTS, `${width}-${theme}-${slug(route)}.jpg`), type: 'jpeg', quality: 70, fullPage: width < 768 ? false : false });
+      await page.screenshot({ path: join(SHOTS, `${width}-${theme}-${slug(route)}.jpg`), type: 'jpeg', quality: 70 });
     }
     const bad = item.errors.length || item.overflow || item.violations || !h1;
     process.stdout.write(bad ? 'x' : '.');

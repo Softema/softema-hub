@@ -92,7 +92,7 @@ function Detail({ c }: { c: Contact }) {
           <TagsBox c={c} all={tags} />
           <section className="contact-info" aria-labelledby="custom-fields-title">
             <div className="cf-head"><h3 id="custom-fields-title">Vlastní pole</h3><IconBtn label="Přidat vlastní pole" onClick={() => setFieldDialog({})}><Plus /></IconBtn></div>
-            {c.customFields.length ? <div className="cf-list">{c.customFields.map(f => <button key={f.id} type="button" className="custom-field-row" onClick={() => setFieldDialog({ id: f.id })} aria-label={`Upravit pole ${f.name}`}><span>{f.name}</span><strong>{f.value || '—'}</strong></button>)}</div>
+            {c.customFields.length ? <div className="cf-list">{c.customFields.map(f => <button key={f.id} type="button" className="custom-field-row" onClick={() => setFieldDialog({ id: f.id })} title={`Upravit pole ${f.name}`}><span>{f.name}</span><strong>{f.value || '—'}</strong></button>)}</div>
               : <><p className="cf-empty">Zatím tu nejsou žádná vlastní pole. Doplňte třeba obor nebo preferovaný kanál.</p><button type="button" className="pill-tag" onClick={() => setFieldDialog({})}>+ Přidat pole</button></>}
           </section>
           <div className="contact-info">

@@ -55,7 +55,7 @@ function GroupList() {
       <div className="card-grid">
         {w.groups.map(g => { const s = stat(g); return (
           <article key={g.id} className="panel course-card">
-            <button type="button" className="course-card-link" onClick={() => go('komunita/' + g.id)} aria-label={`Otevřít skupinu ${g.name}`}><Art accent={g.accent} eyebrow={g.access} title={g.name} /></button>
+            <button type="button" className="course-card-link" onClick={() => go('komunita/' + g.id)} tabIndex={-1} aria-hidden><Art accent={g.accent} eyebrow={g.access} title={g.name} /></button>
             <div className="course-card-body">
               <div className="flex-row spread"><Badge tone={accessTone(g.access)}>{g.access}</Badge><span className="small muted">{g.access === 'Placená' ? `${money(g.price)} / měsíc` : g.access === 'Součást kurzu' ? w.courses.find(c => c.id === g.courseId)?.title ?? 'kurz' : ''}</span></div>
               <h3><button type="button" onClick={() => go('komunita/' + g.id)}>{g.name}</button></h3>
@@ -267,6 +267,7 @@ function Composer({ g, asContact, category }: { g: CommunityGroup; asContact?: C
   const { workspaceId, mutate, profile } = useHub();
   const draft = useDraft();
   const [picked, setPicked] = useState<string>();
+  useUnsavedGuard(!!draft.text || draft.files.length > 0, 'Rozepsaný příspěvek ještě není zveřejněný. Pokud odejdete, ztratíte ho.');
   // explicit choice wins, otherwise the category being viewed, otherwise the first (general) one
   const catId = (g.categories.some(c => c.id === picked) ? picked : undefined) ?? category?.id ?? g.categories[0]?.id ?? '';
   const post = () => {
