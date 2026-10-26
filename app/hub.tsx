@@ -58,12 +58,12 @@ function Navigation() {
   return (
     <Sidebar className="hub-sidebar">
       <SidebarContent>
-        <a href="#prehled" className="brand" aria-label="Softema Hub — přehled"><span className="brand-logo"><Workflow /></span>softema<span className="hub-word">hub</span></a>
+        <a href="#prehled" className="brand" aria-label="Softema Hub — přehled"><span className="brand-logo"><Workflow /></span>softema <span className="hub-word">hub</span></a>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button type="button" className="workspace-switch" aria-label={`Pracovní prostor: ${wsName(workspaceId)}. Změnit`}>
-              {wsIcon(workspaceId)}
-              <span><strong>{wsName(workspaceId)}</strong><small>{wsKind(workspaceId)}</small></span>
+            <button type="button" className="workspace-switch">
+              <span aria-hidden className="contents">{wsIcon(workspaceId)}</span>
+              <span><span className="sr-only">Pracovní prostor: </span><strong>{wsName(workspaceId)}</strong><small>{wsKind(workspaceId)}</small><span className="sr-only">. Změnit</span></span>
               <ChevronsUpDown size={13} className="ml-auto muted" />
             </button>
           </DropdownMenuTrigger>
@@ -236,11 +236,11 @@ function Frame() {
               {sub && <><ChevronRight size={13} /><span>{SUB[sub] ?? crumbName(mod, sub)}</span></>}
             </div>
             <div className="topbar-right">
-              <button type="button" className="global-search" onClick={() => setSearch(true)} aria-label="Hledat v aplikaci" aria-keyshortcuts="Control+K Meta+K"><Search size={16} aria-hidden /><span>Hledat kontakty, kampaně…</span><kbd>Ctrl K</kbd></button>
+              <button type="button" className="global-search" onClick={() => setSearch(true)} aria-keyshortcuts="Control+K Meta+K" title="Hledat v aplikaci (Ctrl K)"><Search size={16} aria-hidden /><span>Hledat kontakty, kampaně…</span><kbd aria-hidden>Ctrl K</kbd><span className="sr-only global-search-sr">Hledat v aplikaci</span></button>
               <IconBtn label="Nápověda" onClick={() => setHelp(true)}><CircleHelp /></IconBtn>
               <ThemeMenu />
               <Notifications open={notice} onOpenChange={setNotice} />
-              <button type="button" className="topbar-profile" onClick={() => go('nastaveni/profil')} aria-label="Můj profil"><Avatar name={profile.name} color={profile.color} size="sm" src={profile.photo?.dataUrl} /></button>
+              <button type="button" className="topbar-profile" onClick={() => go('nastaveni/profil')} title="Můj profil"><Avatar name={profile.name} color={profile.color} size="sm" src={profile.photo?.dataUrl} /><span className="sr-only">Můj profil</span></button>
             </div>
           </header>
           <div key={workspaceId}><Screen /></div>

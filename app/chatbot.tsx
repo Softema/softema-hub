@@ -271,7 +271,7 @@ function TestChat({ bot }: { bot: ChatbotConfig }) {
             <div className="chat-widget-foot">Testovací chat · Softema Hub</div>
           </div>
         ) : null}
-        <button type="button" className="chat-launcher" style={{ background: bot.color }} onClick={() => setOpen(o => !o)} aria-expanded={open}>{open ? <X size={18} aria-hidden /> : <><Bot size={18} aria-hidden />{bot.launcher}</>}</button>
+        <button type="button" className="chat-launcher" style={{ background: bot.color }} onClick={() => setOpen(o => !o)} aria-expanded={open} aria-label={open ? 'Zavřít chat' : undefined}>{open ? <X size={18} aria-hidden /> : <><Bot size={18} aria-hidden />{bot.launcher}</>}</button>
       </div>
     </div>
   );

@@ -83,4 +83,24 @@ Cílová produkční architektura (NestJS, Prisma, PostgreSQL s RLS, Better-Auth
 
 **Unlayer** se načítá z `editor.unlayer.com` a běží bez účtu. Obsahuje proto branding Unlayer a nemá prémiové funkce. Volitelně jde nastavit veřejné `NEXT_PUBLIC_UNLAYER_PROJECT_ID` (není to secret). Když se skript nenačte, aplikace přepne na vestavěný editor.
 
+## Nasazení ukázky na Vercel
+
+Aplikace je čistě frontendová: všechny stránky se předrenderují staticky, data žijí v localStorage návštěvníka a nepotřebuje žádné proměnné prostředí, databázi ani API klíče. Na nové adrese (a v každém novém prohlížeči) se při prvním otevření vytvoří ukázková data.
+
+Nastavení projektu ve Vercelu (část je i ve [vercel.json](vercel.json)):
+
+| Položka | Hodnota |
+| --- | --- |
+| Framework Preset | Next.js |
+| Root Directory | `./` (kořen repozitáře) |
+| Install Command | `npx --yes pnpm@11.25.0 install --frozen-lockfile` (z `vercel.json`) |
+| Build Command | `npx --yes pnpm@11.25.0 build` (z `vercel.json`) |
+| Output Directory | výchozí (`.next`) |
+| Node.js Version | 22.x |
+| Environment Variables | žádné. Volitelně veřejné `NEXT_PUBLIC_UNLAYER_PROJECT_ID`, až bude účet Unlayer. |
+
+pnpm se instaluje v přesné verzi 11.25.0 přes `npx`, protože Vercel by jinak podle lockfilu zvolil starší pnpm, který nezná pravidla v `pnpm-workspace.yaml`. Instalace použije úložiště balíčků v `.sites-runtime/` uvnitř build adresáře (je v `.gitignore`).
+
+Ukládání v prohlížeči se mezi počítači nesdílí. Data z jednoho prohlížeče přenesete exportem a importem v **Nastavení → Data a obnova**.
+
 GitHub CI ([.github/workflows/verify.yml](.github/workflows/verify.yml)) ověřuje instalaci, typy, unit testy a build. Nic nenasazuje ani nerozesílá. Původní verze prototypu na Vinextu a Cloudflare Workers je uložená v lokální větvi `archive/sites-vinext`.

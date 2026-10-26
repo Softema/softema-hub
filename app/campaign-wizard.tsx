@@ -129,7 +129,7 @@ function Stepper({ step, onStep, done = 0 }: { step: number; onStep?: (n: number
         <React.Fragment key={s}>
           {k > 0 && <li className="step-line" aria-hidden />}
           <li className={`wizard-step ${step === k + 1 ? 'current' : ''} ${done > k + 1 || step > k + 1 ? 'complete' : ''}`} aria-current={step === k + 1 ? 'step' : undefined}>
-            {onStep ? <button type="button" onClick={() => onStep(k + 1)}><b>{step > k + 1 ? <Check size={13} aria-hidden /> : k + 1}</b><span>{s}</span></button> : <><b>{k + 1}</b><span>{s}</span></>}
+            {onStep ? <button type="button" aria-label={`${k + 1}. ${s}`} onClick={() => onStep(k + 1)}><b>{step > k + 1 ? <Check size={13} aria-hidden /> : k + 1}</b><span>{s}</span></button> : <><b>{k + 1}</b><span>{s}</span></>}
           </li>
         </React.Fragment>
       ))}

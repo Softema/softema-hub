@@ -37,9 +37,7 @@ export default function Payments() {
 
 function PayNav({ active }: { active: string }) {
   const { w } = useHub();
-  const [now] = useState(() => Date.now());
-  const overdue = w.invoices.filter(i => invoiceView(i, now) === 'Po splatnosti').length;
-  return <SubNav active={active} items={[['platby', 'Přehled'], ['platby/faktury', 'Faktury', overdue || undefined], ['platby/transakce', 'Transakce'], ['platby/predplatne', 'Předplatné', w.subscriptions.filter(s => s.status === 'Aktivní').length], ['platby/odkazy', 'Platební odkazy'], ['platby/kupony', 'Kupóny']]} />;
+  return <SubNav active={active} items={[['platby', 'Přehled'], ['platby/faktury', 'Faktury', w.invoices.length], ['platby/transakce', 'Transakce'], ['platby/predplatne', 'Předplatné', w.subscriptions.filter(s => s.status === 'Aktivní').length], ['platby/odkazy', 'Platební odkazy'], ['platby/kupony', 'Kupóny']]} />;
 }
 
 function useContacts() { const { w } = useHub(); return useMemo(() => new Map(w.contacts.map(c => [c.id, c])), [w.contacts]); }
