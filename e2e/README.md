@@ -12,6 +12,7 @@ Projekty `desktop` (1440×900) a `mobile` (390×844). Každý test dostane nový
   - automatizace (šablona, aktivace, spouštěč z CRM, validace) a faktury;
   - komunita, chatbot (lead do CRM), nastavení a integrace bez API klíčů;
   - veřejné stránky.
+  - koncept kampaně po obnovení stránky, zpět/vpřed, export → import dat do čistého prohlížeče, výpadek CDN Unlayeru.
 - `visual.spec.ts`: snímky dashboardu, kontaktů, detailu kontaktu, průvodce kampaní, reportu kampaně a editoru bloků. Ukázková data se generují relativně k času prvního spuštění, proto test fixuje hodiny na 15. 10. 2026 10:00 (Europe/Prague).
 
 ```sh
@@ -24,5 +25,9 @@ Referenční snímky v `__screenshots__/` pocházejí z původního prototypu p�
 Snímky jsou pořízené na Windows (`-win32`), takže porovnání má smysl jen na stejném OS a ve stejném prohlížeči. V CI se proto nespouští.
 
 V `next dev` skrývá `openHub()` odznak vývojového overlaye Next.js, protože by na mobilu zakrýval spodní navigaci.
+
+## Průchod všemi obrazovkami
+
+`node scripts/ui-audit.mjs --base http://localhost:3000` otevře každou obrazovku Hubu přímým odkazem (oba prostory, 1920/1440/1024/390 px, světlé i tmavé téma) a hlásí nezachycené chyby, chyby v konzoli, horizontální přetečení, chybějící `h1` a závažná porušení axe-core (kontrast, popisky, ARIA). Report je v `test-results/ui-audit.json`. Volbou `--shots docs/screenshots --shot-filter '…'` uloží snímky vybraných obrazovek.
 
 Výsledky selhání jsou v `playwright-report/` a `test-results/` (neverzují se).

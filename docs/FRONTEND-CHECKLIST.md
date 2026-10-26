@@ -15,17 +15,17 @@ Průběžně se aktualizuje. Platí pro větev `frontend/complete`.
 | Požadavek | Stav | Poznámka |
 | --- | --- | --- |
 | Sdílené typované entity a ID napříč moduly | ✅ | `lib/hub/types.ts` podle kap. 5. Fáze kontaktu je oddělená od souhlasu. Role `agency_admin`/`workspace_admin`/`member`, klient jen v portálu. |
-| Perzistence v localStorage s validací a verzí formátu | ✅ | `lib/hub/store.ts`: klíč `softema-hub:data`, `SCHEMA_VERSION`, validace zod a záloha nečitelných dat do `softema-hub:data-backup`. Zápisy jsou dávkové (300 ms) a při skrytí stránky se uloží hned. |
+| Perzistence v localStorage s validací a verzí formátu | ✅ | `lib/hub/store.ts`: klíč `softema-hub:data`, `SCHEMA_VERSION` 2 s migrací z verze 1 (reakce, kategorie fóra), validace zod a záloha nečitelných dat do `softema-hub:data-backup`. Zápisy jsou dávkové (300 ms) a při skrytí stránky se uloží hned. |
 | Ukázková data jen při první inicializaci | ✅ | `lib/hub/seed.ts`: deterministický generátor, jen smyšlená jména. E-maily kontaktů jsou na doméně `.example`. |
 | Oddělení pracovních prostorů | ✅ | Každý záznam má `workspaceId` a UI čte jen přes filtr. Ověřeno smoke testem (kontakt z prostoru A není v prostoru B). |
-| Záměrná obnova ukázkových dat | ✅ | Nastavení → Data a obnova: export JSON, obnova jednoho prostoru nebo všech (s potvrzením). |
+| Záměrná obnova ukázkových dat, export a import | ✅ | Nastavení → Data a obnova: export JSON (prostor nebo vše), import exportu (nahradí jen prostory ze souboru, ostatní nechá, dosavadní stav zálohuje do `softema-hub:data-before-import`), obnova jednoho prostoru nebo všech (s potvrzením). Unit i smoke test. |
 | Žádné secrets v prohlížeči | ✅ | Integrace ukládají jen stav připojení a název účtu. Text, který vypadá jako API klíč, formulář odmítne (smoke test). |
-| Přímé odkazy, zpět/vpřed, refresh | ✅ | Hash routy včetně filtrů a kroků v URL (`kontakty?zdroj=…`, `kampane/7/upravit?krok=3`). Data přežijí refresh. |
+| Přímé odkazy, zpět/vpřed, refresh | ✅ | Hash routy včetně filtrů a kroků v URL (`kontakty?zdroj=…`, `kampane/7/upravit?krok=3`). Data přežijí refresh. Všech 62 obrazovek otevřeno přímým odkazem s refreshem v obou prostorech (`scripts/ui-audit.mjs`). Neexistující záznam ukáže „… nenalezen“ s návratem, neznámá záložka výchozí záložku, neznámá cesta český 404. |
 | Varování před neuloženými změnami | ✅ | `useUnsavedGuard` (segmenty, lekce, nastavení kurzu, produkt, webinář, faktura, scénář, chatbot, nastavení). Hlídá navigaci v aplikaci, tlačítko zpět, přepnutí prostoru i zavření stránky. Kampaně se ukládají automaticky. |
 | Potvrzení destruktivních akcí | ✅ | `useConfirm` u všech mazání, stornování, vrácení plateb, anonymizace a obnovy dat. |
 | Validace a chybové stavy formulářů | ✅ | Chyby se zobrazují u formuláře (`FormError`, role `alert`). Tlačítka bez platného stavu jsou zakázaná. |
 | Prázdné stavy s CTA | ✅ | Seznamy mají prázdný stav a stav „nic neodpovídá filtru“. |
-| Loading stav | ✅ | Skeleton do načtení localStorage. Editor Unlayer má vlastní stav načítání a po 20 s přepne na náhradní editor. |
+| Loading stav | ✅ | Skeleton do načtení localStorage. Editor Unlayer má vlastní stav načítání. Při chybě stažení skriptu nebo offline přepne hned na vestavěný editor, jinak po 20 s (smoke test se zablokovaným CDN). |
 | Propojení modulů (kap. 9) | ✅ | Časová osa kontaktu se skládá ze všech modulů. Spouštěče automatizací reagují na nový kontakt, štítek, import, registraci na webinář, dokončený kurz, platbu a lead z chatbota (`lib/hub/flow.ts`). |
 
 ## Dashboard
@@ -67,7 +67,7 @@ Průběžně se aktualizuje. Platí pro větev `frontend/complete`.
 | --- | --- | --- |
 | Seznam kurzů (koncept/publikováno), vytvoření a úprava | ✅ | Název, popis, obrázek (data URL do 400 kB), cena a typ ceny, dostupnost (drip), certifikát. |
 | Struktura kurz → moduly → lekce | ✅ | Přidání, přejmenování, řazení, přesun mezi moduly, mazání. |
-| Obsah lekce, drip | ✅🔌 | Odkaz na video, text, kvíz, přílohy (jen metadata). Mux a podepsané URL přijdou s backendem. |
+| Obsah lekce, drip | ✅🔌 | Formátovaný text lekce (editor Tiptap s nadpisy), video, kvíz, přílohy (jen metadata). Odkazy z YouTube, Vimeo a přímé MP4 se v náhledu přehrají. Nahrávání videí (Mux) a podepsané URL přijdou s backendem. |
 | Studenti propojení s CRM a jejich postup | ✅ | |
 | Náhled studenta a přehrávač, oddělený od administrace | ✅ | Drip zámky, kvíz, postup se ukládá a zapisuje do časové osy, certifikát. |
 | Digitální produkty | ✅🔌 | Soubory jen jako metadata. Stahování přes podepsanou URL přijde s backendem. |
@@ -89,9 +89,9 @@ Průběžně se aktualizuje. Platí pro větev `frontend/complete`.
 | --- | --- | --- |
 | Automatizace (React Flow) | ✅🔌 | Úpravy uzlů, větvení Ano/Ne, vkládání kroků, validace, uložení, aktivace a simulovaný krok běhu. Skutečný běh (BullMQ) přijde s backendem. |
 | Platby | ✅🔌 | Faktury (koncept → odeslaná → zaplacená/po splatnosti/stornovaná), transakce (vrácení, opakování), předplatné, platební odkazy, kupóny. Nic se neúčtuje. |
-| Komunita | ✅🔌 | Skupiny, členové, příspěvky, komentáře, moderace, náhled přístupu. Notifikace e-mailem a obrázky v příspěvcích přijdou s backendem. |
+| Komunita | ✅🔌 | Skupiny, kategorie fóra (správa v nastavení skupiny), příspěvky a komentáře ve formátovaném editoru s odkazy a přílohami (obrázky do 400 kB s lightboxem, ostatní soubory jen metadata), reakce, moderace, náhled přístupu. Notifikace e-mailem a trvalé nahrávání souborů přijdou s backendem. Reakce se evidují jen za aktuálního uživatele (bez přihlášení nejde rozlišit osoby). |
 | Chatbot | ✅🔌 | Vzhled, znalostní báze, chování, instalace, živý náhled. Testovací chat je lokální vyhledávání (ne Claude API). Lead se uloží do CRM. |
-| Nastavení | ✅ | Profil, prostor, branding a portál, tým a role, domény a odesílatelé, integrace, notifikace, data a obnova. Změny se promítají do UI. |
+| Nastavení | ✅ | Profil (včetně vlastní fotky avatara jako data URL do 400 kB), prostor, branding a portál, tým a role, domény a odesílatelé, integrace, notifikace, data a obnova (export i import). Změny se promítají do UI. |
 | Klientský portál (8.6) | 🔌 | Oddělená autentizace klientů závisí na backendu. Náhledy (student, účastník, přístup do komunity, portál v brandingu) jsou hotové. |
 | Autentizace (8.1) | 🔌 | Přihlášení/registrace jsou původní statické stránky. Přepínač prostoru není oprávnění. |
 
@@ -104,7 +104,7 @@ Průběžně se aktualizuje. Platí pro větev `frontend/complete`.
 
 ## Průběh a navázání
 
-Větev `frontend/complete` (lokálně, bez push). Moduly jdou po sobě v samostatných commitech:
+Větev `frontend/complete` (je i na `origin`; commity z kontroly před předáním jsou jen lokální). Moduly jdou po sobě v samostatných commitech:
 
 1. datová vrstva, dashboard, CRM a e-mailing,
 2. kurzy,
@@ -116,21 +116,23 @@ Větev `frontend/complete` (lokálně, bez push). Moduly jdou po sobě v samosta
 8. nastavení,
 9. testy a dokumentace.
 
-### Výsledky kontrol (poslední stav)
+### Výsledky kontrol (poslední stav, 26. 10. 2026)
 
 | Kontrola | Výsledek |
 | --- | --- |
+| Čistý checkout (`git worktree`), `pnpm install --frozen-lockfile` a `next build` | prošlo, bez lokální cache mimo repozitář, všechny stránky statické |
 | `tsc --noEmit` | bez chyb |
-| ESLint (celý projekt) | 0 chyb, 8 varování (6× `<img>` pro data URL, 2× nepoužité proměnné v původním `marketing.tsx`) |
-| `node --test tests/foundation.test.mjs tests/hub.test.mjs` | 16/16 prošlo |
-| `next build` | prošel, všechny stránky statické |
-| Smoke testy (`e2e/smoke.spec.ts`) proti produkčnímu buildu, včetně `E2E_UNLAYER=1` | 38 prošlo, 6 přeskočeno (testy jen pro desktop nebo jen pro mobil) |
-| Vizuální testy (`e2e/visual.spec.ts`) | běží, ale liší se od původních referenčních snímků (nový vzhled). Reference se přepíšou až po schválení (`pnpm test:e2e:reference`). |
-| Ruční průchod | desktop 1440 a mobil 390, světlé i tmavé téma, oba pracovní prostory |
+| ESLint (celý projekt) | 0 chyb, varování jen `<img>` pro data URL a 2 nepoužité proměnné v původním `marketing.tsx` |
+| `node --test tests/foundation.test.mjs tests/hub.test.mjs` | 18/18 prošlo (včetně migrace dat a importu) |
+| Smoke testy proti produkčnímu buildu (`E2E_UNLAYER=1`) | 45 prošlo, 9 přeskočeno: testy jen pro desktop nebo jen pro mobil (Unlayer, nastavení se sidebarem, nativní výběr data na mobilu, veřejné stránky, export/import, výpadek CDN) |
+| `scripts/ui-audit.mjs` (62 obrazovek × 2 prostory × 1920/1440/1024/390 px × světlé/tmavé téma) | viz předávací zpráva; žádné nezachycené chyby, horizontální přetečení ani chybějící popisky. Zbývá jen přijatá odchylka níže |
+| Vizuální testy (`e2e/visual.spec.ts`) | liší se od referencí z původního prototypu (nový vzhled, bílý text primárních tlačítek, nové funkce). Reference se nepřepisují bez schválení. Aktuální vzhled je v `docs/screenshots/`. |
+
+**Přijatá odchylka:** primární tlačítka mají na přání zadavatele bílý text na #eb6536 (kontrast 3,3 : 1). axe to hlásí jako nedostatečný kontrast u textu menšího než 18,7 px tučně.
 
 ### Otevřené body a rozhodnutí pro zadavatele
 
-- Schválit nový vzhled, potom přepsat referenční snímky.
+- Schválit nový vzhled (snímky v `docs/screenshots/`), potom přepsat referenční snímky (`pnpm test:e2e:reference`).
 - Unlayer: rozhodnout o účtu a `projectId`. Bez účtu je vidět branding Unlayer, chybí prémiové funkce a rozhraní editoru je anglicky (locale `cs` se bez účtu neprojevilo).
 - Graf otevření v reportu a výsledky kampaní jsou simulace. Skutečná data dodá tracking s backendem.
 - Vše označené 🔌 potřebuje backend nebo integraci: Resend, Stripe/Fakturoid, Mux/LiveKit, S3/R2, Claude API, Better-Auth, RLS, BullMQ.

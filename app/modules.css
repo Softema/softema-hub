@@ -59,6 +59,8 @@ img.avatar.photo { object-fit: cover; background: var(--surface-3); }
 .dark .avatar.pink { background: #3a1d2a; color: #f0a9c6; }
 .avatar-edit { display: flex; align-items: center; gap: var(--sp-4); flex-wrap: wrap; }
 .avatar-edit > div { display: flex; flex-direction: column; gap: var(--sp-2); }
+/* 11px timestamps on the contact timeline need the AA text token (ink-4 was 3.2:1) */
+.timeline .timeline-body small { color: var(--ink-3); }
 /* accessible name of the search button also on mobile, where its visible text is hidden */
 .global-search .global-search-sr { display: inline !important; }
 /* the legacy text-input reset (globals.css) also hits radios and file inputs */
