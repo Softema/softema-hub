@@ -279,7 +279,9 @@ function Builder({ id }: { id: string }) {
       <button type="button" className="back-link" onClick={() => go('automatizace')}><ArrowLeft size={15} aria-hidden />Všechny scénáře</button>
       <PageHead title={meta.name || 'Scénář'} desc={`${f.status} · ${plural(nodes.length, 'krok', 'kroky', 'kroků')} · ${plural(f.enrolled.length, 'kontakt', 'kontakty', 'kontaktů')} v běhu`}>
         <Badge tone={statusTone(f.status)}>{f.status}</Badge>
-        <Btn onClick={() => setShowIssues(s => !s)} aria-expanded={showIssues}>{issues.length ? <><AlertTriangle aria-hidden />{plural(issues.length, 'chyba', 'chyby', 'chyb')}</> : <><CheckCircle2 aria-hidden />Bez chyb</>}</Btn>
+        {issues.length
+          ? <Btn onClick={() => setShowIssues(s => !s)} aria-expanded={showIssues}><AlertTriangle aria-hidden />{plural(issues.length, 'chyba', 'chyby', 'chyb')}</Btn>
+          : f.status !== 'Aktivní' && <span className="flow-ok"><CheckCircle2 size={16} aria-hidden />Bez chyb</span>}
         {f.status === 'Aktivní' && <Btn onClick={step} disabled={!f.enrolled.length || dirty} title={dirty ? 'Nejdřív uložte změny' : undefined}><StepForward aria-hidden />Simulovat krok</Btn>}
         {f.status === 'Aktivní' ? <Btn onClick={() => actions.pause(f)}><Pause aria-hidden />Pozastavit</Btn> : <Btn onClick={() => { if (dirty) { toast.error('Nejdřív scénář uložte.'); return; } actions.activate(f); }}><Play aria-hidden />Aktivovat</Btn>}
         <Btn primary onClick={save} disabled={!dirty}><Save aria-hidden />Uložit</Btn>

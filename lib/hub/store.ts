@@ -7,12 +7,12 @@
  * Secrets are never stored here (see WorkspaceSettings.integrations).
  */
 import { z } from 'zod';
-import type { CollectionKey, HubData, ItemOf } from './types';
-import { createSeed } from './seed';
+import type { CollectionKey, CommunityGroup, HubData, ItemOf, Post } from './types';
+import { createSeed, defaultCategories } from './seed';
 
 export const STORAGE_KEY = 'softema-hub:data';
 export const BACKUP_KEY = 'softema-hub:data-backup';
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 const record = z.object({ id: z.union([z.string(), z.number()]), workspaceId: z.string() }).passthrough();
 const COLLECTIONS: CollectionKey[] = ['contacts', 'segments', 'deals', 'activities', 'campaigns', 'workflows', 'invoices', 'transactions', 'subscriptions', 'paymentLinks', 'coupons', 'courses', 'enrollments', 'products', 'purchases', 'groups', 'memberships', 'posts', 'webinars', 'registrations', 'chatbots', 'settings'];
@@ -30,8 +30,24 @@ const EMPTY: HubData = { ...(Object.fromEntries(COLLECTIONS.map(k => [k, []])) a
 
 /** Older formats are migrated here; unknown versions fall back to fresh demo data. */
 function migrate(raw: { version: number; data: unknown }): HubData | null {
-  if (raw.version === SCHEMA_VERSION) return raw.data as HubData;
-  return null;
+  let data = raw.data;
+  if (raw.version === 1) data = migrateV1(data as V1Data);
+  else if (raw.version !== SCHEMA_VERSION) return null;
+  return data as HubData;
+}
+
+/** v1 → v2: community posts get reactions instead of likes and forum categories (existing posts go to the general one). */
+type V1Post = Omit<Post, 'reactions' | 'myReaction' | 'categoryId'> & { likes?: number; likedByMe?: boolean; categoryId?: string };
+type V1Data = Omit<HubData, 'groups' | 'posts'> & { groups: (Omit<CommunityGroup, 'categories'> & { categories?: CommunityGroup['categories'] })[]; posts: V1Post[] };
+export function migrateV1(d: V1Data): HubData {
+  const groups = d.groups.map(g => ({ ...g, categories: g.categories?.length ? g.categories : defaultCategories(g.id) }));
+  const posts = d.posts.map(({ likes = 0, likedByMe = false, ...p }): Post => ({
+    ...p,
+    categoryId: p.categoryId ?? groups.find(g => g.workspaceId === p.workspaceId && g.id === p.groupId)?.categories[0].id ?? `${p.groupId}-obecne`,
+    reactions: likes > 0 ? { like: likes } : {},
+    myReaction: likedByMe ? 'like' : undefined,
+  }));
+  return { ...d, groups, posts };
 }
 
 type Listener = () => void;
@@ -50,7 +66,7 @@ function load(): HubData {
       const parsed = envelope.safeParse(JSON.parse(raw));
       if (parsed.success) {
         const data = migrate(parsed.data);
-        if (data) { createdAt = parsed.data.createdAt; return data; }
+        if (data) { createdAt = parsed.data.createdAt; if (parsed.data.version !== SCHEMA_VERSION) persist(data); return data; }
         loadIssue = `Uložená data mají nepodporovanou verzi ${parsed.data.version}.`;
       } else loadIssue = 'Uložená data neodpovídají očekávanému formátu.';
     } catch { loadIssue = 'Uložená data nejsou čitelná.'; }

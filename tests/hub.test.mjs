@@ -27,7 +27,7 @@ globalThis.document = { addEventListener() {}, visibilityState: 'visible' };
 
 const require = createRequire(import.meta.url);
 const load = m => require(join(output, 'hub', `${m}.js`));
-const { hubStore, STORAGE_KEY, BACKUP_KEY } = load('store');
+const { hubStore, STORAGE_KEY, BACKUP_KEY, SCHEMA_VERSION, migrateV1 } = load('store');
 const { createSeed, WS_SOFTEMA, WS_4LEGS } = load('seed');
 const ops = load('ops');
 const logic = load('logic');
@@ -53,7 +53,7 @@ test('store: seeds once, persists, backs up unreadable data and resets one works
   const first = hubStore.getSnapshot();
   hubStore.flush();
   const saved = JSON.parse(mem.get(STORAGE_KEY));
-  assert.equal(saved.version, 1);
+  assert.equal(saved.version, SCHEMA_VERSION);
   assert.equal(saved.data.contacts.length, first.contacts.length);
 
   // a change in 4legs survives a reset of Softema
@@ -77,6 +77,20 @@ test('store: invalid stored data are moved to a backup key', () => {
   assert.equal(mem.get(BACKUP_KEY), '{"version":1,"data":{"contacts":"nope"}}');
   assert.match(hubStore.consumeLoadIssue() ?? '', /formátu/);
   unsubscribe();
+});
+
+test('store: v1 data migrate likes to reactions and posts into a forum category', () => {
+  const d = fresh();
+  const v1 = { ...d, groups: d.groups.map(({ categories, ...g }) => g), posts: d.posts.map(({ reactions, myReaction, categoryId, ...p }, i) => ({ ...p, likes: 4, likedByMe: i === 0 })) };
+  const m = migrateV1(v1);
+  for (const g of m.groups) assert.ok(g.categories.length > 0, g.id);
+  for (const p of m.posts) {
+    assert.ok(m.groups.find(g => g.id === p.groupId).categories.some(c => c.id === p.categoryId), p.id);
+    assert.deepEqual(p.reactions, { like: 4 });
+    assert.equal('likes' in p || 'likedByMe' in p, false);
+  }
+  assert.equal(m.posts[0].myReaction, 'like');
+  assert.equal(m.posts[1].myReaction, undefined);
 });
 
 test('ops: contacts are deduplicated by e-mail (case-insensitive) per workspace', () => {

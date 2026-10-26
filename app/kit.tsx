@@ -109,18 +109,24 @@ export function Section({ title, desc, actions, children, className = '', id }: 
 }
 
 const MAX_IMAGE = 400 * 1024;
+/** Reads a small image into a data URL (kept only in the browser). Rejects with a user-facing message. */
+export function readImage(file: File): Promise<StoredImage> {
+  if (!file.type.startsWith('image/')) return Promise.reject(new Error('Vyberte obrázek (JPG, PNG, WebP nebo SVG).'));
+  if (file.size > MAX_IMAGE) return Promise.reject(new Error(`Obrázek má ${fmt(Math.round(file.size / 1024))} kB. V ukázce ukládáme do prohlížeče obrázky do 400 kB.`));
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve({ name: file.name, dataUrl: String(reader.result), size: file.size });
+    reader.onerror = () => reject(new Error('Soubor se nepodařilo načíst.'));
+    reader.readAsDataURL(file);
+  });
+}
+
 /** Small images are kept in the browser as data URLs (no upload). Larger files are refused with an explanation. */
 export function ImagePicker({ value, onChange, label = 'Obrázek', ratio = '16 / 9' }: { value?: StoredImage; onChange: (v: StoredImage | undefined) => void; label?: string; ratio?: string }) {
   const [error, setError] = useState('');
   const id = React.useId();
   const pick = (file?: File) => {
-    if (!file) return;
-    if (!file.type.startsWith('image/')) { setError('Vyberte obrázek (JPG, PNG, WebP nebo SVG).'); return; }
-    if (file.size > MAX_IMAGE) { setError(`Obrázek má ${fmt(Math.round(file.size / 1024))} kB. V ukázce ukládáme do prohlížeče obrázky do 400 kB.`); return; }
-    const reader = new FileReader();
-    reader.onload = () => { setError(''); onChange({ name: file.name, dataUrl: String(reader.result), size: file.size }); };
-    reader.onerror = () => setError('Soubor se nepodařilo načíst.');
-    reader.readAsDataURL(file);
+    if (file) readImage(file).then(img => { setError(''); onChange(img); }, (e: Error) => setError(e.message));
   };
   return (
     <div className="image-picker">

@@ -62,7 +62,7 @@ Rozhodnutí zadavatele:
   - `ContactPicker`: výběr kontaktů v dialozích.
   - `DateField`: datum. Na desktopu má kalendář v aplikaci, na dotykových zařízeních nativní výběr.
   - `FilterTabs`: filtrační záložky s podtržením. Segmentový přepínač `.segmented` je jen pro přepnutí režimu.
-- Primární akce používají tokeny `--brand-primary`, `--brand-primary-hover` a `--brand-primary-ink` v [app/shell.css](app/shell.css). Barva #eb6536 má tmavý text, protože s bílým nesplní AA.
+- Primární akce používají tokeny `--brand-primary`, `--brand-primary-hover` a `--brand-primary-ink` v [app/shell.css](app/shell.css). Barva #eb6536 má na přání zadavatele bílý text (26. 10. 2026). Kontrast je 3,3 : 1, takže AA splní jen tučný nebo velký text.
 - Okrajové resety prvků patří do `@layer base`. Nevrstvené CSS přebije utility Tailwindu.
 - Dodržuj interakční standard zadání (kap. 7): hover/focus/disabled stavy, prázdné stavy s CTA, toasty, modaly a obousměrné prokliky (seznam ↔ detail, kampaň ↔ editor). Zachovej responzivitu, popisky formulářů a ovládání klávesnicí.
 - `useHub()` vrací kolekce aktivního prostoru (`w.*`). `upsert`/`patch`/`remove` hlídají `workspaceId` samy. `mutate()` dostává celý dataset, takže zachovávej záznamy ostatních prostorů a kontroluj `workspaceId`. Operace, které zasahují víc kolekcí (deduplikace kontaktu, odeslání, platba, spouštěče automatizací), patří do `lib/hub/*.ts` jako čisté funkce.

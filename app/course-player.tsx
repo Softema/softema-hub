@@ -13,6 +13,7 @@ import { useHub } from './state';
 import { Btn, Pick } from './ui';
 import { Bar, Notice, download, useRoute } from './kit';
 import { minutes } from './learn-shared';
+import { RichText } from './rich-text';
 
 type Access = { open: boolean; reason?: string };
 function accessOf(c: Course, l: Lesson, e: Enrollment | undefined, now: number): Access {
@@ -101,14 +102,8 @@ function Player({ c }: { c: Course }) {
                 <div className="player-locked"><Lock size={28} aria-hidden /><h2>Lekce je zamčená</h2><p>{access.reason}</p>{!e && <Btn primary onClick={() => toast.info('Nákup kurzu proběhne přes Stripe Checkout po napojení plateb. V prototypu přidáte studenta ručně v záložce Studenti.')}>Koupit kurz</Btn>}</div>
               ) : (
                 <>
-                  {current.type === 'Video' && (
-                    <div className="player-video" role="img" aria-label={`Video lekce ${current.title}`}>
-                      <PlayCircle size={56} aria-hidden />
-                      <span>Ukázkové video · {minutes(current.duration)}</span>
-                      <small>{current.videoUrl ? `Zdroj: ${current.videoUrl}` : 'Video zatím není nastavené.'} Přehrávání přes Mux (podepsaná URL) se zapojí s backendem.</small>
-                    </div>
-                  )}
-                  {current.type === 'Kvíz' ? <Quiz key={current.id} text={current.text} /> : current.text && <div className="player-text">{current.text.split(/\n{2,}/).map((p, k) => <p key={k}>{p}</p>)}</div>}
+                  {current.type === 'Video' && <LessonVideo key={current.id} url={current.videoUrl} title={current.title} duration={minutes(current.duration)} />}
+                  {current.type === 'Kvíz' ? <Quiz key={current.id} text={current.text} /> : current.content ? <RichText doc={current.content} text={current.text} className="player-text" /> : current.text && <div className="player-text">{current.text.split(/\n{2,}/).map((p, k) => <p key={k}>{p}</p>)}</div>}
                   {current.attachments.length > 0 && (
                     <div className="player-files"><h2>Materiály ke stažení</h2>
                       <ul>{current.attachments.map(f => <li key={f.id}><Paperclip size={14} aria-hidden /><span>{f.name}<small>{fmt(Math.round(f.size / 1024))} kB</small></span><Btn onClick={() => toast.info('Stahování přes podepsanou URL s expirací přijde s backendem. V prototypu je uložen jen název souboru.')}><Download aria-hidden />Stáhnout</Btn></li>)}</ul>
@@ -132,6 +127,33 @@ function Player({ c }: { c: Course }) {
   );
 }
 
+/** Public YouTube/Vimeo links and direct video files play right away; other sources wait for Mux (backend). */
+function videoSource(url: string): { kind: 'embed' | 'file'; src: string } | null {
+  let u: URL;
+  try { u = new URL(url); } catch { return null; }
+  if (u.protocol !== 'https:') return null;
+  const host = u.hostname.replace(/^(www\.|m\.)/, '');
+  const yt = host === 'youtu.be' ? u.pathname.slice(1) : host === 'youtube.com' ? (u.searchParams.get('v') ?? u.pathname.match(/^\/(?:embed|shorts)\/([\w-]+)/)?.[1]) : undefined;
+  if (yt && /^[\w-]{6,}$/.test(yt)) return { kind: 'embed', src: `https://www.youtube-nocookie.com/embed/${yt}` };
+  const vimeo = host === 'vimeo.com' ? u.pathname.match(/^\/(\d+)/)?.[1] : undefined;
+  if (vimeo) return { kind: 'embed', src: `https://player.vimeo.com/video/${vimeo}` };
+  if (/\.(mp4|webm|ogg|mov)$/i.test(u.pathname)) return { kind: 'file', src: u.href };
+  return null;
+}
+
+function LessonVideo({ url, title, duration }: { url: string; title: string; duration: string }) {
+  const s = videoSource(url);
+  if (s?.kind === 'embed') return <div className="player-video is-live"><iframe src={s.src} title={`Video lekce ${title}`} allow="encrypted-media; picture-in-picture; fullscreen" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" /></div>;
+  if (s?.kind === 'file') return <div className="player-video is-live"><video src={s.src} controls preload="metadata" aria-label={`Video lekce ${title}`} /></div>;
+  return (
+    <div className="player-video" role="img" aria-label={`Video lekce ${title}`}>
+      <PlayCircle size={56} aria-hidden />
+      <span>Video lekce · {duration}</span>
+      <small>{url ? 'Toto video se v ukázce nepřehraje. Přehrají se odkazy z YouTube, Vimeo nebo přímý soubor MP4.' : 'Video zatím není nastavené.'}</small>
+    </div>
+  );
+}
+
 /** Quiz from plain text: "? question", "* correct", "- wrong". */
 function Quiz({ text }: { text: string }) {
   const questions = text.split('\n').reduce<{ q: string; options: { t: string; ok: boolean }[] }[]>((acc, line) => {
@@ -151,7 +173,7 @@ function Quiz({ text }: { text: string }) {
           <legend>{i + 1}. {q.q}</legend>
           {q.options.map((o, k) => (
             <label key={k} className={`check-row ${checked ? (o.ok ? 'ok' : answers[i] === k ? 'bad' : '') : ''}`}>
-              <input type="radio" name={`q${i}`} checked={answers[i] === k} onChange={() => { setAnswers({ ...answers, [i]: k }); setChecked(false); }} />{o.t}
+              <input type="radio" name={`q${i}`} checked={answers[i] === k} onChange={() => { setAnswers({ ...answers, [i]: k }); setChecked(false); }} /><span>{o.t}</span>
             </label>
           ))}
         </fieldset>

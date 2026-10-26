@@ -2,7 +2,7 @@
 /* Settings: profile, workspace & company, branding & client portal, team & roles, sending domains & senders,
    integrations (no secrets in the browser), notifications and "Data a obnova" (export, reset demo data). */
 import React, { useState } from 'react';
-import { Check, Copy, Database, Download, Globe, KeyRound, Mail, MoreHorizontal, Plus, RefreshCcw, RotateCcw, ShieldCheck, Trash2, UserPlus } from 'lucide-react';
+import { Check, Copy, Database, Download, Globe, ImagePlus, KeyRound, Mail, MoreHorizontal, Plus, RefreshCcw, RotateCcw, ShieldCheck, Trash2, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { fmt, fmtDate, fmtDateTime, isEmail, newId } from '@/lib/hub/format';
@@ -10,7 +10,7 @@ import { hubStore, SCHEMA_VERSION } from '@/lib/hub/store';
 import type { DnsRecord, IntegrationKey, Role, SendingDomain, TeamMember, UserProfile, WorkspaceSettings } from '@/lib/hub/types';
 import { useHub, useUnsavedGuard } from './state';
 import { Avatar, Badge, Btn, Field, IconBtn, Modal, PageHead, Pick } from './ui';
-import { FormError, ImagePicker, Notice, Section, ToggleRow, download, useConfirm, useRoute } from './kit';
+import { FormError, ImagePicker, Notice, Section, ToggleRow, download, readImage, useConfirm, useRoute } from './kit';
 
 const SECTIONS: [string, string][] = [['profil', 'Můj profil'], ['prostor', 'Pracovní prostor'], ['branding', 'Branding a portál'], ['tym', 'Tým a role'], ['domeny', 'E-mailové domény'], ['integrace', 'Integrace'], ['notifikace', 'Notifikace'], ['data', 'Data a obnova']];
 export const ROLE_LABEL: Record<Role, string> = { agency_admin: 'Správce agentury', workspace_admin: 'Správce prostoru', member: 'Člen týmu' };
@@ -61,7 +61,17 @@ function Profile() {
   return (
     <Section title="Můj profil" desc="Jméno a fotka se zobrazují v aplikaci a u poznámek.">
       <div className="sec-body stack">
-        <div className="flex-row"><Avatar name={v.name || '?'} color={v.color} size="lg" /><div className="flex-row wrap">{COLORS.map(c => <button key={c} type="button" className={`color-dot ${c} ${v.color === c ? 'on' : ''}`} aria-label={`Barva avataru ${c}`} aria-pressed={v.color === c} onClick={() => setV({ ...v, color: c })} />)}</div></div>
+        <div className="avatar-edit">
+          <Avatar name={v.name || '?'} color={v.color} size="lg" src={v.photo?.dataUrl} />
+          <div>
+            <div className="flex-row wrap">
+              <label className="hub-btn file-btn"><input type="file" accept="image/*" className="sr-only" onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) readImage(f).then(photo => { setV(x => ({ ...x, photo })); setError(''); }, (err: Error) => setError(err.message)); }} /><ImagePlus aria-hidden />{v.photo ? 'Změnit fotku' : 'Nahrát fotku'}</label>
+              {v.photo && <Btn onClick={() => setV(x => ({ ...x, photo: undefined }))}>Odebrat fotku</Btn>}
+            </div>
+            {!v.photo && <div className="flex-row wrap">{COLORS.map(c => <button key={c} type="button" className={`color-dot ${c} ${v.color === c ? 'on' : ''}`} aria-label={`Barva avataru ${c}`} aria-pressed={v.color === c} onClick={() => setV({ ...v, color: c })} />)}</div>}
+            <small className="muted">Fotka se uloží jen v tomto prohlížeči (max. 400 kB). Bez fotky se zobrazí iniciály.</small>
+          </div>
+        </div>
         <div className="form-grid">
           <Field label="Jméno a příjmení"><input value={v.name} onChange={e => { setV({ ...v, name: e.target.value }); setError(''); }} /></Field>
           <Field label="Pozice"><input value={v.title} onChange={e => setV({ ...v, title: e.target.value })} /></Field>

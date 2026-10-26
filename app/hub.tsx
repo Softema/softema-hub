@@ -87,7 +87,7 @@ function Navigation() {
           <SidebarMenu className="hub-nav">{item('nastaveni')}</SidebarMenu>
           <Link href="/" className="hub-website-link"><ArrowUpRight size={14} />Zpět na web Softema Hub</Link>
           <button type="button" className="profile" onClick={() => nav('nastaveni/profil')}>
-            <Avatar name={profile.name} color={profile.color} />
+            <Avatar name={profile.name} color={profile.color} src={profile.photo?.dataUrl} />
             <span><strong>{profile.name}</strong><small>{profile.title}</small></span>
             <ChevronsUpDown size={13} className="ml-auto muted" />
           </button>
@@ -240,7 +240,7 @@ function Frame() {
               <IconBtn label="Nápověda" onClick={() => setHelp(true)}><CircleHelp /></IconBtn>
               <ThemeMenu />
               <Notifications open={notice} onOpenChange={setNotice} />
-              <button type="button" className="topbar-profile" onClick={() => go('nastaveni/profil')} aria-label="Můj profil"><Avatar name={profile.name} color={profile.color} size="sm" /></button>
+              <button type="button" className="topbar-profile" onClick={() => go('nastaveni/profil')} aria-label="Můj profil"><Avatar name={profile.name} color={profile.color} size="sm" src={profile.photo?.dataUrl} /></button>
             </div>
           </header>
           <div key={workspaceId}><Screen /></div>

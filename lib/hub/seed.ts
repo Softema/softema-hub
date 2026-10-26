@@ -6,12 +6,20 @@
 import { demoWorkspaces } from '../domain/tenancy';
 import type {
   Activity, Campaign, ChatbotConfig, CommunityGroup, Contact, Consent, ConsentState, Coupon, Course, CourseModule, Deal, DealStage,
-  DigitalProduct, Enrollment, HubData, Invoice, Lesson, Lifecycle, Membership, PaymentLink, Post, Purchase, Registration,
+  DigitalProduct, Enrollment, ForumCategory, HubData, Invoice, Lesson, Lifecycle, Membership, PaymentLink, Post, Purchase, Registration,
   Segment, Subscription, Transaction, UserProfile, Webinar, Workflow, WorkspaceSettings, Block,
 } from './types';
 
 export const WS_SOFTEMA = demoWorkspaces[0].id;
 export const WS_4LEGS = demoWorkspaces[1].id;
+
+/** Forum categories of a new group (also used by the v1 → v2 migration). The first one is the general fallback. */
+export const defaultCategories = (groupId: string): ForumCategory[] => [
+  { id: `${groupId}-obecne`, name: 'Obecná diskuse', description: 'Cokoli, co se nehodí jinam.' },
+  { id: `${groupId}-novinky`, name: 'Novinky a oznámení', description: 'Informace od pořadatelů skupiny.' },
+  { id: `${groupId}-tipy`, name: 'Tipy a zkušenosti', description: 'Co se vám osvědčilo.' },
+  { id: `${groupId}-dotazy`, name: 'Dotazy a pomoc', description: 'Zeptejte se ostatních členů.' },
+];
 
 /* ---------- deterministic helpers ---------- */
 function prng(seed: number) {
@@ -321,24 +329,25 @@ export function createSeed(now = new Date()): HubData {
 
     // community
     const groups: CommunityGroup[] = soft ? [
-      { id: 'g-club', workspaceId: ws, name: 'Marketingový klub', description: 'Uzavřená skupina pro pravidelnou výměnu zkušeností a měsíční živé Q&A.', access: 'Placená', price: 490, accent: 'orange', createdAt: ago(200) },
-      { id: 'g-alumni', workspaceId: ws, name: 'Absolventi: Marketing od základů', description: 'Prostor pro studenty a absolventy kurzu.', access: 'Součást kurzu', price: 0, courseId: 'c-marketing', accent: 'blue', createdAt: ago(230) },
-      { id: 'g-open', workspaceId: ws, name: 'Webinářová komunita', description: 'Otevřená diskuse k našim webinářům.', access: 'Veřejná', price: 0, accent: 'green', createdAt: ago(90) },
-    ] : [{ id: 'g-legs', workspaceId: ws, name: 'Komunita 4legs', description: 'Rady a zkušenosti majitelů psů a koček.', access: 'Veřejná', price: 0, accent: 'green', createdAt: ago(70) }];
+      { id: 'g-club', workspaceId: ws, name: 'Marketingový klub', description: 'Uzavřená skupina pro pravidelnou výměnu zkušeností a měsíční živé Q&A.', access: 'Placená', price: 490, accent: 'orange', categories: defaultCategories('g-club'), createdAt: ago(200) },
+      { id: 'g-alumni', workspaceId: ws, name: 'Absolventi: Marketing od základů', description: 'Prostor pro studenty a absolventy kurzu.', access: 'Součást kurzu', price: 0, courseId: 'c-marketing', accent: 'blue', categories: defaultCategories('g-alumni'), createdAt: ago(230) },
+      { id: 'g-open', workspaceId: ws, name: 'Webinářová komunita', description: 'Otevřená diskuse k našim webinářům.', access: 'Veřejná', price: 0, accent: 'green', categories: defaultCategories('g-open'), createdAt: ago(90) },
+    ] : [{ id: 'g-legs', workspaceId: ws, name: 'Komunita 4legs', description: 'Rady a zkušenosti majitelů psů a koček.', access: 'Veřejná', price: 0, accent: 'green', categories: defaultCategories('g-legs'), createdAt: ago(70) }];
     data.groups.push(...groups);
     groups.forEach((g, gi) => {
       const members = g.courseId ? data.enrollments.filter(e => e.courseId === g.courseId).map(e => contacts.find(c => c.id === e.contactId)!).filter(Boolean) : contacts.filter((_, k) => (k + gi) % (soft ? 4 : 3) === 0).slice(0, 36);
       members.forEach((c, k) => data.memberships.push({ id: `mb-${g.id}-${c.id}`, workspaceId: ws, groupId: g.id, contactId: c.id, role: k === 0 ? 'Moderátor' : 'Člen', status: k % 23 === 9 ? 'Zablokován' : g.access === 'Placená' && k % 19 === 5 ? 'Vypršelo' : 'Aktivní', joinedAt: ago(int(r, 3, 180)) } satisfies Membership));
     });
-    const postsSeed: [string, string | number, string, number, [string, string][]][] = soft ? [
-      ['g-club', 'Marie Smolková', 'Co vám v posledním měsíci nejvíc pomohlo v marketingu? Sdílejte jeden tip, který by ostatní měli vyzkoušet. Za mě: věnovat víc času předmětu newsletteru.', 12, [['Petra Svobodová', 'Segmentace databáze! Konečně posíláme relevantní obsah.']]],
-      ['g-alumni', 2, 'Právě jsem dokončila modul o obsahové strategii. Díky za praktické příklady, konečně mám jasno, co a proč publikovat.', 8, []],
-      ['g-open', 5, 'Bude ze středečního webináře záznam? Nestihnu to živě.', 3, [['Marie Smolková', 'Ano, záznam pošleme všem registrovaným do druhého dne.']]],
-      ['g-club', 9, 'Hledám tip na nástroj pro plánování příspěvků na sociální sítě. Co používáte?', 5, []],
-    ] : [['g-legs', 1001, 'Jaké pamlsky doporučujete pro štěně s citlivým bříškem?', 6, [['Eva Konečná', 'Nám se osvědčily sušené kousky králíka.']]]];
-    postsSeed.forEach(([groupId, author, text, likes, comments], k) => {
+    const postsSeed: [string, string | number, string, string, Post['reactions'], [string, string][]][] = soft ? [
+      ['g-club', 'Marie Smolková', 'tipy', 'Co vám v posledním měsíci nejvíc pomohlo v marketingu? Sdílejte jeden tip, který by ostatní měli vyzkoušet. Za mě: věnovat víc času předmětu newsletteru.', { like: 9, love: 3 }, [['Petra Svobodová', 'Segmentace databáze! Konečně posíláme relevantní obsah.']]],
+      ['g-alumni', 2, 'obecne', 'Právě jsem dokončila modul o obsahové strategii. Díky za praktické příklady, konečně mám jasno, co a proč publikovat.', { love: 5, like: 3 }, []],
+      ['g-open', 5, 'dotazy', 'Bude ze středečního webináře záznam? Nestihnu to živě.', { like: 2, sad: 1 }, [['Marie Smolková', 'Ano, záznam pošleme všem registrovaným do druhého dne.']]],
+      ['g-club', 9, 'dotazy', 'Hledám tip na nástroj pro plánování příspěvků na sociální sítě. Co používáte?', { like: 4, haha: 1 }, []],
+      ['g-club', 'Marie Smolková', 'novinky', 'Příští živé Q&A bude ve čtvrtek v 18:00. Otázky můžete psát předem sem do komentářů.', { like: 6, wow: 2 }, []],
+    ] : [['g-legs', 1001, 'dotazy', 'Jaké pamlsky doporučujete pro štěně s citlivým bříškem?', { like: 5, love: 1 }, [['Eva Konečná', 'Nám se osvědčily sušené kousky králíka.']]]];
+    postsSeed.forEach(([groupId, author, category, text, reactions, comments], k) => {
       const contact = typeof author === 'number' ? contacts.find(c => c.id === author) : undefined;
-      data.posts.push({ id: `post-${ws.slice(-2)}-${k}`, workspaceId: ws, groupId, author: contact ? contact.name : String(author), contactId: contact?.id, text, date: ago(k * 2, 9 + k, 15), pinned: k === 0, hidden: false, likes, likedByMe: false, comments: comments.map(([a, t], j) => ({ id: `cm-${k}-${j}`, author: a, text: t, date: ago(k * 2, 12 + j, 5), hidden: false })), reports: soft && k === 3 ? [{ id: 'rep-1', reason: 'Reklama / spam', by: 'Anna Němcová', date: ago(1, 18), resolved: false }] : [] } satisfies Post);
+      data.posts.push({ id: `post-${ws.slice(-2)}-${k}`, workspaceId: ws, groupId, author: contact ? contact.name : String(author), contactId: contact?.id, text, categoryId: `${groupId}-${category}`, date: ago(k * 2, 9 + k, 15), pinned: k === 0, hidden: false, reactions, comments: comments.map(([a, t], j) => ({ id: `cm-${k}-${j}`, author: a, text: t, date: ago(k * 2, 12 + j, 5), hidden: false })), reports: soft && k === 3 ? [{ id: 'rep-1', reason: 'Reklama / spam', by: 'Anna Němcová', date: ago(1, 18), resolved: false }] : [] } satisfies Post);
     });
 
     // webinars

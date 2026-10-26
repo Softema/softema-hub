@@ -13,6 +13,7 @@ import { useHub, useUnsavedGuard } from './state';
 import { Avatar, Badge, Btn, Empty, Field, IconBtn, Metric, Modal, PageHead, Pick } from './ui';
 import { Bar, ContactPicker, FilterTabs, FormError, ImagePicker, Notice, Pager, Section, SubNav, ToggleRow, download, paginate, toCsv, useConfirm, useRoute } from './kit';
 import CoursePlayer from './course-player';
+import { RichEditor, fromPlain } from './rich-text';
 import { ACCENTS, Art, LESSON_ICON, LearnNav, minutes, priceLabel } from './learn-shared';
 import Products from './products';
 
@@ -264,10 +265,18 @@ function LessonEditor({ courseId, lessonId }: { courseId: string; lessonId: stri
               <Field label="Typ lekce"><Pick value={draft.type} onChange={v => set({ type: v as LessonType })} options={['Video', 'Text', 'Soubor', 'Kvíz']} className="full" label="Typ lekce" /></Field>
               <Field label="Délka (minuty)"><input type="number" min={0} max={600} value={draft.duration} onChange={e => set({ duration: Number(e.target.value) })} /></Field>
             </div>
-            {draft.type === 'Video' && <Field label="Odkaz na video" hint="Po napojení backendu se video nahraje do Mux a přehrává se přes podepsanou URL."><input type="url" value={draft.videoUrl} onChange={e => set({ videoUrl: e.target.value })} placeholder="https://" /></Field>}
-            <Field label={draft.type === 'Kvíz' ? 'Otázky kvízu' : 'Text lekce'} hint={draft.type === 'Kvíz' ? 'Formát: řádek začínající „?“ je otázka, „*“ správná a „-“ špatná odpověď.' : 'Ve finální verzi editor Tiptap. Zde prostý text s odstavci.'}>
-              <textarea rows={10} value={draft.text} onChange={e => set({ text: e.target.value })} placeholder={draft.type === 'Kvíz' ? QUIZ_HINT : 'Text, který student uvidí pod videem nebo místo něj.'} />
-            </Field>
+            {draft.type === 'Video' && <Field label="Odkaz na video" hint="V ukázce se přehraje odkaz z YouTube, Vimeo nebo přímý soubor MP4. Nahrávání videí (Mux) přijde s backendem."><input type="url" value={draft.videoUrl} onChange={e => set({ videoUrl: e.target.value })} placeholder="https://" /></Field>}
+            {draft.type === 'Kvíz' ? (
+              <Field label="Otázky kvízu" hint="Formát: řádek začínající „?“ je otázka, „*“ správná a „-“ špatná odpověď.">
+                <textarea rows={10} value={draft.text} onChange={e => set({ text: e.target.value, content: undefined })} placeholder={QUIZ_HINT} />
+              </Field>
+            ) : (
+              <div className="field">
+                <span id="lesson-text-label">Text lekce</span>
+                <RichEditor key={draft.id} headings label="Text lekce" placeholder="Text, který student uvidí pod videem nebo místo něj." initial={draft.content ?? (draft.text ? fromPlain(draft.text) : undefined)} onChange={v => set({ content: v.doc, text: v.text })} />
+                <small>Nadpisy, zvýraznění, seznamy, citace a odkazy. Student uvidí text naformátovaný.</small>
+              </div>
+            )}
             <div className="field">
               <span>Přílohy</span>
               <ul className="file-list">

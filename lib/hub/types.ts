@@ -31,7 +31,7 @@ export interface WorkspaceSettings {
   community: { gracePeriodDays: number };
   invoicing: { prefix: string; dueDays: number; nextNumber: number };
 }
-export interface UserProfile { name: string; email: string; phone: string; title: string; color: string; twoFactor: boolean }
+export interface UserProfile { name: string; email: string; phone: string; title: string; color: string; twoFactor: boolean; photo?: StoredImage }
 
 /** Small images are stored as data URLs in the browser; anything else keeps only metadata. */
 export interface StoredImage { name: string; dataUrl: string; size: number }
@@ -101,7 +101,8 @@ export interface Coupon { id: string; workspaceId: string; code: string; kind: '
 
 /* ---------- Courses, digital products ---------- */
 export type LessonType = 'Video' | 'Text' | 'Soubor' | 'Kvíz';
-export interface Lesson { id: string; title: string; type: LessonType; duration: number; videoUrl: string; text: string; attachments: FileMeta[]; dripDays: number; preview: boolean }
+/** `text` stays as plain text (quiz source, search); `content` is the formatted lesson text when present. */
+export interface Lesson { id: string; title: string; type: LessonType; duration: number; videoUrl: string; text: string; content?: RichNode; attachments: FileMeta[]; dripDays: number; preview: boolean }
 export interface CourseModule { id: string; title: string; lessons: Lesson[] }
 export type PriceType = 'Zdarma' | 'Jednorázově' | 'Předplatné' | 'Součást členství';
 export interface Course {
@@ -116,11 +117,20 @@ export interface Purchase { id: string; workspaceId: string; productId: string; 
 
 /* ---------- Community ---------- */
 export type GroupAccess = 'Veřejná' | 'Placená' | 'Součást kurzu' | 'Na pozvání';
-export interface CommunityGroup { id: string; workspaceId: string; name: string; description: string; access: GroupAccess; price: number; courseId?: string; accent: string; createdAt: ISODate }
+export interface CommunityGroup { id: string; workspaceId: string; name: string; description: string; access: GroupAccess; price: number; courseId?: string; accent: string; categories: ForumCategory[]; createdAt: ISODate }
+/** Forum category inside a group; every post belongs to one. A group always keeps at least one. */
+export interface ForumCategory { id: string; name: string; description: string }
 export interface Membership { id: string; workspaceId: string; groupId: string; contactId: number; role: 'Člen' | 'Moderátor'; status: 'Aktivní' | 'Zablokován' | 'Vypršelo'; joinedAt: ISODate }
-export interface Comment { id: string; author: string; contactId?: number; text: string; date: ISODate; hidden: boolean }
+/** Rich text from the community editor (Tiptap JSON). Rendered through a whitelist, never as raw HTML. */
+export interface RichNode { type: string; text?: string; attrs?: Record<string, unknown>; marks?: { type: string; attrs?: Record<string, unknown> }[]; content?: RichNode[] }
+/** Images keep a small data URL (browser only); other files keep only metadata. */
+export interface Attachment { id: string; name: string; size: number; type: string; dataUrl?: string }
+/** `text` is the plain-text version (moderation, activity, search); `content` the formatted one when present. */
+export interface Comment { id: string; author: string; contactId?: number; text: string; content?: RichNode; attachments?: Attachment[]; date: ISODate; hidden: boolean }
 export interface Report { id: string; reason: string; by: string; date: ISODate; resolved: boolean; commentId?: string }
-export interface Post { id: string; workspaceId: string; groupId: string; author: string; contactId?: number; text: string; date: ISODate; pinned: boolean; hidden: boolean; likes: number; likedByMe: boolean; comments: Comment[]; reports: Report[] }
+export interface Post { id: string; workspaceId: string; groupId: string; author: string; contactId?: number; text: string; content?: RichNode; attachments?: Attachment[]; categoryId: string; date: ISODate; pinned: boolean; hidden: boolean; reactions: Partial<Record<Reaction, number>>; myReaction?: Reaction; comments: Comment[]; reports: Report[] }
+/** Facebook-style reactions; `reactions` counts include the user's own `myReaction`. */
+export type Reaction = 'like' | 'love' | 'haha' | 'wow' | 'sad' | 'angry';
 
 /* ---------- Webinars ---------- */
 export interface ReminderSettings { confirmation: boolean; before24h: boolean; before1h: boolean; followUp: boolean; replayMail: boolean }

@@ -1,18 +1,22 @@
 'use client';
-/* Community: groups, feed with posts and comments, members, moderation and an access preview per contact.
-   User-generated text is rendered as plain text (React escapes it); images are small local data URLs. */
+/* Community: groups with forum categories, feed with posts, reactions and comments, members, moderation and an access preview per contact.
+   Posts and comments use the Tiptap editor (rich-text.tsx); its JSON is rendered through a whitelist, never as HTML.
+   Image attachments are small local data URLs, other files only metadata. */
 import React, { useMemo, useState } from 'react';
-import { ArrowLeft, EyeOff, Flag, Heart, Lock, MessageCircle, MoreHorizontal, Pin, Plus, Send, ShieldAlert, Trash2, UserX, Users } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, EyeOff, Flag, Lock, MessageCircle, MoreHorizontal, Pencil, Pin, Plus, Send, ShieldAlert, SmilePlus, Trash2, UserX, Users } from 'lucide-react';
 import { toast } from 'sonner';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { fmt, fmtDate, fmtDateTime, money, newId, normalize, plural, relTime } from '@/lib/hub/format';
 import { logActivity } from '@/lib/hub/ops';
 import { newInvoice, payInvoice } from '@/lib/hub/payments';
-import type { CommunityGroup, Contact, GroupAccess, Membership, Post } from '@/lib/hub/types';
+import { defaultCategories } from '@/lib/hub/seed';
+import type { Attachment, CommunityGroup, Contact, ForumCategory, GroupAccess, Membership, Post, Reaction } from '@/lib/hub/types';
 import { useHub, useUnsavedGuard } from './state';
-import { Avatar, Badge, Btn, Field, Metric, Modal, PageHead, Pick } from './ui';
-import { ContactPicker, FormError, Notice, Section, SubNav, useConfirm, useRoute } from './kit';
+import { Avatar, Badge, Btn, Field, IconBtn, Metric, Modal, PageHead, Pick } from './ui';
+import { ContactPicker, FilterTabs, FormError, Notice, Section, SubNav, useConfirm, useRoute } from './kit';
 import { ACCENTS, Art } from './learn-shared';
+import { AttachButton, AttachmentList, EMPTY_RICH, RichEditor, RichText, type RichValue } from './rich-text';
 
 const ACCESS: GroupAccess[] = ['Veřejná', 'Placená', 'Součást kurzu', 'Na pozvání'];
 const accessTone = (a: GroupAccess) => (a === 'Placená' ? 'orange' : a === 'Součást kurzu' ? 'purple' : a === 'Veřejná' ? 'green' : 'blue');
@@ -62,12 +66,12 @@ function GroupList() {
         ); })}
       </div>
       {!w.groups.length && <section className="panel empty"><Users size={28} aria-hidden /><h3>Zatím žádná skupina</h3><p>Založte veřejnou, placenou nebo kurzovou skupinu.</p><Btn primary onClick={() => setCreating(true)}><Plus aria-hidden />Nová skupina</Btn></section>}
-      {creating && <GroupDialog onClose={() => setCreating(false)} onSave={g => { const group: CommunityGroup = { ...g, id: newId('g'), workspaceId, createdAt: new Date().toISOString() }; mutate(d => ({ ...d, groups: [...d.groups, group] })); toast.success('Skupina byla založena.'); go('komunita/' + group.id); }} />}
+      {creating && <GroupDialog onClose={() => setCreating(false)} onSave={g => { const id = newId('g'); const group: CommunityGroup = { ...g, id, workspaceId, categories: defaultCategories(id), createdAt: new Date().toISOString() }; mutate(d => ({ ...d, groups: [...d.groups, group] })); toast.success('Skupina byla založena.'); go('komunita/' + group.id); }} />}
     </div>
   );
 }
 
-type GroupDraft = Omit<CommunityGroup, 'id' | 'workspaceId' | 'createdAt'>;
+type GroupDraft = Omit<CommunityGroup, 'id' | 'workspaceId' | 'createdAt' | 'categories'>;
 function GroupForm({ v, set }: { v: GroupDraft; set: (p: Partial<GroupDraft>) => void }) {
   const { w } = useHub();
   return (
@@ -131,19 +135,91 @@ function GroupPage({ id, tab }: { id: string; tab: string }) {
 }
 
 /* ---------- feed ---------- */
-function PostCard({ p, admin, asContact }: { p: Post; admin: boolean; asContact?: Contact }) {
+const MAX_TEXT = 5000;
+/** Rich editor + attachments shared by the post composer and the comment form. */
+function useDraft() {
+  const [v, setV] = useState<RichValue>(EMPTY_RICH);
+  const [files, setFiles] = useState<Attachment[]>([]);
+  const [round, setRound] = useState(0);
+  const text = v.text.trim();
+  return {
+    v, setV, files, round, text,
+    ready: (!!text || files.length > 0) && v.text.length <= MAX_TEXT,
+    add: (a: Attachment[]) => setFiles(f => [...f, ...a]),
+    remove: (id: string) => setFiles(f => f.filter(x => x.id !== id)),
+    /** Fields stored on the post/comment; `text` falls back to file names for moderation and activity. */
+    out: () => ({ text: text || files.map(f => f.name).join(', '), content: text ? v.doc : undefined, attachments: files.length ? files : undefined }),
+    reset: () => { setV(EMPTY_RICH); setFiles([]); setRound(r => r + 1); },
+  };
+}
+
+const REACTIONS: [Reaction, string, string][] = [['like', '👍', 'Líbí se mi'], ['love', '❤️', 'Srdce'], ['haha', '😂', 'Haha'], ['wow', '😮', 'Wow'], ['sad', '😢', 'Smutné'], ['angry', '😡', 'Naštvané']];
+/** Sets the user's reaction; the same one again removes it. */
+function react(p: Post, r: Reaction): Post {
+  const counts = { ...p.reactions };
+  if (p.myReaction) counts[p.myReaction] = Math.max(0, (counts[p.myReaction] ?? 0) - 1);
+  const next = p.myReaction === r ? undefined : r;
+  if (next) counts[next] = (counts[next] ?? 0) + 1;
+  return { ...p, reactions: counts, myReaction: next };
+}
+
+/** Main button toggles "Líbí se mi" (or removes the own reaction); the smiley opens all reactions. */
+function Reactions({ p, onReact }: { p: Post; onReact: (r: Reaction) => void }) {
+  const [open, setOpen] = useState(false);
+  const used = REACTIONS.filter(([k]) => (p.reactions[k] ?? 0) > 0).sort((a, b) => (p.reactions[b[0]] ?? 0) - (p.reactions[a[0]] ?? 0));
+  const total = used.reduce((s, [k]) => s + (p.reactions[k] ?? 0), 0);
+  const mine = REACTIONS.find(([k]) => k === p.myReaction);
+  return (
+    <div className="reactions">
+      <button type="button" className={`reaction-main ${mine ? 'on' : ''}`} aria-pressed={!!mine} onClick={() => onReact(mine ? mine[0] : 'like')} title={mine ? 'Zrušit reakci' : 'Líbí se mi'}>
+        <span aria-hidden>{mine ? mine[1] : '👍'}</span>{mine ? mine[2] : 'Líbí se mi'}
+      </button>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild><button type="button" className="reaction-more" aria-label="Vybrat reakci" title="Vybrat reakci"><SmilePlus size={16} aria-hidden /></button></PopoverTrigger>
+        <PopoverContent className="reaction-picker" side="top" align="start" aria-label="Reakce">
+          {REACTIONS.map(([k, e, l]) => <button key={k} type="button" aria-label={l} title={l} aria-pressed={p.myReaction === k} className={p.myReaction === k ? 'on' : ''} onClick={() => { onReact(k); setOpen(false); }}><span aria-hidden>{e}</span></button>)}
+        </PopoverContent>
+      </Popover>
+      {total > 0 && <span className="reaction-sum" title={used.map(([k, , l]) => `${l}: ${p.reactions[k]}`).join(' · ')}><span aria-hidden>{used.slice(0, 3).map(([, e]) => e).join('')}</span><span className="sr-only">Reakce: {used.map(([k, , l]) => `${l} ${p.reactions[k]}`).join(', ')}.</span><span aria-hidden>{fmt(total)}</span></span>}
+    </div>
+  );
+}
+
+/** Category filter of a group (?kategorie=), shared by the feed and the access preview. */
+function useCategory(g: CommunityGroup, posts: Post[]) {
+  const { query, setQuery } = useRoute();
+  const sel = g.categories.find(c => c.id === query.get('kategorie'));
+  const set = (id: string) => setQuery({ kategorie: id || undefined });
+  const tabs = (
+    <div className="forum-cats">
+      <FilterTabs label="Kategorie fóra" value={sel?.id ?? ''} onChange={set} items={[['', 'Vše', posts.length], ...g.categories.map(c => [c.id, c.name, posts.filter(p => p.categoryId === c.id).length] as [string, string, number])]} />
+      {sel?.description && <p className="small muted">{sel.description}</p>}
+    </div>
+  );
+  return { sel, set, tabs, shown: sel ? posts.filter(p => p.categoryId === sel.id) : posts };
+}
+
+function PostCard({ p, admin, asContact, category, onCategory }: { p: Post; admin: boolean; asContact?: Contact; category?: ForumCategory; onCategory?: (id: string) => void }) {
   const { workspaceId, mutate, profile, go } = useHub();
-  const [comment, setComment] = useState('');
+  const draft = useDraft();
   const [confirmEl, confirm] = useConfirm();
   const [now] = useState(() => Date.now());
   const update = (fn: (x: Post) => Post) => mutate(d => ({ ...d, posts: d.posts.map(x => (x.workspaceId === workspaceId && x.id === p.id ? fn(x) : x)) }));
   const author = asContact?.name ?? profile.name;
   const open = p.reports.filter(r => !r.resolved).length;
+  /** The workspace user's own posts/comments show their profile photo. */
+  const photo = (x: { author: string; contactId?: number }) => (!x.contactId && x.author === profile.name ? profile.photo?.dataUrl : undefined);
+  const addComment = () => {
+    if (!draft.ready) return;
+    update(x => ({ ...x, comments: [...x.comments, { id: newId('cm'), author, contactId: asContact?.id, ...draft.out(), date: new Date().toISOString(), hidden: false }] }));
+    draft.reset();
+  };
   return (
     <article className={`panel post ${p.hidden ? 'is-hidden' : ''}`}>
       <header className="post-head">
-        <Avatar name={p.author} size="sm" />
+        <Avatar name={p.author} size="sm" src={photo(p)} />
         <div><strong>{p.contactId ? <button type="button" className="text-link inline" onClick={() => admin && go('kontakty/' + p.contactId)}>{p.author}</button> : p.author}</strong><small>{relTime(p.date, now)}{p.pinned ? ' · připnuto' : ''}{p.hidden ? ' · skryto' : ''}</small></div>
+        {category && (onCategory ? <button type="button" className="post-cat" onClick={() => onCategory(category.id)} title="Zobrazit kategorii">{category.name}</button> : <span className="post-cat">{category.name}</span>)}
         {p.pinned && <Pin size={14} aria-label="Připnutý příspěvek" className="muted" />}
         {admin && open > 0 && <Badge tone="red">{plural(open, 'nahlášení', 'nahlášení', 'nahlášení')}</Badge>}
         {admin && (
@@ -158,9 +234,10 @@ function PostCard({ p, admin, asContact }: { p: Post; admin: boolean; asContact?
           </DropdownMenu>
         )}
       </header>
-      <p className="post-text">{p.text}</p>
+      <RichText doc={p.content} text={p.text} className="post-text" />
+      <AttachmentList items={p.attachments} />
       <div className="post-actions">
-        <button type="button" aria-pressed={p.likedByMe} className={p.likedByMe ? 'liked' : ''} onClick={() => update(x => ({ ...x, likedByMe: !x.likedByMe, likes: x.likes + (x.likedByMe ? -1 : 1) }))}><Heart size={16} aria-hidden />{fmt(p.likes)}</button>
+        <Reactions p={p} onReact={r => update(x => react(x, r))} />
         <span><MessageCircle size={16} aria-hidden />{p.comments.filter(c => admin || !c.hidden).length}</span>
         {!admin && <button type="button" onClick={() => { update(x => ({ ...x, reports: [...x.reports, { id: newId('rep'), reason: 'Nevhodný obsah', by: author, date: new Date().toISOString(), resolved: false }] })); toast.success('Příspěvek byl nahlášen moderátorům.'); }}><Flag size={16} aria-hidden />Nahlásit</button>}
       </div>
@@ -168,48 +245,65 @@ function PostCard({ p, admin, asContact }: { p: Post; admin: boolean; asContact?
         <ul className="comments">
           {p.comments.filter(c => admin || !c.hidden).map(c => (
             <li key={c.id} className={c.hidden ? 'is-hidden' : ''}>
-              <Avatar name={c.author} size="sm" />
-              <div><strong>{c.author}</strong> <small>{relTime(c.date, now)}{c.hidden ? ' · skryto' : ''}</small><p>{c.text}</p></div>
+              <Avatar name={c.author} size="sm" src={photo(c)} />
+              <div><strong>{c.author}</strong> <small>{relTime(c.date, now)}{c.hidden ? ' · skryto' : ''}</small><RichText doc={c.content} text={c.text} /><AttachmentList items={c.attachments} /></div>
               {admin && <button type="button" className="text-link" onClick={() => update(x => ({ ...x, comments: x.comments.map(y => (y.id === c.id ? { ...y, hidden: !y.hidden } : y)) }))}>{c.hidden ? 'Zobrazit' : 'Skrýt'}</button>}
             </li>
           ))}
         </ul>
       )}
-      <form className="comment-form" onSubmit={e => { e.preventDefault(); const t = comment.trim(); if (!t) return; update(x => ({ ...x, comments: [...x.comments, { id: newId('cm'), author, contactId: asContact?.id, text: t, date: new Date().toISOString(), hidden: false }] })); setComment(''); }}>
-        <input value={comment} onChange={e => setComment(e.target.value)} placeholder={`Komentovat jako ${author}…`} aria-label="Nový komentář" maxLength={1000} />
-        <Btn type="submit" disabled={!comment.trim()} aria-label="Odeslat komentář"><Send aria-hidden /></Btn>
-      </form>
+      <div className="comment-form">
+        <RichEditor key={draft.round} compact label="Nový komentář" placeholder={`Komentovat jako ${author}…`} onChange={draft.setV} onSubmit={addComment} tools={<AttachButton count={draft.files.length} onAdd={draft.add} />}>
+          <AttachmentList items={draft.files} onRemove={draft.remove} />
+        </RichEditor>
+        <Btn disabled={!draft.ready} onClick={addComment} aria-label="Odeslat komentář" title="Odeslat (Ctrl+Enter)"><Send aria-hidden /></Btn>
+      </div>
       {confirmEl}
     </article>
   );
 }
 
-function Composer({ g, asContact }: { g: CommunityGroup; asContact?: Contact }) {
+function Composer({ g, asContact, category }: { g: CommunityGroup; asContact?: Contact; category?: ForumCategory }) {
   const { workspaceId, mutate, profile } = useHub();
-  const [text, setText] = useState('');
+  const draft = useDraft();
+  const [picked, setPicked] = useState<string>();
+  // explicit choice wins, otherwise the category being viewed, otherwise the first (general) one
+  const catId = (g.categories.some(c => c.id === picked) ? picked : undefined) ?? category?.id ?? g.categories[0]?.id ?? '';
   const post = () => {
-    const t = text.trim(); if (!t) return;
-    const p: Post = { id: newId('post'), workspaceId, groupId: g.id, author: asContact?.name ?? profile.name, contactId: asContact?.id, text: t, date: new Date().toISOString(), pinned: false, hidden: false, likes: 0, likedByMe: false, comments: [], reports: [] };
-    mutate(d => { const next = { ...d, posts: [p, ...d.posts] }; return asContact ? logActivity(next, workspaceId, asContact.id, 'community', `Příspěvek ve skupině ${g.name}`, t.slice(0, 80), 'komunita/' + g.id) : next; });
-    setText(''); toast.success('Příspěvek je zveřejněný.', { description: 'Upozornění členům e-mailem se v prototypu neodesílá.' });
+    if (!draft.ready) return;
+    const p: Post = { id: newId('post'), workspaceId, groupId: g.id, author: asContact?.name ?? profile.name, contactId: asContact?.id, ...draft.out(), categoryId: catId, date: new Date().toISOString(), pinned: false, hidden: false, reactions: {}, comments: [], reports: [] };
+    mutate(d => { const next = { ...d, posts: [p, ...d.posts] }; return asContact ? logActivity(next, workspaceId, asContact.id, 'community', `Příspěvek ve skupině ${g.name}`, p.text.slice(0, 80), 'komunita/' + g.id) : next; });
+    draft.reset(); setPicked(undefined); toast.success('Příspěvek je zveřejněný.', { description: 'Upozornění členům e-mailem se v prototypu neodesílá.' });
   };
+  const len = draft.v.text.length;
   return (
     <section className="panel composer">
-      <textarea rows={3} value={text} onChange={e => setText(e.target.value)} placeholder={asContact ? `Napište příspěvek jako ${asContact.name}…` : 'Napište příspěvek pro členy…'} aria-label="Nový příspěvek" maxLength={5000} />
-      <div className="flex-row spread"><span className="small muted">{text.length}/5000</span><Btn primary onClick={post} disabled={!text.trim()}><Send aria-hidden />Zveřejnit</Btn></div>
+      <RichEditor key={draft.round} label="Nový příspěvek" placeholder={asContact ? `Napište příspěvek jako ${asContact.name}…` : 'Napište příspěvek pro členy…'} onChange={draft.setV} onSubmit={post} tools={<AttachButton count={draft.files.length} onAdd={draft.add} />}>
+        <AttachmentList items={draft.files} onRemove={draft.remove} />
+      </RichEditor>
+      <div className="composer-foot">
+        <span className={`small ${len > MAX_TEXT ? 'negative' : 'muted'}`}>{fmt(len)}/{fmt(MAX_TEXT)} · Ctrl+Enter zveřejní</span>
+        <div className="flex-row">
+          {g.categories.length > 1 && <Pick value={catId} onChange={setPicked} options={g.categories.map(c => [c.id, c.name] as [string, string])} label="Kategorie příspěvku" />}
+          <Btn primary onClick={post} disabled={!draft.ready}><Send aria-hidden />Zveřejnit</Btn>
+        </div>
+      </div>
     </section>
   );
 }
 
 function Feed({ g }: { g: CommunityGroup }) {
   const { w } = useHub();
-  const posts = w.posts.filter(p => p.groupId === g.id).sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.date.localeCompare(a.date));
+  const all = w.posts.filter(p => p.groupId === g.id).sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.date.localeCompare(a.date));
+  const { sel, set, tabs, shown } = useCategory(g, all);
+  const cats = new Map(g.categories.map(c => [c.id, c]));
   return (
     <div className="split">
       <div className="stack">
-        <Composer g={g} />
-        {posts.map(p => <PostCard key={p.id} p={p} admin />)}
-        {!posts.length && <section className="panel empty"><MessageCircle size={28} aria-hidden /><h3>Ve skupině zatím nic není</h3><p>Napište první příspěvek a přivítejte členy.</p></section>}
+        {tabs}
+        <Composer g={g} category={sel} />
+        {shown.map(p => <PostCard key={p.id} p={p} admin category={sel ? undefined : cats.get(p.categoryId)} onCategory={set} />)}
+        {!shown.length && <section className="panel empty"><MessageCircle size={28} aria-hidden /><h3>{sel ? `V kategorii ${sel.name} zatím nic není` : 'Ve skupině zatím nic není'}</h3><p>Napište první příspěvek a přivítejte členy.</p></section>}
       </div>
       <Section title="O skupině" className="sticky-side">
         <div className="sec-body">
@@ -307,13 +401,16 @@ function GroupSettings({ g }: { g: CommunityGroup }) {
   const posts = w.posts.filter(p => p.groupId === g.id).length;
   return (
     <div className="split">
-      <Section title="Skupina">
-        <div className="sec-body stack">
-          <GroupForm v={v} set={p => { setV({ ...v, ...p }); setError(''); }} />
-          <FormError>{error}</FormError>
-          <div className="form-actions"><Btn onClick={() => setV(init)} disabled={!dirty}>Zahodit změny</Btn><Btn primary disabled={!dirty} onClick={() => { const e = groupError(v); if (e) { setError(e); return; } patch('groups', g.id, x => ({ ...x, ...v, name: v.name.trim() })); toast.success('Skupina byla uložena.'); }}>Uložit</Btn></div>
-        </div>
-      </Section>
+      <div className="stack">
+        <Section title="Skupina">
+          <div className="sec-body stack">
+            <GroupForm v={v} set={p => { setV({ ...v, ...p }); setError(''); }} />
+            <FormError>{error}</FormError>
+            <div className="form-actions"><Btn onClick={() => setV(init)} disabled={!dirty}>Zahodit změny</Btn><Btn primary disabled={!dirty} onClick={() => { const e = groupError(v); if (e) { setError(e); return; } patch('groups', g.id, x => ({ ...x, ...v, name: v.name.trim() })); toast.success('Skupina byla uložena.'); }}>Uložit</Btn></div>
+          </div>
+        </Section>
+        <Categories g={g} />
+      </div>
       <Section title="Smazání skupiny" className="sticky-side">
         <div className="sec-body stack">
           <p className="small muted">Smaže se skupina, {plural(posts, 'příspěvek', 'příspěvky', 'příspěvků')} a členství. Kontakty v CRM zůstanou.</p>
@@ -322,6 +419,62 @@ function GroupSettings({ g }: { g: CommunityGroup }) {
       </Section>
       {confirmEl}
     </div>
+  );
+}
+
+/** Forum categories: add, rename, reorder, delete (its posts move to another category). */
+function Categories({ g }: { g: CommunityGroup }) {
+  const { w, patch, mutate, workspaceId } = useHub();
+  const [edit, setEdit] = useState<ForumCategory | null>(null);
+  const [confirmEl, confirm] = useConfirm();
+  const count = (id: string) => w.posts.filter(p => p.groupId === g.id && p.categoryId === id).length;
+  const setCats = (fn: (c: ForumCategory[]) => ForumCategory[]) => patch('groups', g.id, x => ({ ...x, categories: fn(x.categories) }));
+  const move = (i: number, d: number) => setCats(c => { const n = [...c]; [n[i], n[i + d]] = [n[i + d], n[i]]; return n; });
+  const remove = (c: ForumCategory) => {
+    const target = g.categories.find(x => x.id !== c.id)!;
+    const n = count(c.id);
+    confirm({ title: `Smazat kategorii ${c.name}?`, desc: n ? `${plural(n, 'příspěvek se přesune', 'příspěvky se přesunou', 'příspěvků se přesune')} do kategorie ${target.name}.` : 'Kategorie je prázdná.', confirm: 'Smazat', danger: true, onConfirm: () => {
+      mutate(d => ({ ...d, groups: d.groups.map(x => (x.workspaceId === workspaceId && x.id === g.id ? { ...x, categories: x.categories.filter(k => k.id !== c.id) } : x)), posts: d.posts.map(p => (p.workspaceId === workspaceId && p.groupId === g.id && p.categoryId === c.id ? { ...p, categoryId: target.id } : p)) }));
+      toast.success('Kategorie byla smazána.');
+    } });
+  };
+  return (
+    <Section title="Kategorie fóra" desc="Členové vybírají kategorii u každého příspěvku. Pořadí určuje pořadí záložek." actions={<Btn onClick={() => setEdit({ id: '', name: '', description: '' })}><Plus aria-hidden />Nová kategorie</Btn>}>
+      <ul className="sec-body cat-list">
+        {g.categories.map((c, i) => (
+          <li key={c.id}>
+            <div><strong>{c.name}</strong><small>{c.description || 'Bez popisu'} · {plural(count(c.id), 'příspěvek', 'příspěvky', 'příspěvků')}</small></div>
+            <IconBtn label={`Posunout ${c.name} výš`} onClick={() => move(i, -1)} disabled={i === 0}><ArrowUp /></IconBtn>
+            <IconBtn label={`Posunout ${c.name} níž`} onClick={() => move(i, 1)} disabled={i === g.categories.length - 1}><ArrowDown /></IconBtn>
+            <IconBtn label={`Upravit ${c.name}`} onClick={() => setEdit(c)}><Pencil /></IconBtn>
+            <IconBtn label={g.categories.length < 2 ? 'Skupina musí mít aspoň jednu kategorii' : `Smazat ${c.name}`} onClick={() => remove(c)} disabled={g.categories.length < 2}><Trash2 /></IconBtn>
+          </li>
+        ))}
+      </ul>
+      {edit && <CategoryDialog c={edit} taken={g.categories.filter(x => x.id !== edit.id).map(x => normalize(x.name))} onClose={() => setEdit(null)} onSave={v => { setCats(cs => (v.id ? cs.map(x => (x.id === v.id ? v : x)) : [...cs, { ...v, id: newId('cat') }])); toast.success(v.id ? 'Kategorie byla upravena.' : 'Kategorie byla přidána.'); }} />}
+      {confirmEl}
+    </Section>
+  );
+}
+
+function CategoryDialog({ c, taken, onClose, onSave }: { c: ForumCategory; taken: string[]; onClose: () => void; onSave: (c: ForumCategory) => void }) {
+  const [v, setV] = useState(c);
+  const [error, setError] = useState('');
+  const save = () => {
+    const name = v.name.trim();
+    if (!name) return setError('Vyplňte název kategorie.');
+    if (taken.includes(normalize(name))) return setError('Kategorie s tímto názvem už existuje.');
+    onSave({ ...v, name, description: v.description.trim() }); onClose();
+  };
+  return (
+    <Modal open onClose={onClose} title={c.id ? 'Upravit kategorii' : 'Nová kategorie'} desc="Kategorie rozdělí diskusi ve skupině do témat.">
+      <div className="stack">
+        <Field label="Název"><input autoFocus value={v.name} onChange={e => { setV({ ...v, name: e.target.value }); setError(''); }} maxLength={40} onKeyDown={e => { if (e.key === 'Enter') save(); }} /></Field>
+        <Field label="Popis" hint="Zobrazí se pod záložkou kategorie."><input value={v.description} onChange={e => setV({ ...v, description: e.target.value })} maxLength={140} /></Field>
+      </div>
+      <FormError>{error}</FormError>
+      <div className="form-actions"><Btn onClick={onClose}>Zrušit</Btn><Btn primary onClick={save}>{c.id ? 'Uložit' : 'Přidat kategorii'}</Btn></div>
+    </Modal>
   );
 }
 
@@ -348,6 +501,8 @@ function AccessPreview({ g }: { g: CommunityGroup }) {
   const enrolled = !!(c && g.courseId && w.enrollments.some(e => e.courseId === g.courseId && e.contactId === c.id && e.status !== 'Pozastaveno'));
   const a = accessFor(g, c, w.memberships, enrolled);
   const posts = w.posts.filter(p => p.groupId === g.id && !p.hidden).sort((x, y) => Number(y.pinned) - Number(x.pinned) || y.date.localeCompare(x.date));
+  const cat = useCategory(g, posts);
+  const cats = new Map(g.categories.map(x => [x.id, x]));
   return (
     <div className="stack">
       <div className="preview-banner" role="note">
@@ -357,9 +512,10 @@ function AccessPreview({ g }: { g: CommunityGroup }) {
       <Notice tone={a.ok ? 'info' : 'warn'}>{a.ok ? `Má přístup: ${a.reason}` : `Nemá přístup: ${a.reason}`}</Notice>
       {a.ok ? (
         <div className="member-view">
-          {c && <Composer g={g} asContact={c} />}
-          {posts.map(p => <PostCard key={p.id} p={p} admin={false} asContact={c} />)}
-          {!posts.length && <p className="muted">Ve skupině zatím nejsou příspěvky.</p>}
+          {cat.tabs}
+          {c && <Composer g={g} asContact={c} category={cat.sel} />}
+          {cat.shown.map(p => <PostCard key={p.id} p={p} admin={false} asContact={c} category={cat.sel ? undefined : cats.get(p.categoryId)} onCategory={cat.set} />)}
+          {!cat.shown.length && <p className="muted">{cat.sel ? 'V této kategorii zatím nejsou příspěvky.' : 'Ve skupině zatím nejsou příspěvky.'}</p>}
         </div>
       ) : (
         <section className="panel player-locked">
@@ -389,9 +545,9 @@ function Moderation() {
       <CommunityNav active="komunita/moderace" />
       {!open.length && <Notice>Žádné otevřené nahlášení. Vše je vyřešené.</Notice>}
       <div className="stack mt-4">
-        {items.map(({ p, r }) => { const g = w.groups.find(x => x.id === p.groupId); return (
+        {items.map(({ p, r }) => { const g = w.groups.find(x => x.id === p.groupId); const cat = g?.categories.find(x => x.id === p.categoryId); return (
           <section key={r.id} className={`panel report ${r.resolved ? 'is-resolved' : ''}`}>
-            <header className="post-head"><ShieldAlert size={18} aria-hidden className={r.resolved ? 'muted' : 'negative'} /><div><strong>{r.reason}</strong><small>nahlásil(a) {r.by} · {relTime(r.date, now)} · {g?.name}</small></div><Badge tone={r.resolved ? 'gray' : 'red'}>{r.resolved ? 'Vyřešeno' : 'Čeká'}</Badge></header>
+            <header className="post-head"><ShieldAlert size={18} aria-hidden className={r.resolved ? 'muted' : 'negative'} /><div><strong>{r.reason}</strong><small>nahlásil(a) {r.by} · {relTime(r.date, now)} · {g?.name}{cat ? ` › ${cat.name}` : ''}</small></div><Badge tone={r.resolved ? 'gray' : 'red'}>{r.resolved ? 'Vyřešeno' : 'Čeká'}</Badge></header>
             <blockquote className="post-text">„{p.text}“ <small>— {p.author}, {fmtDateTime(p.date)}{p.hidden ? ' · skryto' : ''}</small></blockquote>
             {!r.resolved && (
               <div className="flex-row wrap">

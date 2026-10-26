@@ -314,7 +314,7 @@ test('automation: template → activate → CRM tag enrols → insert step with 
   await page.getByRole('button', { name: 'Uložit' }).click();
   await expect(page.locator('.flow-issues')).toContainText('vyplňte příjemce');
   await page.locator('.flow-side').getByLabel('Komu').fill('tym@softema.example');
-  await expect(page.getByRole('button', { name: 'Bez chyb' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /\d+ chyb/ })).toHaveCount(0);
   await page.getByRole('button', { name: 'Uložit' }).click();
   await expect(page.locator('.fnode')).toHaveCount(7);
   await page.reload();
@@ -352,6 +352,23 @@ test('community: post, moderate and check access', async ({ page }) => {
   await page.getByLabel('Nový příspěvek').fill('Testovací příspěvek pro členy klubu');
   await page.getByRole('button', { name: 'Zveřejnit' }).click();
   await expect(page.locator('.post').filter({ hasText: 'Testovací příspěvek pro členy klubu' })).toHaveCount(1);
+
+  // forum category: a post written in a category stays there; reactions; image attachment opens in a lightbox
+  await page.getByRole('group', { name: 'Kategorie fóra' }).getByRole('button', { name: /Dotazy a pomoc/ }).click();
+  await page.getByLabel('Nový příspěvek').fill('Dotaz s obrázkem');
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  await page.locator('.composer input[type=file]').setInputFiles({ name: 'graf.png', mimeType: 'image/png', buffer: png });
+  await page.getByRole('button', { name: 'Zveřejnit' }).click();
+  const asked = page.locator('.post').filter({ hasText: 'Dotaz s obrázkem' });
+  await expect(asked).toHaveCount(1);
+  await expect(page.locator('.post').filter({ hasText: 'Testovací příspěvek pro členy klubu' })).toHaveCount(0);
+  await asked.getByRole('button', { name: 'Vybrat reakci' }).click();
+  await page.getByRole('button', { name: 'Srdce' }).click();
+  await expect(asked.getByRole('button', { name: /Srdce/, pressed: true })).toBeVisible();
+  await asked.getByRole('button', { name: 'Zvětšit obrázek graf.png' }).click();
+  await expect(page.getByRole('dialog', { name: 'graf.png' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 
   await openHub(page, 'komunita/moderace');
   await page.getByRole('button', { name: 'Skrýt příspěvek' }).click();
