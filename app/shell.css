@@ -58,7 +58,7 @@
 body { background: var(--canvas); color: var(--ink); }
 
 /* ===== App frame: one width rule for every work screen ===== */
-.page, .dash { max-width: 1680px; margin: 0; padding: var(--sp-8); }
+.page, .dash { max-width: 1680px; margin: 0 auto; padding: var(--sp-8); }
 .page-head { margin-bottom: var(--sp-6); }
 .page-head h1 { font-size: 28px; line-height: 1.2; font-weight: 600; letter-spacing: -.02em; color: var(--ink); }
 .page-head p { margin-top: var(--sp-2); font-size: 15px; line-height: 1.5; color: var(--ink-2); }
