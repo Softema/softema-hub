@@ -41,6 +41,8 @@ pnpm dev:live       # API na :4100, web na :3000
 
 Otevřete <http://localhost:3000/prihlaseni>. Heslo najdete v `.env` jako `SEED_USER_PASSWORD`.
 
+**Stav ověření (5. 11. 2026):** čistý klon, `pnpm setup:env`, `pnpm db:setup`, `pnpm test:api` a `pnpm test:e2e:live` prošly proti PostgreSQL 17 s ověřením heslem na portu 5433, ale bez Dockeru, který na původním Macu nebyl. Samotné `pnpm db:up` a obraz `pgvector/pgvector:pg17` zatím nikdo nespustil. Po prvním spuštění na novém počítači proto pusťte i `pnpm test:api`.
+
 ## 4. Testovací uživatelé
 
 | E-mail | Role | Prostor |
