@@ -1,0 +1,31 @@
+{
+  "name": "@softema/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "generate": "prisma generate",
+    "postinstall": "prisma generate",
+    "typecheck": "tsc --noEmit",
+    "migrate": "prisma migrate deploy",
+    "roles": "tsx scripts/roles.ts",
+    "seed": "tsx scripts/seed.ts",
+    "setup": "prisma migrate deploy && tsx scripts/roles.ts && tsx scripts/seed.ts",
+    "reset": "tsx scripts/reset.ts && prisma migrate deploy && tsx scripts/roles.ts && tsx scripts/seed.ts"
+  },
+  "dependencies": {
+    "@node-rs/argon2": "2.2.2",
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@softema/shared": "workspace:*",
+    "@types/node": "22.19.19",
+    "@types/pg": "8.15.5",
+    "prisma": "7.10.1",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3"
+  }
+}

@@ -1,3 +1,6 @@
+packages:
+  - apps/*
+  - packages/*
 # Supply-chain policy: only releases older than 7 days, verified lockfile,
 # install scripts only for the packages listed in allowBuilds.
 minimumReleaseAge: 10080
@@ -7,6 +10,10 @@ strictDepBuilds: true
 allowBuilds:
   sharp: true
   unrs-resolver: true
+  '@prisma/engines': true
+  prisma: true
+  turbo: false
+  esbuild: true
 # Project-local pnpm store (path kept from the original export; moving it
 # requires a fresh install). SITES_PNPM_SHARED_STORE may still override it.
 storeDir: ${SITES_PNPM_SHARED_STORE:-.sites-runtime/pnpm-store}

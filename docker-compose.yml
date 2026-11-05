@@ -1,0 +1,21 @@
+# Local PostgreSQL for development. Bound to localhost only; data can be discarded and restored by seed.
+# The pgvector image keeps the database ready for the chatbot (zadání kap. 4); the extension is not enabled yet.
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: softema-hub-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-softema_hub}
+      POSTGRES_USER: ${POSTGRES_USER:-softema_owner}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Spusťte nejdřív pnpm setup:env}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - softema_hub_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+volumes:
+  softema_hub_pg:

@@ -1,0 +1,269 @@
+// Softema Hub, first batch: identity, workspaces, contacts, tags, notes, history.
+// Everything lives in the `hub` schema, which is never exposed through a data API.
+// RLS policies, grants, partial indexes and generated columns are in the SQL migrations.
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["hub"]
+}
+
+/* ---------- Better-Auth (no tenant data, table names as the library expects) ---------- */
+model User {
+  id                 String              @id
+  name               String
+  email              String              @unique
+  emailVerified      Boolean             @default(false)
+  image              String?
+  createdAt          DateTime            @default(now()) @db.Timestamptz
+  updatedAt          DateTime            @updatedAt @db.Timestamptz
+  sessions           Session[]
+  accounts           Account[]
+  agencyMemberships  AgencyMembership[]
+  memberships        WorkspaceMembership[]
+  ownedContacts      Contact[]           @relation("ContactOwner")
+  notes              Note[]
+  activities         Activity[]
+
+  @@map("user")
+  @@schema("hub")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime @db.Timestamptz
+  token     String   @unique
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+  @@schema("hub")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime? @db.Timestamptz
+  refreshTokenExpiresAt DateTime? @db.Timestamptz
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now()) @db.Timestamptz
+  updatedAt             DateTime  @updatedAt @db.Timestamptz
+
+  @@index([userId])
+  @@map("account")
+  @@schema("hub")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime @db.Timestamptz
+  createdAt  DateTime @default(now()) @db.Timestamptz
+  updatedAt  DateTime @updatedAt @db.Timestamptz
+
+  @@index([identifier])
+  @@map("verification")
+  @@schema("hub")
+}
+
+/* ---------- tenancy ---------- */
+enum WorkspaceKind {
+  internal
+  client
+
+  @@schema("hub")
+}
+
+enum WorkspaceRole {
+  workspace_admin
+  member
+
+  @@schema("hub")
+}
+
+model Agency {
+  id         String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String
+  createdAt  DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  workspaces Workspace[]
+  members    AgencyMembership[]
+
+  @@map("agency")
+  @@schema("hub")
+}
+
+/** Holding a row here makes the user `agency_admin` of every workspace of the agency. */
+model AgencyMembership {
+  agencyId  String   @map("agency_id") @db.Uuid
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  agency    Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([agencyId, userId])
+  @@index([userId])
+  @@map("agency_membership")
+  @@schema("hub")
+}
+
+model Workspace {
+  id        String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  agencyId  String                @map("agency_id") @db.Uuid
+  name      String
+  kind      WorkspaceKind         @default(client)
+  timezone  String                @default("Europe/Prague")
+  createdAt DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  agency    Agency                @relation(fields: [agencyId], references: [id], onDelete: Restrict)
+  members   WorkspaceMembership[]
+
+  @@index([agencyId])
+  @@map("workspace")
+  @@schema("hub")
+}
+
+model WorkspaceMembership {
+  workspaceId String        @map("workspace_id") @db.Uuid
+  userId      String        @map("user_id")
+  role        WorkspaceRole
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([workspaceId, userId])
+  @@index([userId])
+  @@map("workspace_membership")
+  @@schema("hub")
+}
+
+/* ---------- CRM ---------- */
+enum ContactStage {
+  lead
+  prospect
+  client
+
+  @@schema("hub")
+}
+
+model Contact {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId     String    @map("workspace_id") @db.Uuid
+  name            String
+  email           String
+  emailNormalized String    @map("email_normalized")
+  phone           String    @default("")
+  company         String    @default("")
+  city            String    @default("")
+  stage           ContactStage @default(lead)
+  source          String    @default("Ruční zadání")
+  ownerUserId     String?   @map("owner_user_id")
+  customFields    Json      @default("{}") @map("custom_fields")
+  version         Int       @default(1)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
+  /// Generated by the database. Read-only: filter on it, never write it.
+  searchText      String?   @map("search_text")
+  owner           User?     @relation("ContactOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  tags            ContactTag[]
+  notes           Note[]
+  activities      Activity[]
+
+  @@unique([workspaceId, id])
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@map("contact")
+  @@schema("hub")
+}
+
+model Tag {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId    String       @map("workspace_id") @db.Uuid
+  name           String
+  nameNormalized String       @map("name_normalized")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  contacts       ContactTag[]
+
+  @@unique([workspaceId, id])
+  @@unique([workspaceId, nameNormalized])
+  @@map("tag")
+  @@schema("hub")
+}
+
+model ContactTag {
+  workspaceId String   @map("workspace_id") @db.Uuid
+  contactId   String   @map("contact_id") @db.Uuid
+  tagId       String   @map("tag_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  contact     Contact  @relation(fields: [workspaceId, contactId], references: [workspaceId, id], onDelete: Cascade)
+  tag         Tag      @relation(fields: [workspaceId, tagId], references: [workspaceId, id], onDelete: Cascade)
+
+  @@id([contactId, tagId])
+  @@index([workspaceId, tagId])
+  @@map("contact_tag")
+  @@schema("hub")
+}
+
+model Note {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId  String    @map("workspace_id") @db.Uuid
+  contactId    String    @map("contact_id") @db.Uuid
+  authorUserId String    @map("author_user_id")
+  body         String
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+  contact      Contact   @relation(fields: [workspaceId, contactId], references: [workspaceId, id], onDelete: Cascade)
+  author       User      @relation(fields: [authorUserId], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId, contactId, createdAt(sort: Desc)])
+  @@map("note")
+  @@schema("hub")
+}
+
+/** Timeline of a contact (zadání kap. 9). Append-only for the application role. */
+model Activity {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  contactId   String   @map("contact_id") @db.Uuid
+  actorUserId String?  @map("actor_user_id")
+  type        String
+  payload     Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  contact     Contact  @relation(fields: [workspaceId, contactId], references: [workspaceId, id], onDelete: Cascade)
+  actor       User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, contactId, createdAt(sort: Desc)])
+  @@map("activity")
+  @@schema("hub")
+}
+
+/** Who accessed or changed personal data (zadání 6.7). Field names only, never values. */
+model AuditLog {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId   String   @map("workspace_id") @db.Uuid
+  actorUserId   String?  @map("actor_user_id")
+  action        String
+  entity        String
+  entityId      String   @map("entity_id")
+  changedFields String[] @default([]) @map("changed_fields")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@map("audit_log")
+  @@schema("hub")
+}

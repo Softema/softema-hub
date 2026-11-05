@@ -1,0 +1,10 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "globalEnv": ["NEXT_PUBLIC_APP_MODE", "NEXT_PUBLIC_UNLAYER_PROJECT_ID", "API_INTERNAL_URL"],
+  "tasks": {
+    "build": { "outputs": [".next/**", "!.next/cache/**"] },
+    "typecheck": {},
+    "lint": {},
+    "test": {}
+  }
+}
