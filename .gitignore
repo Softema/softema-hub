@@ -43,6 +43,7 @@ next-env.d.ts
 
 # playwright (reference screenshots in e2e/__screenshots__ ARE versioned)
 test-results/
+test-results-live/
 playwright-report/
 blob-report/
 /playwright/.cache/
@@ -52,6 +53,7 @@ blob-report/
 
 # local monorepo artefacts
 .turbo/
+.next-live/
 packages/db/src/generated/
 tsconfig.tsbuildinfo
 next-env.d.ts

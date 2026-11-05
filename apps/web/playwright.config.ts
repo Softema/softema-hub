@@ -16,6 +16,7 @@ const project = (device: 'desktop' | 'mobile'): Project => ({
 });
 
 export default defineConfig({
+  testIgnore: "**/e2e-live/**",
   testDir: './e2e',
   fullyParallel: false,
   workers: 1,

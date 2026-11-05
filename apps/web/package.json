@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern playwright-report --ignore-pattern test-results",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern .next-live --ignore-pattern playwright-report --ignore-pattern test-results",
     "test:e2e": "playwright test",
     "test:e2e:reference": "playwright test e2e/visual.spec.ts --update-snapshots=all",
     "theme:css": "node scripts/build-theme-css.mjs",

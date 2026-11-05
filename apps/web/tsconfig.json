@@ -25,6 +25,12 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@softema/app-entry": [
+        "./app/hub.tsx"
+      ],
+      "@softema/sign-in": [
+        "./app/live/sign-in.ts"
       ]
     },
     "types": [
@@ -37,6 +43,8 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
+    ".next-live/types/**/*.ts",
+    ".next-live/dev/types/**/*.ts",
     "**/*.mts"
   ],
   "exclude": [

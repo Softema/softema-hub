@@ -32,6 +32,6 @@ export class ApiExceptionFilter implements ExceptionFilter {
     }
     // Only the error class and Prisma code: messages can contain personal data.
     this.log.error(`Unhandled ${name}${e instanceof Prisma.PrismaClientKnownRequestError ? ` ${e.code}` : ''}`);
-    return send(500, { code: 'INTERNAL', message: 'Něco se nepovedlo. Změna se neuložila.' });
+    return send(500, { code: 'INTERNAL', message: 'Něco se nepovedlo. Pokud jste něco ukládali, změna se neuložila.' });
   }
 }
