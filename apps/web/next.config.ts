@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 import type { NextConfig } from 'next';
 
 const LIVE = process.env.NEXT_PUBLIC_APP_MODE === 'live';
-const api = process.env.API_INTERNAL_URL ?? 'http://127.0.0.1:4000';
+const api = process.env.API_INTERNAL_URL ?? 'http://127.0.0.1:4100';
 const noSession = [{ type: 'cookie' as const, key: 'better-auth.session_token' }];
 
 const nextConfig: NextConfig = {

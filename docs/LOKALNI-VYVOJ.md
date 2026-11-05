@@ -36,7 +36,7 @@ pnpm install --frozen-lockfile
 pnpm setup:env      # vytvoří .env s náhodnými lokálními hesly a vypíše heslo testovacích uživatelů
 pnpm db:up          # spustí PostgreSQL v Dockeru na 127.0.0.1:5433
 pnpm db:setup       # migrace, databázové role, seed
-pnpm dev:live       # API na :4000, web na :3000
+pnpm dev:live       # API na :4100, web na :3000
 ```
 
 Otevřete <http://localhost:3000/prihlaseni>. Heslo najdete v `.env` jako `SEED_USER_PASSWORD`.
@@ -86,6 +86,7 @@ Pokud na portu 3000 něco běží, ukončete to, nebo změňte `WEB_ORIGIN` v `.
 | Příznak | Řešení |
 | --- | --- |
 | `pnpm db:up` hlásí chybu Dockeru | Docker Desktop neběží. Spusťte ho a počkejte. |
+| Port 4100 je obsazený | Změňte `API_PORT` v `.env`. |
 | Port 5433 je obsazený | Změňte `POSTGRES_PORT` a port v adresách `DATABASE_*_URL` v `.env`. |
 | Přihlášení hlásí nedostupný server | Zkontrolujte, že běží `pnpm dev:live` a že `pnpm db:up` proběhl. |
 | Heslo v `.env` nesedí s databází | `docker compose down -v`, potom znovu `pnpm db:up` a `pnpm db:setup`. |
