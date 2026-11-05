@@ -64,7 +64,8 @@ export function HubProvider({ children }: { children: React.ReactNode }) {
 
   const applyRoute = useCallback((r: string, replace = false) => {
     const hash = '#' + r;
-    if (replace) history.replaceState(null, '', hash); else if (location.hash !== hash) history.pushState(null, '', hash);
+    // Fragment navigation, not history.pushState/replaceState: Next.js patches those and its router would later write a stale URL back over the hash.
+    if (replace) location.replace(hash); else if (location.hash !== hash) location.hash = hash;
     lastRoute.current = r; setRoute(r); if (!replace) window.scrollTo({ top: 0, behavior: 'instant' });
   }, []);
   const go = useCallback((r: string, opts?: { replace?: boolean }) => {
@@ -75,7 +76,7 @@ export function HubProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const read = () => {
       const r = decodeURIComponent(location.hash.slice(1)) || 'prehled';
-      if (guard.current && r !== lastRoute.current) { history.pushState(null, '', '#' + lastRoute.current); setPending({ route: r, message: guard.current }); return; }
+      if (guard.current && r !== lastRoute.current) { location.hash = '#' + lastRoute.current; setPending({ route: r, message: guard.current }); return; }
       lastRoute.current = r; setRoute(r);
     };
     read(); window.addEventListener('hashchange', read); window.addEventListener('popstate', read);
