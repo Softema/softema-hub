@@ -1,12 +1,16 @@
 # Softema Hub
 
-Česká marketingová a CRM platforma agentury Softema Creative. **Aktuální etapa: proklikatelný frontend nad lokálními daty** ke společnému review se zadavatelem. Všechny údaje jsou smyšlené. Aplikace nemá backend a neodesílá e-maily ani platby. Odeslání, platby, vysílání a tréninky jsou v aplikaci výslovně označené jako simulace.
+Česká marketingová a CRM platforma agentury Softema Creative.
+
+**Databázová verze** (přihlášení a kontakty nad PostgreSQL, jen lokálně): [docs/LOKALNI-VYVOJ.md](docs/LOKALNI-VYVOJ.md), architektura v [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+**Demo** (níže) je proklikatelný frontend nad lokálními daty. Všechny údaje jsou smyšlené. Aplikace nemá backend a neodesílá e-maily ani platby. Odeslání, platby, vysílání a tréninky jsou v aplikaci výslovně označené jako simulace.
 
 Závazné zadání: [docs/ZADANI-APLIKACE.md](docs/ZADANI-APLIKACE.md). Priority a pořadí dodávek: [docs/ZADANI-PRVNIHO-TASKU.md](docs/ZADANI-PRVNIHO-TASKU.md). Stav jednotlivých požadavků: [docs/FRONTEND-CHECKLIST.md](docs/FRONTEND-CHECKLIST.md). [docs/MIGRACE.md](docs/MIGRACE.md) je historický podklad z doby GPT Sites a zadání nepřebíjí.
 
 ## Spuštění
 
-Node.js ≥ 22.13.0 a pnpm 11.25.0. Bez globálního pnpm použijte `npx --yes pnpm@11.25.0` místo `pnpm`.
+Node.js ≥ 22.22.1 a pnpm 11.25.0.
 
 ```sh
 pnpm install --frozen-lockfile

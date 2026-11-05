@@ -1,6 +1,6 @@
 # Softema Hub — instrukce pro Claude Code
 
-Česká all-in-one marketingová a CRM platforma agentury Softema. **Aktuální etapa: proklikatelný frontend s mock daty ke společnému review se zadavatelem.** Produkční funkcionalita (backend, auth, integrace) přijde až potom a jen na základě samostatného zadání.
+Česká all-in-one marketingová a CRM platforma agentury Softema. **Aktuální etapa: dokončování skutečné aplikace.** Na větvi `feat/auth-contacts` je první dávka: přihlášení a kontakty nad PostgreSQL, zatím jen lokálně se smyšlenými daty. Veřejné demo (`main`, Vercel) zůstává beze změny. Architektura: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), spuštění: [docs/LOKALNI-VYVOJ.md](docs/LOKALNI-VYVOJ.md).
 
 ## Podklady a jejich priorita
 
@@ -17,7 +17,8 @@ Skutečný kód má přednost před popisy jeho stavu. Rozpor mezi dokumenty, za
 - Implementuj jen aktuální zadání a vyber nejmenší změnu, která ho splní. Cílová architektura níže sama o sobě není pokyn k migraci.
 - Před úpravou si přečti relevantní soubory a `git status --short`. Nepřepisuj cizí rozpracované změny.
 - Bez zadání nedělej plošné formátování ani přepisy modulů a neaktualizuj závislosti. Dlouhé řádky v `app/*.tsx` nejsou důvod k refaktoringu.
-- Repozitář je lokální (`main`, bez remote). Commitovat smíš, push, publikování, placené služby a produkční migrace ne, pokud nejsou výslovně zadané.
+- Repozitář má remote `origin` a je napojený na Vercel. Commitovat smíš, push, publikování, placené služby a produkční migrace ne, pokud nejsou výslovně zadané. Push může spustit preview nasazení.
+- Monorepo: frontend je v `apps/web`, cesty `app/…` níže znamenají `apps/web/app/…`.
 - Nový kód typuj (TS `strict`), žádné plošné `any` ani vypínání kontrol. Respektuj hranici mezi klientskými a serverovými importy.
 
 ## Aktuální stav
@@ -43,6 +44,8 @@ Pozůstatky, které zůstávají záměrně:
 - složka `vendor/` (styly shadcn), kterou aplikace používá.
 
 ## Rozsah aktuální etapy
+
+Databázová verze je v `apps/web/app/live/`, oddělená od dema při sestavení. Nové funkce pro ni nepřidávej do `useHub()`.
 
 **Pořadí dodávek:** migrace frameworku je hotová. Na větvi `frontend/complete` je funkční frontend všech modulů z kap. 1.1 nad lokálními daty. Stav položek a závislosti na backendu jsou v [docs/FRONTEND-CHECKLIST.md](docs/FRONTEND-CHECKLIST.md). Následuje review se zadavatelem. Prioritou zůstává tvorba kampaně a editor e-mailu, potom detail kontaktu.
 
@@ -76,23 +79,27 @@ Rozhodnutí zadavatele:
 Detail je v zadání v kap. 3–6 a 13–15. Stručně: Next.js App Router + TS strict + Tailwind + shadcn/ui; buildery Unlayer, React Flow, Tiptap; backend **NestJS** (REST + webhooky); **Prisma** (migrace jen přes `prisma migrate`); **PostgreSQL s RLS** (+ pgvector); **Redis + BullMQ** (fronty, workflow engine); **Better-Auth** (2FA, oddělená auth klientského portálu); Resend za adaptérem `EmailProvider`; Stripe + Fakturoid; S3/R2; **Docker + Hetzner (EU)**; monorepo pnpm + Turborepo (`apps/web`, `apps/api`, `apps/worker`, `packages/*`).
 
 V aktuální etapě:
-- **Neaktivuj** backend, autentizaci, databázi ani žádnou integraci. `.env.example` nic nezapojuje.
-- `supabase/` a Supabase proměnné v `.env.example` jsou historický návrh v jiném stacku. Nenavazuj na ně, nerozšiřuj je a nevracej Supabase, D1 ani Cloudflare jako cíl.
+- Backend, autentizace a databáze běží jen lokálně. Žádnou externí integraci neaktivuj bez zadání.
+- `supabase/` je historický návrh v jiném stacku, nenavazuj na něj. Supabase může později sloužit jen jako hostovaný PostgreSQL, viz [docs/POC-AUTH-RLS.md](docs/POC-AUTH-RLS.md).
 - `lib/server/email/resend.ts` je připravený, nezapojený adaptér (Resend je v cílovém stacku). Nepoužívej ho k reálnému odesílání.
 - Secrets nikdy nepatří do Gitu, klientského stavu, URL, logů ani do proměnných `NEXT_PUBLIC_`/`VITE_`.
 
 ## Příkazy
 
-Node.js ≥ 22.13.0, pnpm 11.25.0. Bez globálního pnpm použij `npx --yes pnpm@11.25.0 <příkaz>`. Projekt nemá obecný skript `test`.
+Node.js ≥ 22.22.1, pnpm 11.25.0 (nainstalovaný globálně, skripty ho volají). Úplný přehled je v [docs/LOKALNI-VYVOJ.md](docs/LOKALNI-VYVOJ.md).
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm dev                 # next dev, http://localhost:3000/aplikace
+pnpm dev                 # jen demo, http://localhost:3000/aplikace
+pnpm dev:live            # API + web nad PostgreSQL
+pnpm db:up && pnpm db:setup   # PostgreSQL v Dockeru, migrace, role, seed
+pnpm test:api            # integrační testy API a RLS
+pnpm test:e2e:live       # E2E databázové verze
 pnpm build               # next build, bez deploye
 pnpm start               # next start nad hotovým buildem
-pnpm exec tsc --noEmit --incremental false
+pnpm typecheck
 pnpm lint                # pozor: v původním kódu app/ zatím hlásí chyby (any, react-hooks)
-node --test tests/foundation.test.mjs tests/hub.test.mjs   # demo store, Resend adaptér, datová vrstva lib/hub
+pnpm test                # demo store, Resend adaptér, datová vrstva lib/hub
 pnpm test:e2e            # Playwright proti běžící aplikaci (výchozí :3000, jinak E2E_BASE_URL)
 pnpm test:e2e:reference  # přepíše referenční snímky; jen po schválené změně vzhledu
 pnpm theme:css           # znovu vygeneruje app/theme-legacy.css z původních stylů

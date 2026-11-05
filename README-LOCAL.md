@@ -1,4 +1,6 @@
-# Softema Hub: lokální vývoj
+# Softema Hub: lokální vývoj dema
+
+Databázová verze má vlastní návod: [docs/LOKALNI-VYVOJ.md](docs/LOKALNI-VYVOJ.md).
 
 ## Požadavky
 
@@ -54,8 +56,8 @@ Referenční snímky se porovnávají na pixel a pořízené jsou na Windows, vi
 
 | Oblast | Stav |
 | --- | --- |
-| Data kontaktů, kampaní a modulů | Smyšlená, jen v paměti prohlížeče. Obnovení stránky je resetuje. |
-| E-mailový editor, workflow builder | Vlastní React implementace (`app/campaigns.tsx`, `app/automations.tsx`). Cílově Unlayer a React Flow. |
+| Data kontaktů, kampaní a modulů | Smyšlená, jen v localStorage prohlížeče. Obnovení stránky je zachová. |
+| E-mailový editor, workflow builder | Unlayer s vestavěným náhradním editorem a React Flow. |
 | Přihlášení, registrace, obnova hesla | Jen formuláře, žádné účty ani ověřování. |
 | Rozesílka, platby, AI agenti, chatbot | Simulace bez externích služeb. |
 | `lib/server/email/resend.ts` | Připravený adaptér Resend, nikde nezapojený. |
