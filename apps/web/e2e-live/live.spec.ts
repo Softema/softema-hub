@@ -287,6 +287,7 @@ test('pozvánka: nový správce si založí účet, zapne 2FA; správce mu změn
   expect((await guest.request.get(`/api/v1/workspaces/${WS_A}/contacts`)).status()).toBe(403);
   await guest.getByLabel('Současné heslo').fill(password);
   await guest.getByRole('button', { name: 'Pokračovat' }).click();
+  await expect(guest.getByRole('img', { name: 'QR kód pro autentizační aplikaci' })).toBeVisible();
   const key = await guest.getByLabel('Klíč pro autentizační aplikaci').innerText();
   await guest.getByLabel('Ověřovací kód').fill(totp(fromBase32(key)));
   await guest.getByRole('button', { name: 'Zapnout ověření' }).click();

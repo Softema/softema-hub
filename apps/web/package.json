@@ -17,6 +17,8 @@
     "@base-ui/react": "^1.7.0",
     "@hookform/resolvers": "^5.7.1",
     "@shadcn/react": "^0.3.0",
+    "@softema/shared": "workspace:*",
+    "@tanstack/react-query": "5.105.0",
     "@tiptap/pm": "^3.32.0",
     "@tiptap/react": "^3.32.0",
     "@tiptap/starter-kit": "^3.32.0",
@@ -40,10 +42,9 @@
     "recharts": "^3.8.0",
     "sonner": "^2.0.8",
     "tailwind-merge": "3.6.0",
+    "uqr": "0.1.3",
     "vaul": "^1.1.2",
-    "zod": "^4.6.7",
-    "@softema/shared": "workspace:*",
-    "@tanstack/react-query": "5.105.0"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",

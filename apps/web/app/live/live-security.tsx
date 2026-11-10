@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Copy, Download, KeyRound, LogOut, ShieldCheck, Smartphone } from 'lucide-react';
 import { toast } from 'sonner';
+import { encode } from 'uqr';
 import { PASSWORD_MIN } from '@softema/shared';
 import { Badge, Btn, Field, Modal, PageHead } from '../ui';
 import { FormError, Notice } from '../kit-core';
@@ -14,6 +15,20 @@ const PASSWORD_HINT = `Aspoň ${PASSWORD_MIN} znaků. Nejlépe několik slov, kt
 
 /** The key from the otpauth URI, in groups of four for typing into an authenticator app. */
 const keyOf = (uri: string) => (new URL(uri).searchParams.get('secret') ?? '').match(/.{1,4}/g)?.join(' ') ?? '';
+
+/**
+ * QR code of the otpauth URI, generated in the browser: the secret never goes to any service.
+ * Drawn as one SVG path from the module matrix; always dark on white so phones can read it in dark mode too.
+ */
+function TotpQr({ uri }: { uri: string }) {
+  const { data, size } = React.useMemo(() => encode(uri, { ecc: 'M', border: 2 }), [uri]);
+  const d = data.flatMap((row, y) => row.map((on, x) => (on ? `M${x} ${y}h1v1h-1z` : ''))).join('');
+  return (
+    <svg className="totp-qr" viewBox={`0 0 ${size} ${size}`} role="img" aria-label="QR kód pro autentizační aplikaci" shapeRendering="crispEdges">
+      <rect width={size} height={size} fill="#fff" /><path d={d} fill="#000" />
+    </svg>
+  );
+}
 
 function saveCodes(codes: string[]) {
   const blob = new Blob([`Softema Hub: záložní kódy pro dvoufázové ověření\nKaždý kód platí jen jednou.\n\n${codes.join('\n')}\n`], { type: 'text/plain;charset=utf-8' });
@@ -53,7 +68,7 @@ export function TwoFactorSetup({ onDone, onCancel }: { onDone: () => void; onCan
     <form className="stack" onSubmit={e => { e.preventDefault(); void run(async () => { await authCall('/two-factor/verify-totp', { code: code.replace(/\s/g, '') }); setStep('codes'); }); }}>
       <ol className="totp-steps">
         <li>Otevřete v telefonu autentizační aplikaci, například Google Authenticator, Microsoft Authenticator nebo 1Password.</li>
-        <li>Přidejte nový účet a zadejte tento klíč:<br /><code className="totp-key mono" aria-label="Klíč pro autentizační aplikaci">{keyOf(setup.totpURI)}</code><br /><a href={setup.totpURI} className="small"><Smartphone size={14} aria-hidden className="inline" /> Na telefonu otevřít rovnou v aplikaci</a></li>
+        <li>Přidejte nový účet a naskenujte QR kód:<br /><TotpQr uri={setup.totpURI} /><br />Skenovat nejde? Zadejte v aplikaci ručně tento klíč:<br /><code className="totp-key mono" aria-label="Klíč pro autentizační aplikaci">{keyOf(setup.totpURI)}</code><br /><a href={setup.totpURI} className="small"><Smartphone size={14} aria-hidden className="inline" /> Na telefonu otevřít rovnou v aplikaci</a></li>
         <li>Opište šestimístný kód, který aplikace ukáže.</li>
       </ol>
       <Field label="Ověřovací kód"><input inputMode="numeric" autoComplete="one-time-code" maxLength={8} value={code} onChange={e => { setCode(e.target.value); setError(''); }} placeholder="123456" required autoFocus /></Field>
