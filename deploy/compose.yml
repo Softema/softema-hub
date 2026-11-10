@@ -1,0 +1,19 @@
+# API server on the VPS. Run from the deploy/ folder of a clone of the repository:
+#   docker compose up -d --build
+# Secrets live only in deploy/.env on the server (template: deploy/.env.example), never in Git.
+# The API listens on 127.0.0.1 only; the server's existing reverse proxy publishes it over HTTPS.
+name: softema-hub
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    env_file: .env
+    environment:
+      NODE_ENV: production
+    ports:
+      - "127.0.0.1:4100:4100"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }

@@ -1,0 +1,19 @@
+# Only source code goes into the API image: never secrets, local data or build output.
+**/node_modules
+**/.next
+**/.next-live
+**/out
+**/.turbo
+**/test-results*
+**/playwright-report
+.env*
+!.env.example
+deploy/.env*
+.outbox
+.sites-runtime
+.git
+supabase
+vendor
+apps/web/*
+!apps/web/package.json
+packages/db/src/generated

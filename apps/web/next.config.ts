@@ -3,11 +3,13 @@ import type { NextConfig } from 'next';
 
 const LIVE = process.env.NEXT_PUBLIC_APP_MODE === 'live';
 const api = process.env.API_INTERNAL_URL ?? 'http://127.0.0.1:4100';
-const noSession = [{ type: 'cookie' as const, key: 'better-auth.session_token' }];
+// Over HTTPS Better-Auth adds the __Secure- prefix; the redirect applies only when neither cookie is present.
+const noSession = [{ type: 'cookie' as const, key: 'better-auth.session_token' }, { type: 'cookie' as const, key: '__Secure-better-auth.session_token' }];
 
 const nextConfig: NextConfig = {
   // Separate output, so a live build can never be served as the demo or the other way round.
-  distDir: LIVE ? '.next-live' : '.next',
+  // On Vercel each project builds only one of them, and Vercel expects the default `.next`.
+  distDir: LIVE && !process.env.VERCEL ? '.next-live' : '.next',
   turbopack: {
     root: resolve(import.meta.dirname, '../..'),
     resolveAlias: {

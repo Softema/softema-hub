@@ -1,5 +1,6 @@
 // End-to-end tests of the database version on a throwaway database: builds the live web app, starts it with the API, runs Playwright.
 import { spawnSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { existsSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createRequire } from 'node:module';
@@ -21,6 +22,8 @@ const origin = `http://localhost:${port}`;
 const outbox = resolve('apps/web/test-results-live/outbox');
 rmSync(outbox, { recursive: true, force: true });
 const env = { ...process.env, NODE_ENV: 'production', NEXT_PUBLIC_APP_MODE: 'live', API_INTERNAL_URL: `http://127.0.0.1:${apiPort}`, API_PORT: apiPort, WEB_ORIGIN: origin, AUTH_RATE_LIMIT_MAX: '1000', E2E_BASE_URL: origin, MAIL_OUTBOX_DIR: outbox, E2E_OUTBOX: outbox,
+  // Like on Vercel: the web reaches the API only through proxy.ts with the shared secret.
+  HUB_PROXY_SECRET: randomBytes(32).toString('hex'),
   DATABASE_OWNER_URL: swap(process.env.DATABASE_OWNER_URL, DB), DATABASE_APP_URL: swap(process.env.DATABASE_APP_URL, DB), DATABASE_AUTH_URL: swap(process.env.DATABASE_AUTH_URL, DB) };
 const run = (args, extra = {}) => { const r = spawnSync('pnpm', args, { stdio: 'inherit', env: { ...env, ...extra }, shell }); if (r.status) process.exit(r.status); };
 run(['--filter', '@softema/db', 'run', 'setup'], { NODE_ENV: 'development' });

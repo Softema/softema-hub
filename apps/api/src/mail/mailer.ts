@@ -29,6 +29,23 @@ export class OutboxMailer implements Mailer {
   }
 }
 
+/**
+ * Sends through Resend (target stack). Used only when MAIL_PROVIDER=resend. The API key is a server secret and is
+ * never logged; neither are provider responses, which can echo the recipient. Accepted does not mean delivered.
+ */
+export class ResendMailer implements Mailer {
+  constructor(private readonly apiKey: string, private readonly from: string, private readonly fetcher: typeof fetch = fetch) {}
+  async send(m: MailMessage) {
+    const res = await this.fetcher('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${this.apiKey}`, 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
+      body: JSON.stringify({ from: this.from, to: [m.to], subject: m.subject, html: m.html, text: m.text }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) throw new Error(`RESEND_HTTP_${res.status}`);
+  }
+}
+
 /** Collects messages in memory, for tests. */
 export class MemoryMailer implements Mailer {
   readonly sent: MailMessage[] = [];

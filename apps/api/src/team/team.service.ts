@@ -3,7 +3,7 @@
  * caller's role in the database again (migration 0002); the API checks first only to answer precisely.
  */
 import { createHash, randomBytes } from 'node:crypto';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { fromNodeHeaders } from 'better-auth/node';
 import type { IncomingHttpHeaders } from 'node:http';
 import type { z } from 'zod';
@@ -31,6 +31,7 @@ function check(status: string, what = 'Člen týmu') {
 
 @Injectable()
 export class TeamService {
+  private readonly log = new Logger('Team');
   constructor(
     @Inject(APP_DB) private readonly db: PrismaClient,
     @Inject(AUTH) private readonly auth: Auth,
@@ -74,13 +75,19 @@ export class TeamService {
       const dto: InvitationDto = { id: r.id!, email: input.email, role: input.role, invitedBy: me, createdAt: new Date().toISOString(), expiresAt: expiresAt.toISOString() };
       return { dto, workspace: ws.name, inviter: me.name };
     });
-    // After the commit: a failed e-mail never leaves a half-created invitation, and the admin can send it again.
-    await this.mailer.send(renderMail({
+    // After the commit: a failed e-mail never leaves a half-created invitation, and the admin can send it again
+    // (a new invitation replaces the pending one). The provider error itself is not passed on: it can contain the address.
+    const mail = renderMail({
       to: input.email, subject: `Pozvánka do pracovního prostoru ${workspace}`,
       lines: [`Dobrý den,`, `${inviter} vás zve do pracovního prostoru ${workspace} v Softema Hub s rolí ${ROLE_LABEL[input.role]}.`, `Pozvánku přijmete odkazem níže. Platí ${INVITATION_TTL_DAYS} dní a lze ji použít jen jednou.`],
       action: { label: 'Přijmout pozvánku', url: `${this.config.WEB_ORIGIN}/pozvanka#${token}` },
       footer: 'Pokud pozvánku nečekáte, e-mail ignorujte. Bez přijetí se nic nestane.',
-    }));
+    });
+    try { await this.mailer.send(mail); }
+    catch (e) {
+      this.log.error(`Invitation e-mail failed (${e instanceof Error ? e.message.slice(0, 40) : 'unknown'})`);
+      throw new ApiError(503, 'SERVICE_UNAVAILABLE', 'Pozvánka je uložená, ale e-mail se nepodařilo odeslat. Zkuste člověka pozvat znovu.');
+    }
     return dto;
   }
 

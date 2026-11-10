@@ -9,6 +9,8 @@
     "postinstall": "prisma generate",
     "typecheck": "tsc --noEmit",
     "migrate": "prisma migrate deploy",
+    "deploy": "prisma migrate deploy && tsx scripts/roles.ts",
+    "bootstrap": "tsx scripts/bootstrap.ts",
     "roles": "tsx scripts/roles.ts",
     "seed": "tsx scripts/seed.ts",
     "totp": "tsx scripts/totp.ts",

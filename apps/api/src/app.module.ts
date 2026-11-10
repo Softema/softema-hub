@@ -7,7 +7,7 @@ import { OriginGuard, SessionGuard, WorkspaceGuard } from './common/guards';
 import type { Config } from './config';
 import { ContactsController } from './contacts/contacts.controller';
 import { ContactsService } from './contacts/contacts.service';
-import { DEFAULT_OUTBOX, type Mailer, OutboxMailer } from './mail/mailer';
+import { DEFAULT_OUTBOX, type Mailer, OutboxMailer, ResendMailer } from './mail/mailer';
 import { InvitationsController, TeamController } from './team/team.controller';
 import { TeamService } from './team/team.service';
 import { APP_DB, AUTH, AUTH_DB, CONFIG, MAILER } from './tokens';
@@ -26,7 +26,7 @@ export class AppModule {
       controllers: [HealthController, WorkspacesController, ContactsController, TeamController, InvitationsController],
       providers: [
         { provide: CONFIG, useValue: config },
-        { provide: MAILER, useValue: deps.mailer ?? new OutboxMailer(config.MAIL_OUTBOX_DIR ?? DEFAULT_OUTBOX) },
+        { provide: MAILER, useValue: deps.mailer ?? (config.MAIL_PROVIDER === 'resend' ? new ResendMailer(config.RESEND_API_KEY!, config.MAIL_FROM!) : new OutboxMailer(config.MAIL_OUTBOX_DIR ?? DEFAULT_OUTBOX)) },
         { provide: APP_DB, useFactory: () => createClient(config.DATABASE_APP_URL) },
         { provide: AUTH_DB, useFactory: () => createClient(config.DATABASE_AUTH_URL, 5) },
         { provide: AUTH, useFactory: (db: PrismaClient, mailer: Mailer) => createAuth(config, db, mailer), inject: [AUTH_DB, MAILER] },
