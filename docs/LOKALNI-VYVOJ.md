@@ -7,7 +7,7 @@ Platí pro větev `feat/auth-contacts`. Vše běží jen lokálně, data jsou sm
 | Nástroj | Verze | Odkud |
 | --- | --- | --- |
 | Git | aktuální | [git-scm.com](https://git-scm.com/downloads), na Macu nabídne instalaci příkaz `git --version` |
-| Node.js | 22 LTS, aspoň 22.22.1 | [nodejs.org](https://nodejs.org/en/download) |
+| Node.js | 24 LTS | [nodejs.org](https://nodejs.org/en/download) |
 | pnpm | přesně 11.25.0 | `npm install -g pnpm@11.25.0` |
 | Docker Desktop | aktuální | [docker.com](https://www.docker.com/products/docker-desktop/). Po instalaci ho spusťte a počkejte, až běží. |
 

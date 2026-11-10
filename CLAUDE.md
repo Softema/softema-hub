@@ -86,7 +86,7 @@ V aktuální etapě:
 
 ## Příkazy
 
-Node.js ≥ 22.22.1, pnpm 11.25.0 (nainstalovaný globálně, skripty ho volají). Úplný přehled je v [docs/LOKALNI-VYVOJ.md](docs/LOKALNI-VYVOJ.md).
+Node.js 24 (`engines` v `package.json` je `24.x`, stejně jako ve Vercelu), pnpm 11.25.0 (nainstalovaný globálně, skripty ho volají). Úplný přehled je v [docs/LOKALNI-VYVOJ.md](docs/LOKALNI-VYVOJ.md).
 
 ```sh
 pnpm install --frozen-lockfile

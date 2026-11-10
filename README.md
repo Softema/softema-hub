@@ -10,7 +10,7 @@ Závazné zadání: [docs/ZADANI-APLIKACE.md](docs/ZADANI-APLIKACE.md). Priority
 
 ## Spuštění
 
-Node.js ≥ 22.22.1 a pnpm 11.25.0.
+Node.js 24 a pnpm 11.25.0.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -100,7 +100,7 @@ Fungují dvě nastavení. **Výchozí (Root Directory `./`):** [vercel.json](ver
 | Install Command | `npx --yes pnpm@11.25.0 install --frozen-lockfile` (z `vercel.json`, nainstaluje celý workspace) |
 | Build Command | `npx --yes pnpm@11.25.0 build` (z `vercel.json`, sestaví demo bez API) |
 | Output Directory | výchozí (`.next` v `apps/web`) |
-| Node.js Version | 22.x |
+| Node.js Version | 24.x (určuje `engines` v `package.json`) |
 | Environment Variables | žádné. Volitelně veřejné `NEXT_PUBLIC_UNLAYER_PROJECT_ID`, až bude účet Unlayer. |
 
 pnpm se instaluje v přesné verzi 11.25.0 přes `npx`, protože Vercel by jinak podle lockfilu zvolil starší pnpm, který nezná pravidla v `pnpm-workspace.yaml`. Instalace použije úložiště balíčků v `.sites-runtime/` uvnitř build adresáře (je v `.gitignore`).
