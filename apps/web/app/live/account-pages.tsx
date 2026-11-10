@@ -1,7 +1,7 @@
 'use client';
 /* Pages opened from e-mail links: new password and invitation. The one-time token arrives in the URL fragment,
    which the browser never sends to a server; it is moved out of the address bar right away. */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ArrowRight, CircleCheck, KeyRound, LogOut, MailWarning, UserPlus } from 'lucide-react';
 import { type InvitationPreviewDto, PASSWORD_MIN, ROLE_LABEL } from '@softema/shared';
 import { AccessFrame, useHydrated } from '../access';
@@ -14,8 +14,11 @@ const INVITE_KEY = 'softema-hub:live:invitation';
 /** Reads the token once and removes it from the address bar and history. */
 function useFragmentToken(storageKey?: string) {
   const [token, setToken] = useState<string | null | undefined>(undefined);
+  // React runs effects twice in development; the first run already removed the fragment, so remember what it read.
+  const read = useRef<string | null>(null);
   useEffect(() => {
-    let t = decodeURIComponent(window.location.hash.slice(1)) || null;
+    let t = decodeURIComponent(window.location.hash.slice(1)) || read.current;
+    read.current = t;
     try {
       if (storageKey && t) sessionStorage.setItem(storageKey, t);
       if (storageKey && !t) t = sessionStorage.getItem(storageKey);
