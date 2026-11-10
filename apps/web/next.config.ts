@@ -17,6 +17,9 @@ const nextConfig: NextConfig = {
     },
   },
   transpilePackages: ['@softema/shared'],
+  // Vercel project rooted at the repository (vercel.json there): the demo is fully static, so it is exported to
+  // apps/web/out and served as plain files. Local `pnpm build` + `pnpm start` are unaffected.
+  ...(!LIVE && process.env.NEXT_OUTPUT === 'export' ? { output: 'export' as const } : {}),
   // Live mode only. A demo build has neither rewrites nor redirects and never talks to the API.
   // The cookie check is just a fast redirect; the API verifies every session.
   ...(LIVE ? {

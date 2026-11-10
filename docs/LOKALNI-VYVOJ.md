@@ -139,7 +139,7 @@ Pokud na portu 3000 něco běží, ukončete to, nebo změňte `WEB_ORIGIN` v `.
 ## 7. Než větev pošlete na GitHub nebo sloučíte
 
 - **Push:** projekt je napojený na Vercel, který standardně staví preview z každé větve. Nejdřív v nastavení Vercelu ověřte, že push této větve nespustí nasazení (Settings → Git, Ignored Build Step).
-- **Sloučení do `main`:** aplikace je v `apps/web`. Ve Vercelu musí být Root Directory `apps/web`, jinak build skončí chybou „No Next.js version detected“ (viz README, Nasazení ukázky na Vercel).
+- **Sloučení do `main`:** aplikace je v `apps/web`. Vercel s Root Directory v kořeni nasadí demo jako statický export podle kořenového `vercel.json`. S Root Directory `apps/web` ho nasadí jako Next.js (viz README, Nasazení ukázky na Vercel).
 
 ## 8. Řešení problémů
 

@@ -91,12 +91,12 @@ Cílová produkční architektura (NestJS, Prisma, PostgreSQL s RLS, Better-Auth
 
 Aplikace je čistě frontendová: všechny stránky se předrenderují staticky, data žijí v localStorage návštěvníka a nepotřebuje žádné proměnné prostředí, databázi ani API klíče. Na nové adrese (a v každém novém prohlížeči) se při prvním otevření vytvoří ukázková data.
 
-Nastavení projektu ve Vercelu (část je i ve [apps/web/vercel.json](apps/web/vercel.json)). Aplikace je od přechodu na monorepo ve složce `apps/web`, proto musí být Root Directory nastavené na ni:
+Fungují dvě nastavení. **Výchozí (Root Directory `./`):** [vercel.json](vercel.json) v kořeni sestaví demo jako statický export (`NEXT_OUTPUT=export`) do `apps/web/out` a Vercel ho servíruje jako soubory. Demo je celé statické, takže se chová stejně. **Alternativa (Root Directory `apps/web`):** použije se [apps/web/vercel.json](apps/web/vercel.json) a Vercel nasadí Next.js normálně. Tabulka platí pro alternativu:
 
 | Položka | Hodnota |
 | --- | --- |
 | Framework Preset | Next.js |
-| Root Directory | `apps/web`, se zapnutým „Include files outside the Root Directory“ (výchozí) |
+| Root Directory | `./` (statický export), nebo `apps/web` se zapnutým „Include files outside the Root Directory“ |
 | Install Command | `npx --yes pnpm@11.25.0 install --frozen-lockfile` (z `vercel.json`, nainstaluje celý workspace) |
 | Build Command | `npx --yes pnpm@11.25.0 build` (z `vercel.json`, sestaví demo bez API) |
 | Output Directory | výchozí (`.next` v `apps/web`) |
