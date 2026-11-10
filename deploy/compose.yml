@@ -16,6 +16,9 @@ services:
       NODE_ENV: production
     ports:
       - "127.0.0.1:4100:4100"
+    # Supabase root CA: database URLs use sslmode=verify-full, so the connection is encrypted and the server checked.
+    volumes:
+      - ./supabase-ca.crt:/etc/softema/supabase-ca.crt:ro
     restart: unless-stopped
     networks: [traefik]
     labels:

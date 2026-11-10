@@ -27,6 +27,7 @@ sudo git clone https://github.com/Softema/softema-hub.git /opt/softema-hub
 cd /opt/softema-hub/deploy
 sudo cp .env.example .env && sudo chmod 600 .env
 sudo nano .env                      # vyplnit podle komentářů v souboru
+sudo curl -fsS -o supabase-ca.crt https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt   # certifikát Supabase pro ověřené TLS
 openssl rand -hex 32                # pro BETTER_AUTH_SECRET a HUB_PROXY_SECRET (každý zvlášť), hesla rolí
 sudo docker compose build
 sudo docker compose run --rm --workdir /app api pnpm --filter @softema/db run deploy   # migrace + hesla rolí
