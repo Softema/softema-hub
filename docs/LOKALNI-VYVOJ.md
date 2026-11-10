@@ -17,6 +17,8 @@ Kontrola:
 node -v && pnpm -v && docker compose version
 ```
 
+Docker potřebuje zapnutou virtualizaci procesoru v BIOSu (u AMD „SVM Mode“, u Intelu „Intel VT-x“). Pokud ji zapnout nemůžete nebo nechcete, použijte místo Dockeru PostgreSQL nainstalovaný přímo v systému, viz [část 3b](#3b-postgresql-bez-dockeru).
+
 ## 2. Získání kódu
 
 **Ze souboru zálohy** (`softema-hub.bundle`):
@@ -42,6 +44,41 @@ pnpm dev:live       # API na :4100, web na :3000
 Otevřete <http://localhost:3000/prihlaseni>. Heslo najdete v `.env` jako `SEED_USER_PASSWORD`.
 
 **Stav ověření (5. 11. 2026):** `pnpm setup:env`, `pnpm db:up`, `pnpm db:setup`, `pnpm test:api` a `pnpm test:e2e:live` prošly v Dockeru s obrazem `pgvector/pgvector:pg17`. Engine zajišťovala Colima, Docker Desktop vyzkoušený není. Čistý klon ze zálohy prošel stejnými testy na PostgreSQL 17 mimo Docker. Po prvním spuštění na novém počítači proto pusťte i `pnpm test:api`.
+
+## 3b. PostgreSQL bez Dockeru
+
+Pro počítače, kde Docker neběží (typicky kvůli vypnuté virtualizaci). Nastavení je stejné jako v Dockeru: port 5433, databáze `softema_hub` a vlastník `softema_owner` s heslem `POSTGRES_PASSWORD` z `.env`. Soubor `.env` proto zůstává beze změny.
+
+**Windows** (PowerShell v kořeni projektu, po `pnpm setup:env`). Instalace si vyžádá potvrzení správce:
+
+```powershell
+$pw = ((Get-Content .env | Where-Object { $_ -match '^POSTGRES_PASSWORD=' }) -split '=',2)[1]
+winget install --id PostgreSQL.PostgreSQL.17 -e --silent --accept-package-agreements --accept-source-agreements `
+  --override "--mode unattended --unattendedmodeui none --superpassword $pw --serverport 5433 --disable-components pgAdmin,stackbuilder"
+
+$env:PGPASSWORD = $pw
+& "C:\Program Files\PostgreSQL\17\bin\psql.exe" -h 127.0.0.1 -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 `
+  -c "create role softema_owner login superuser password '$pw';" `
+  -c "create database softema_hub owner softema_owner encoding 'UTF8' template template0;"
+```
+
+PostgreSQL pak běží jako služba Windows `postgresql-x64-17` a spouští se sám se systémem. Dál pokračujte jako v části 3, jen **bez `pnpm db:up`**:
+
+```sh
+pnpm db:setup
+pnpm test:api
+pnpm dev:live
+```
+
+**macOS / Linux:** nainstalujte PostgreSQL 17 (`brew install postgresql@17`, nebo balíček distribuce) s portem 5433 a vytvořte stejnou roli a databázi příkazem `psql` výše.
+
+Rozdíly proti Dockeru:
+
+- `pnpm db:up`, `pnpm db:down` a `docker compose down -v` tu nefungují. Databáze běží pořád. Ostatní příkazy (`db:setup`, `db:reset`, `test:api`, `dev:live`) fungují beze změny.
+- Chybí rozšíření `pgvector`. Současné migrace ho nepotřebují, bude potřeba až pro chatbota.
+- Pokud později přejdete na Docker, zastavte nejdřív službu (`Stop-Service postgresql-x64-17` v PowerShellu jako správce), jinak obě databáze chtějí port 5433.
+
+**Stav ověření (10. 11. 2026):** Windows 11, PostgreSQL 17.11 z wingetu. `pnpm db:setup`, `pnpm test:api` (44/44) a `pnpm test:e2e:live` (21 prošlo, 1 záměrně přeskočený na mobilu) prošly.
 
 ## 4. Testovací uživatelé
 
@@ -88,6 +125,8 @@ Pokud na portu 3000 něco běží, ukončete to, nebo změňte `WEB_ORIGIN` v `.
 | Příznak | Řešení |
 | --- | --- |
 | `pnpm db:up` hlásí chybu Dockeru | Docker Desktop neběží. Spusťte ho a počkejte. |
+| Docker hlásí „Virtualization support not detected“ nebo chybu WSL | Zapněte virtualizaci v BIOSu (SVM Mode / Intel VT-x), nebo použijte [PostgreSQL bez Dockeru](#3b-postgresql-bez-dockeru). |
+| Heslo v `.env` nesedí s databází (bez Dockeru) | V `psql` jako `postgres` spusťte `alter role softema_owner password '<POSTGRES_PASSWORD z .env>';`, potom `pnpm db:setup`. |
 | Port 4100 je obsazený | Změňte `API_PORT` v `.env`. |
 | Port 5433 je obsazený | Změňte `POSTGRES_PORT` a port v adresách `DATABASE_*_URL` v `.env`. |
 | Přihlášení hlásí nedostupný server | Zkontrolujte, že běží `pnpm dev:live` a že `pnpm db:up` proběhl. |
