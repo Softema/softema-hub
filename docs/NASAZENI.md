@@ -14,7 +14,7 @@ prohlížeč ──HTTPS──> Vercel (web, proxy.ts) ──HTTPS + tajný klí
 
 ## 1. Supabase
 
-1. Nový projekt, region **Central EU (Frankfurt)**. Data API **vypnout**, „Automatically expose new tables“ **vypnout**, „automatic RLS“ **zapnout**.
+1. Nový projekt v regionu EU (projekt `icrvwqqpbdfqkjeeumfi` je v **eu-west-1, Irsko**). Data API **vypnout**, „Automatically expose new tables“ **vypnout**, „automatic RLS“ **zapnout**.
 2. Heslo databáze uložit do správce hesel.
 3. **Connect → Session pooler** (IPv4, port 5432): z adresy vzít hostitele (`aws-…-eu-central-1.pooler.supabase.com`) a `project-ref`.
 
@@ -38,15 +38,7 @@ curl -s http://127.0.0.1:4100/api/health   # {"status":"ok"}
 
 ### HTTPS pro backend
 
-Backend poslouchá jen na `127.0.0.1:4100`. Ven ho vystaví reverzní proxy, která už na serveru běží pro ostatní aplikace (Traefik, Caddy nebo nginx). Dokud není doména, stačí bezplatná adresa **`api-<ip-s-pomlckami>.sslip.io`** (např. `api-203-0-113-7.sslip.io`) s certifikátem Let's Encrypt. Po koupi domény se jen vymění adresa.
-
-Ukázka pro Caddy:
-
-```
-api-203-0-113-7.sslip.io {
-    reverse_proxy 127.0.0.1:4100
-}
-```
+Na serveru už běží **Traefik** (síť `root_default`, certifikáty přes resolver `mytlschallenge`) pro n8n. `deploy/compose.yml` připojí backend do stejné sítě a Traefik ho vystaví na adrese `API_HOSTNAME` s certifikátem Let's Encrypt. Nastavení Traefiku ani n8n se nemění. Hostinger směruje na VPS každou subdoménu `srv1083481.hstgr.cloud`, takže dokud není vlastní doména, backend běží na **`https://hub-api.srv1083481.hstgr.cloud`**. Po koupi domény se jen změní `API_HOSTNAME`.
 
 ## 3. Vercel (nový projekt, demo zůstává)
 
@@ -57,7 +49,7 @@ api-203-0-113-7.sslip.io {
 | Proměnná | Hodnota |
 | --- | --- |
 | `NEXT_PUBLIC_APP_MODE` | `live` |
-| `API_INTERNAL_URL` | `https://api-…sslip.io` |
+| `API_INTERNAL_URL` | `https://hub-api.srv1083481.hstgr.cloud` |
 | `HUB_PROXY_SECRET` | stejná hodnota jako v `deploy/.env` |
 
 4. Po prvním nasazení zapsat adresu webu (`https://<projekt>.vercel.app`) do `WEB_ORIGIN` v `deploy/.env` a backend restartovat: `sudo docker compose up -d`.

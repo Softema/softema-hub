@@ -1,7 +1,10 @@
 # API server on the VPS. Run from the deploy/ folder of a clone of the repository:
 #   docker compose up -d --build
 # Secrets live only in deploy/.env on the server (template: deploy/.env.example), never in Git.
-# The API listens on 127.0.0.1 only; the server's existing reverse proxy publishes it over HTTPS.
+#
+# HTTPS: the server already runs Traefik (root_default network, certificate resolver "mytlschallenge") for n8n.
+# The API joins that network and is published under API_HOSTNAME with a Let's Encrypt certificate; nothing in the
+# existing Traefik or n8n setup changes. Port 4100 is additionally open on 127.0.0.1 for checks on the server.
 name: softema-hub
 services:
   api:
@@ -14,6 +17,20 @@ services:
     ports:
       - "127.0.0.1:4100:4100"
     restart: unless-stopped
+    networks: [traefik]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=root_default
+      - traefik.http.routers.softema-hub-api.rule=Host(`${API_HOSTNAME:?Nastavte API_HOSTNAME v deploy/.env}`)
+      - traefik.http.routers.softema-hub-api.entrypoints=websecure
+      - traefik.http.routers.softema-hub-api.tls=true
+      - traefik.http.routers.softema-hub-api.tls.certresolver=mytlschallenge
+      - traefik.http.services.softema-hub-api.loadbalancer.server.port=4100
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
+
+networks:
+  traefik:
+    name: root_default
+    external: true
