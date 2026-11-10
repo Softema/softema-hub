@@ -31,6 +31,9 @@
       ],
       "@softema/sign-in": [
         "./app/live/sign-in.ts"
+      ],
+      "@softema/account-pages": [
+        "./app/live/account-pages.tsx"
       ]
     },
     "types": [

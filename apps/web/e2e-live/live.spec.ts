@@ -1,4 +1,7 @@
 // Database version end to end: real sign-in, API and PostgreSQL. Only fictional seed data.
+import { createHash, createHmac } from 'node:crypto';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
 const PASSWORD = process.env.SEED_USER_PASSWORD!;
@@ -7,11 +10,42 @@ const WS_A = '20000000-0000-4000-8000-00000000000a';
 let n = 0;
 const unique = () => `e2e-${Date.now().toString(36)}-${++n}@test-firma.example`;
 
+/* 2FA of the seed administrators. Same derivation as packages/db/src/seed-auth.ts (this package cannot import it). */
+const SEED_TOTP = createHash('sha256').update(`softema-hub-seed-totp:${PASSWORD}`).digest('base64url').slice(0, 32);
+const ADMINS = new Set([MANAGER, OUTSIDER, AGENCY]);
+function totp(secret: string) {
+  const counter = Buffer.alloc(8); counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30_000)));
+  const h = createHmac('sha1', Buffer.from(secret, 'utf8')).update(counter).digest();
+  return String((h.readUInt32BE(h[h.length - 1] & 15) & 0x7fffffff) % 1_000_000).padStart(6, '0');
+}
+/** The key an authenticator app gets (base32), back to the raw secret. */
+function fromBase32(key: string) {
+  const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; let bits = 0, value = 0; const out: number[] = [];
+  for (const ch of key.replace(/\s/g, '')) { value = (value << 5) | A.indexOf(ch); bits += 5; if (bits >= 8) { out.push((value >>> (bits - 8)) & 255); bits -= 8; } }
+  return Buffer.from(out).toString('utf8');
+}
+/** The newest e-mail for `to` in the local outbox of this run, as the one-time link it contains. */
+async function mailLink(to: string, path: '/pozvanka' | '/nove-heslo') {
+  const dir = process.env.E2E_OUTBOX!;
+  let link: string | undefined;
+  await expect.poll(() => {
+    const files = readdirSync(dir).map(f => join(dir, f)).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
+    const html = files.map(f => readFileSync(f, 'utf8')).find(h => h.includes(to) && h.includes(path));
+    link = html?.match(new RegExp(`href="(https?://[^"]*${path}#[A-Za-z0-9_-]+)"`))?.[1];
+    return link;
+  }, { timeout: 10_000 }).toBeTruthy();
+  return link!.replace(/^https?:\/\/[^/]+/, '');
+}
+
 async function login(page: Page, email: string, password = PASSWORD) {
   await page.goto('/prihlaseni');
   await page.getByLabel('E-mail').fill(email);
   await page.getByLabel('Heslo', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Přihlásit se', exact: true }).click();
+  if (ADMINS.has(email)) {
+    await page.getByLabel('Ověřovací kód').fill(totp(SEED_TOTP));
+    await page.getByRole('button', { name: 'Ověřit a přihlásit' }).click();
+  }
 }
 async function session(browser: Browser, email: string, info: { project: { use: object } }) {
   const ctx = await browser.newContext({ ...info.project.use, baseURL: test.info().project.use.baseURL });
@@ -205,4 +239,113 @@ test('současná úprava: druhý dostane konflikt a načte aktuální data', asy
   await b.getByRole('button', { name: 'Načíst aktuální data' }).click();
   await expect(b.getByLabel('Město')).toHaveValue('Brno');
   await a.context().close(); await b.context().close();
+});
+
+test('správce se samotným heslem nepřihlásí; kód z aplikace ano', async ({ page }) => {
+  await page.goto('/prihlaseni');
+  await page.getByLabel('E-mail').fill(MANAGER);
+  await page.getByLabel('Heslo', { exact: true }).fill(PASSWORD);
+  await page.getByRole('button', { name: 'Přihlásit se', exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Ověření ve dvou krocích' })).toBeVisible();
+  expect((await page.request.get('/api/v1/me')).status()).toBe(401);
+  await page.getByLabel('Ověřovací kód').fill('000000');
+  await page.getByRole('button', { name: 'Ověřit a přihlásit' }).click();
+  await expect(page.locator('.a-error')).toContainText('Kód není platný');
+  await page.getByLabel('Ověřovací kód').fill(totp(SEED_TOTP));
+  await page.getByRole('button', { name: 'Ověřit a přihlásit' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Kontakty' })).toBeVisible();
+});
+
+test('pozvánka: nový správce si založí účet, zapne 2FA; správce mu změní roli a odebere ho', async ({ browser }, info) => {
+  test.skip(!!info.project.use.isMobile, 'dlouhý scénář stačí jednou; obrazovky jsou na mobilu stejné');
+  const manager = await session(browser, MANAGER, info);
+  const email = unique();
+  await manager.goto('/aplikace#tym');
+  await expect(manager.getByRole('heading', { level: 1, name: 'Tým' })).toBeVisible();
+  await manager.getByRole('button', { name: 'Pozvat člena' }).first().click();
+  const dialog = manager.getByRole('dialog');
+  await dialog.getByLabel('E-mail').fill(email);
+  await dialog.getByRole('combobox', { name: 'Role' }).click();
+  await manager.getByRole('option', { name: 'Správce prostoru' }).click();
+  await dialog.getByRole('button', { name: 'Poslat pozvánku' }).click();
+  await expect(manager.getByText(`Pozvánka pro ${email} je připravená.`)).toBeVisible();
+  await expect(manager.getByRole('region', { name: 'Čekající pozvánky' }).getByText(email)).toBeVisible();
+
+  const ctx = await browser.newContext({ ...info.project.use, baseURL: test.info().project.use.baseURL });
+  const guest = await ctx.newPage();
+  await guest.goto(await mailLink(email, '/pozvanka'));
+  await expect(guest.getByRole('heading', { level: 1, name: 'Připojte se k prostoru Prostor Alfa.' })).toBeVisible();
+  expect(guest.url()).not.toContain('#');
+  const password = 'Nove-heslo-pozvaneho-2026';
+  await guest.getByLabel('Jméno a příjmení').fill('Nela Nováčková');
+  await guest.getByLabel('Nové heslo').fill(password);
+  await guest.getByLabel('Heslo znovu').fill(password);
+  await guest.getByRole('button', { name: 'Založit účet a přijmout' }).click();
+
+  // Administrators must turn on 2FA before they see any data.
+  await expect(guest.getByRole('heading', { name: 'Zapněte si dvoufázové ověření' })).toBeVisible();
+  expect((await guest.request.get(`/api/v1/workspaces/${WS_A}/contacts`)).status()).toBe(403);
+  await guest.getByLabel('Současné heslo').fill(password);
+  await guest.getByRole('button', { name: 'Pokračovat' }).click();
+  const key = await guest.getByLabel('Klíč pro autentizační aplikaci').innerText();
+  await guest.getByLabel('Ověřovací kód').fill(totp(fromBase32(key)));
+  await guest.getByRole('button', { name: 'Zapnout ověření' }).click();
+  await expect(guest.getByRole('list', { name: 'Záložní kódy' }).getByRole('listitem')).toHaveCount(10);
+  await guest.getByRole('button', { name: 'Kódy mám uložené, pokračovat' }).click();
+  await expect(guest.getByRole('heading', { level: 1, name: 'Kontakty' })).toBeVisible();
+
+  await manager.reload();
+  const row = manager.getByRole('row', { name: new RegExp(email) });
+  await expect(row.getByText('Zapnuto')).toBeVisible();
+  await row.getByRole('combobox', { name: 'Role: Nela Nováčková' }).click();
+  await manager.getByRole('option', { name: 'Člen týmu' }).click();
+  await expect(manager.getByText('Nela Nováčková má nyní roli Člen týmu.')).toBeVisible();
+  await row.getByRole('button', { name: 'Odebrat Nela Nováčková' }).click();
+  await manager.getByRole('dialog').getByRole('button', { name: 'Odebrat z prostoru' }).click();
+  await expect(manager.getByRole('row', { name: new RegExp(email) })).toHaveCount(0);
+
+  await guest.reload();
+  await expect(guest.getByRole('heading', { name: 'Nemáte přístup k žádnému prostoru' })).toBeVisible();
+  await guest.goto(await mailLink(email, '/pozvanka'));
+  await expect(guest.getByRole('heading', { name: 'Pozvánka už neplatí.' })).toBeVisible();
+  await manager.context().close(); await ctx.close();
+});
+
+test('člen vidí tým, ale nespravuje ho', async ({ page }) => {
+  await login(page, MEMBER);
+  await expect(page.getByRole('heading', { level: 1, name: 'Kontakty' })).toBeVisible();
+  await page.goto('/aplikace#tym');
+  await expect(page.getByRole('row', { name: /Petr Správce/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Pozvat člena' })).toHaveCount(0);
+  await expect(page.getByRole('combobox', { name: /^Role:/ })).toHaveCount(0);
+  await expect(page.getByText('Čekající pozvánky')).toHaveCount(0);
+});
+
+test('zapomenuté heslo: odkaz z e-mailu nastaví nové heslo a platí jen jednou', async ({ page }, info) => {
+  test.skip(!!info.project.use.isMobile, 'mění heslo sdíleného testovacího účtu; stačí jednou');
+  const reset = async (password: string) => {
+    await page.goto('/prihlaseni');
+    await page.getByRole('link', { name: 'Zapomněli jste heslo?' }).click();
+    await page.getByLabel('E-mail').fill(MEMBER);
+    await page.getByRole('button', { name: 'Poslat odkaz' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Zkontrolujte svůj e-mail.' })).toBeVisible();
+    const link = await mailLink(MEMBER, '/nove-heslo');
+    await page.goto(link);
+    await page.getByLabel('Nové heslo').fill(password);
+    await page.getByLabel('Heslo znovu').fill(password);
+    await page.getByRole('button', { name: 'Uložit nové heslo' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Heslo je změněné.' })).toBeVisible();
+    return link;
+  };
+  const used = await reset('Docasne-heslo-e2e-2026');
+  await login(page, MEMBER);
+  await expect(page.locator('.a-error')).toHaveText('Nesprávný e-mail nebo heslo.');
+  await login(page, MEMBER, 'Docasne-heslo-e2e-2026');
+  await expect(page.getByRole('heading', { level: 1, name: 'Kontakty' })).toBeVisible();
+  await page.goto(used);
+  await page.getByLabel('Nové heslo').fill('Jeste-jine-heslo-2026');
+  await page.getByLabel('Heslo znovu').fill('Jeste-jine-heslo-2026');
+  await page.getByRole('button', { name: 'Uložit nové heslo' }).click();
+  await expect(page.locator('.a-error')).toContainText('neplatný');
+  await reset(PASSWORD); // other tests use the seed password
 });

@@ -4,7 +4,8 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { can, type MeDto, type Permission, type WorkspaceDto } from '@softema/shared';
 import { parseRoute, withQuery } from '../hash-route';
 
-const KEY = 'softema-hub:live:workspace';
+export const LIVE_WORKSPACE_KEY = 'softema-hub:live:workspace';
+const KEY = LIVE_WORKSPACE_KEY;
 interface Live { me: MeDto; workspace: WorkspaceDto; setWorkspace: (id: string) => void; allowed: (p: Permission) => boolean; route: string; go: (r: string, replace?: boolean) => void }
 const Ctx = createContext<Live>(null!);
 export const useLive = () => useContext(Ctx);

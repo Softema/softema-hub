@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
     resolveAlias: {
       '@softema/app-entry': LIVE ? './app/live/live-hub.tsx' : './app/hub.tsx',
       '@softema/sign-in': LIVE ? './app/live/sign-in.ts' : './app/live/sign-in.demo.ts',
+      '@softema/account-pages': LIVE ? './app/live/account-pages.tsx' : './app/live/account-pages.demo.ts',
     },
   },
   transpilePackages: ['@softema/shared'],
@@ -24,7 +25,6 @@ const nextConfig: NextConfig = {
       return [
         { source: '/aplikace', missing: noSession, destination: '/prihlaseni', permanent: false },
         { source: '/registrace', destination: '/prihlaseni', permanent: false },
-        { source: '/obnova-hesla', destination: '/prihlaseni', permanent: false },
       ];
     },
   } : {}),

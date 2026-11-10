@@ -1,9 +1,9 @@
 /** Client of the local API. Every request reports failure explicitly: nothing here assumes a write succeeded. */
 import { keepPreviousData, QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ActivityPageDto, ApiErrorBody, ContactCreateInput, ContactDetailDto, ContactDto, ContactListDto, ContactUpdateInput, ErrorCode, MeDto, MemberDto, NoteDto, TagDto } from '@softema/shared';
+import { type ActivityPageDto, type ApiErrorBody, type ContactCreateInput, type ContactDetailDto, type ContactDto, type ContactListDto, type ContactUpdateInput, type ErrorCode, type InvitationAcceptedDto, type InvitationAcceptInput, type InvitationCreateInput, type InvitationDto, type InvitationPreviewDto, type MeDto, type MemberDto, type NoteDto, PASSWORD_MIN, type TagDto, type WorkspaceRole } from '@softema/shared';
 
 export class ApiFailure extends Error {
-  constructor(readonly status: number, readonly code: ErrorCode | 'NETWORK', message: string, readonly fields?: Record<string, string>) { super(message); }
+  constructor(readonly status: number, readonly code: ErrorCode | 'NETWORK' | 'AUTH', message: string, readonly fields?: Record<string, string>) { super(message); }
 }
 const UNAVAILABLE = 'Server je dočasně nedostupný.';
 const outcome = (write: boolean) => (write ? ' Změna se neuložila.' : '');
@@ -25,6 +25,28 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 const send = <T,>(method: string, path: string, body?: unknown) => request<T>(path, { method, body: body === undefined ? undefined : JSON.stringify(body) });
 export const message = (e: unknown) => (e instanceof ApiFailure ? e.message : UNAVAILABLE);
+
+/** Better-Auth answers `{ code, message }` in English; the user sees Czech. */
+const AUTH_MESSAGES: Record<string, string> = {
+  INVALID_PASSWORD: 'Nesprávné heslo.',
+  INVALID_CODE: 'Kód není platný. Zadejte aktuální kód z aplikace.',
+  INVALID_TOKEN: 'Odkaz je neplatný, už byl použit nebo vypršel. Požádejte o nový.',
+  PASSWORD_TOO_SHORT: `Heslo musí mít aspoň ${PASSWORD_MIN} znaků.`,
+  PASSWORD_TOO_LONG: 'Heslo může mít nejvýše 128 znaků.',
+  TOTP_ALREADY_ENABLED: 'Dvoufázové ověření už máte zapnuté.',
+  ACCOUNT_TEMPORARILY_LOCKED: 'Kvůli opakovaným chybným kódům je ověření na 15 minut zamčené.',
+};
+/** Calls a Better-Auth endpoint through the same origin. Throws ApiFailure with a Czech message. */
+export async function authCall<T = unknown>(path: string, body: unknown): Promise<T> {
+  let res: Response;
+  try { res = await fetch(`/api/auth${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); }
+  catch { throw new ApiFailure(0, 'NETWORK', 'Nepodařilo se spojit se serverem. Změna se neuložila.'); }
+  const data = await res.json().catch(() => null) as (T & { code?: string }) | null;
+  if (res.ok) return data as T;
+  if (res.status === 429) throw new ApiFailure(429, 'AUTH', 'Příliš mnoho pokusů. Zkuste to prosím za chvíli.');
+  if (res.status === 401 && !data?.code) { window.location.assign('/prihlaseni'); }
+  throw new ApiFailure(res.status, 'AUTH', (data?.code && AUTH_MESSAGES[data.code]) || (res.status >= 500 ? `${UNAVAILABLE} Změna se neuložila.` : 'Požadavek se nepodařilo provést. Zkontrolujte zadané údaje.'));
+}
 export async function signOut() { await fetch('/api/auth/sign-out', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); window.location.assign('/prihlaseni'); }
 
 export const createQueryClient = () => new QueryClient({
@@ -41,6 +63,22 @@ export const useContact = (w: string, id: string) => useQuery({ queryKey: ['cont
 export const useActivities = (w: string, id: string) => useQuery({ queryKey: ['activities', w, id], queryFn: () => request<ActivityPageDto>(`${ws(w)}/contacts/${id}/activities`) });
 export const useTags = (w: string) => useQuery({ queryKey: ['tags', w], queryFn: () => request<TagDto[]>(`${ws(w)}/tags`) });
 export const useMembers = (w: string) => useQuery({ queryKey: ['members', w], queryFn: () => request<MemberDto[]>(`${ws(w)}/members`) });
+export const useInvitations = (w: string, enabled: boolean) => useQuery({ queryKey: ['invitations', w], queryFn: () => request<InvitationDto[]>(`${ws(w)}/invitations`), enabled });
+
+export function useTeamMutations(w: string) {
+  const qc = useQueryClient();
+  const refresh = () => Promise.all([qc.invalidateQueries({ queryKey: ['members', w] }), qc.invalidateQueries({ queryKey: ['invitations', w] })]);
+  return {
+    invite: useMutation({ mutationFn: (v: InvitationCreateInput) => send<InvitationDto>('POST', `${ws(w)}/invitations`, v), onSuccess: refresh }),
+    revoke: useMutation({ mutationFn: (id: string) => send<void>('DELETE', `${ws(w)}/invitations/${id}`), onSuccess: refresh }),
+    setRole: useMutation({ mutationFn: (v: { userId: string; role: WorkspaceRole }) => send<MemberDto[]>('PATCH', `${ws(w)}/members/${encodeURIComponent(v.userId)}`, { role: v.role }), onSuccess: refresh }),
+    remove: useMutation({ mutationFn: (userId: string) => send<void>('DELETE', `${ws(w)}/members/${encodeURIComponent(userId)}`), onSuccess: refresh }),
+  };
+}
+
+/** Opened from the e-mail link, often without a session. The token goes in the body, never into a URL. */
+export const previewInvitation = (token: string) => send<InvitationPreviewDto>('POST', '/invitations/preview', { token });
+export const acceptInvitation = (v: InvitationAcceptInput) => send<InvitationAcceptedDto>('POST', '/invitations/accept', v);
 
 /** Writes refresh what they touched from the server; the screen never shows a state the server did not confirm. */
 export function useContactMutations(w: string, id?: string) {

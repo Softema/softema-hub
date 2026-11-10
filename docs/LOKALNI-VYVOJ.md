@@ -41,7 +41,7 @@ pnpm db:setup       # migrace, databázové role, seed
 pnpm dev:live       # API na :4100, web na :3000
 ```
 
-Otevřete <http://localhost:3000/prihlaseni>. Heslo najdete v `.env` jako `SEED_USER_PASSWORD`.
+Otevřete <http://localhost:3000/prihlaseni>. Heslo najdete v `.env` jako `SEED_USER_PASSWORD`. Správci se přihlašují i kódem z aplikace (2FA), aktuální kód vypíše `pnpm totp`.
 
 **Stav ověření (5. 11. 2026):** `pnpm setup:env`, `pnpm db:up`, `pnpm db:setup`, `pnpm test:api` a `pnpm test:e2e:live` prošly v Dockeru s obrazem `pgvector/pgvector:pg17`. Engine zajišťovala Colima, Docker Desktop vyzkoušený není. Čistý klon ze zálohy prošel stejnými testy na PostgreSQL 17 mimo Docker. Po prvním spuštění na novém počítači proto pusťte i `pnpm test:api`.
 
@@ -82,12 +82,20 @@ Rozdíly proti Dockeru:
 
 ## 4. Testovací uživatelé
 
-| E-mail | Role | Prostor |
-| --- | --- | --- |
-| `spravce@softema-hub.example` | správce prostoru | Prostor Alfa |
-| `clen@softema-hub.example` | člen, nesmí mazat | Prostor Alfa |
-| `cizi@softema-hub.example` | správce prostoru | jen Prostor Beta |
-| `agentura@softema-hub.example` | správce agentury | oba prostory |
+| E-mail | Role | Prostor | 2FA |
+| --- | --- | --- | --- |
+| `spravce@softema-hub.example` | správce prostoru | Prostor Alfa | ano |
+| `clen@softema-hub.example` | člen, nesmí mazat ani spravovat tým | Prostor Alfa | ne |
+| `cizi@softema-hub.example` | správce prostoru | jen Prostor Beta | ano |
+| `agentura@softema-hub.example` | správce agentury | oba prostory | ano |
+
+Všichni mají heslo `SEED_USER_PASSWORD` z `.env`. Správci mají dvoufázové ověření povinné. Seed jim ho nastaví se společným klíčem odvozeným z hesla, takže stačí:
+
+```sh
+pnpm totp    # vypíše aktuální šestimístný kód a klíč pro autentizační aplikaci
+```
+
+Klíč si můžete přidat i do autentizační aplikace v telefonu (Google Authenticator a podobně). Platí jen pro tyto smyšlené účty.
 
 ## 5. Vyzkoušení sdílení mezi dvěma uživateli
 
@@ -98,6 +106,17 @@ Rozdíly proti Dockeru:
 5. Otevřete u obou **Upravit kontakt**, u prvního uložte a u druhého také: druhý dostane upozornění na konflikt a nic se tiše nepřepíše.
 6. Zkopírujte adresu kontaktu a otevřete ji jako `cizi@…`: uvidíte „Kontakt nenalezen“.
 
+## 5b. Vyzkoušení účtů a týmu
+
+E-maily se lokálně **neodesílají**. API je ukládá jako HTML soubory do složky `.outbox/` v kořeni projektu. Otevřete nejnovější soubor v prohlížeči a klikněte na odkaz.
+
+1. **Pozvánka:** jako `spravce@…` otevřete **Tým → Pozvat člena**, zadejte smyšlený e-mail (např. `nova@test-firma.example`) a roli.
+2. Otevřete odkaz z `.outbox/` v anonymním okně, vyplňte jméno a heslo (aspoň 12 znaků).
+3. Pokud jste zvolili roli **Správce prostoru**, aplikace vás nepustí dál, dokud nezapnete dvoufázové ověření. K tomu potřebujete autentizační aplikaci v telefonu. Člen se dostane rovnou ke kontaktům.
+4. Ve **Tým** u správce změňte roli nebo člena odeberte. Odebraný po obnovení stránky ztratí přístup.
+5. **Zapomenuté heslo:** na přihlášení klikněte na **Zapomněli jste heslo?**, zadejte e-mail a otevřete odkaz z `.outbox/`. Odkaz platí hodinu a jen jednou. Pokud měníte heslo testovacího účtu, `pnpm db:seed` ho vrátí na `SEED_USER_PASSWORD`.
+6. **Zabezpečení účtu** (menu profilu): změna hesla, nové záložní kódy, u člena zapnutí a vypnutí 2FA.
+
 ## 6. Běžné příkazy
 
 | Příkaz | Co dělá |
@@ -105,6 +124,8 @@ Rozdíly proti Dockeru:
 | `pnpm dev` | jen demo s ukázkovými daty v prohlížeči, bez API a databáze |
 | `pnpm dev:live` | databázová verze |
 | `pnpm db:reset` | smaže lokální data a znovu vytvoří seed |
+| `pnpm db:seed` | vrátí testovacím účtům heslo a 2FA ze seedu, data ponechá |
+| `pnpm totp` | aktuální ověřovací kód testovacích správců |
 | `pnpm db:down` | zastaví PostgreSQL, data zůstanou |
 | `docker compose down -v` | zastaví PostgreSQL a smaže i jeho data |
 | `pnpm test:api` | integrační testy API a izolace, vlastní dočasná databáze |
@@ -131,3 +152,5 @@ Pokud na portu 3000 něco běží, ukončete to, nebo změňte `WEB_ORIGIN` v `.
 | Port 5433 je obsazený | Změňte `POSTGRES_PORT` a port v adresách `DATABASE_*_URL` v `.env`. |
 | Přihlášení hlásí nedostupný server | Zkontrolujte, že běží `pnpm dev:live` a že `pnpm db:up` proběhl. |
 | Heslo v `.env` nesedí s databází | `docker compose down -v`, potom znovu `pnpm db:up` a `pnpm db:setup`. |
+| Kód 2FA testovacího správce nesedí | Zkontrolujte čas v počítači (kód platí 30 s). Po 5 chybných kódech je ověření 15 minut zamčené, `pnpm db:seed` zámek zruší. |
+| Odkaz z e-mailu nikam nevede | E-maily nejsou ve schránce, ale ve složce `.outbox/`. Odkaz musí obsahovat i část za `#`. |

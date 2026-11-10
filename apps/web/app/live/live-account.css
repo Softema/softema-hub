@@ -1,0 +1,15 @@
+/* Account security and team screens of the database version. Built on the tokens in shell.css. */
+@layer components {
+  .account-grid { display: grid; gap: var(--sp-4); max-width: 760px; }
+  .account-section { display: grid; gap: var(--sp-3); }
+  .account-section h2 { font-size: 17px; font-weight: 600; color: var(--ink); }
+  .account-section > p { color: var(--ink-2); font-size: 14px; }
+  .account-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); }
+  .totp-steps { display: grid; gap: var(--sp-4); margin: 0; padding-left: 20px; color: var(--ink-2); font-size: 14px; }
+  .totp-steps li::marker { color: var(--ink-3); font-weight: 600; }
+  .totp-key { display: inline-flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); padding: var(--sp-2) var(--sp-3); border: 1px solid var(--line); border-radius: var(--r-ctl); background: var(--surface-2); color: var(--ink); font-size: 15px; word-break: break-all; }
+  .backup-codes { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--sp-2); margin: 0; padding: var(--sp-3); list-style: none; border: 1px solid var(--line); border-radius: var(--r-ctl); background: var(--surface-2); color: var(--ink); }
+  .forced-2fa { max-width: 640px; margin: var(--sp-6, 24px) auto; }
+  .team-pending td { color: var(--ink-2); }
+  .team-role { min-width: 170px; }
+}

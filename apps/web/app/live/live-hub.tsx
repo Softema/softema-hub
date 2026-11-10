@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { ArrowUpRight, Check, ChevronRight, ChevronsUpDown, LogOut, Menu, Users, Workflow } from 'lucide-react';
+import { ArrowUpRight, Check, ChevronRight, ChevronsUpDown, LogOut, Menu, ShieldCheck, UserCog, Users, Workflow } from 'lucide-react';
 import { ROLE_LABEL } from '@softema/shared';
 import { Sidebar, SidebarContent, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, useSidebar } from '@/components/ui/sidebar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -14,6 +14,8 @@ import { createQueryClient, signOut, useMe } from './api';
 import { LoadFailure, LoadingBlock } from './live-ui';
 import { LiveContacts } from './live-contacts';
 import { LiveProvider, useLive, useLiveRoute } from './live-state';
+import { ForcedTwoFactor, LiveSecurity } from './live-security';
+import { LiveTeam } from './live-team';
 import '../product.css';
 import '../theme-legacy.css';
 import '../shell.css';
@@ -43,6 +45,7 @@ function Navigation() {
         <div className="nav-section">Pracovní prostor</div>
         <SidebarMenu className="hub-nav">
           <SidebarMenuItem><SidebarMenuButton isActive={route.startsWith('kontakty')} onClick={() => { go('kontakty'); setOpenMobile(false); }}><Users /><span>Kontakty</span></SidebarMenuButton></SidebarMenuItem>
+          <SidebarMenuItem><SidebarMenuButton isActive={route.startsWith('tym')} onClick={() => { go('tym'); setOpenMobile(false); }}><UserCog /><span>Tým</span></SidebarMenuButton></SidebarMenuItem>
         </SidebarMenu>
         <div className="sidebar-bottom">
           <Link href="/" className="hub-website-link"><ArrowUpRight size={14} />Zpět na web Softema Hub</Link>
@@ -54,7 +57,8 @@ function Navigation() {
 }
 
 function ProfileMenu({ className }: { className: string }) {
-  const { me, workspace } = useLive();
+  const { me, workspace, go } = useLive();
+  const { setOpenMobile } = useSidebar();
   const [busy, setBusy] = useState(false);
   return (
     <DropdownMenu>
@@ -67,6 +71,7 @@ function ProfileMenu({ className }: { className: string }) {
       <DropdownMenuContent align="end" className="w-60">
         <DropdownMenuLabel>{me.user.email}</DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => { go('zabezpeceni'); setOpenMobile(false); }}><ShieldCheck aria-hidden />Zabezpečení účtu</DropdownMenuItem>
         <DropdownMenuItem disabled={busy} onSelect={() => { setBusy(true); void signOut(); }}><LogOut aria-hidden />{busy ? 'Odhlašuji…' : 'Odhlásit se'}</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -74,20 +79,23 @@ function ProfileMenu({ className }: { className: string }) {
 }
 
 function MobileTabs() {
-  const { go } = useLive();
+  const { go, route } = useLive();
   const { openMobile, setOpenMobile } = useSidebar();
+  const current = (r: string) => (route.startsWith(r) ? 'page' as const : undefined);
   return (
     <nav className="mobile-tabs" aria-label="Hlavní moduly">
-      <button type="button" aria-current="page" onClick={() => go('kontakty')}><Users aria-hidden /><span>Kontakty</span></button>
+      <button type="button" aria-current={current('kontakty')} onClick={() => go('kontakty')}><Users aria-hidden /><span>Kontakty</span></button>
+      <button type="button" aria-current={current('tym')} onClick={() => go('tym')}><UserCog aria-hidden /><span>Tým</span></button>
       <button type="button" aria-label="Více – otevřít navigaci" aria-expanded={openMobile} onClick={() => setOpenMobile(true)}><Menu aria-hidden /><span>Více</span></button>
     </nav>
   );
 }
 
 function Frame() {
-  const { workspace } = useLive();
+  const { workspace, me } = useLive();
   const { parts, go } = useLiveRoute();
   const mod = parts[0];
+  const title = mod === 'tym' ? 'Tým' : mod === 'zabezpeceni' ? 'Zabezpečení účtu' : 'Kontakty';
   return (
     <SidebarProvider style={{ '--sidebar-width': '240px' } as React.CSSProperties}>
       <Navigation />
@@ -96,13 +104,13 @@ function Frame() {
           <div className="breadcrumb">
             <button type="button" className="topbar-home" onClick={() => go('kontakty')} aria-label="Kontakty"><Workflow aria-hidden /></button>
             <span className="workspace-crumb">{workspace.name}</span><ChevronRight size={13} className="workspace-crumb" />
-            <span>Kontakty</span>
-            {parts[1] && <><ChevronRight size={13} /><span>Detail</span></>}
+            <span>{title}</span>
+            {mod === 'kontakty' && parts[1] && <><ChevronRight size={13} /><span>Detail</span></>}
           </div>
           <div className="topbar-right"><ThemeMenu /><ProfileMenu className="topbar-profile" /></div>
         </header>
         <div key={workspace.id}>
-          {mod === 'kontakty' ? <LiveContacts /> : <div className="page"><section className="panel empty"><h3>Tento modul zatím není napojený</h3><p>V databázové verzi jsou zatím dostupné kontakty.</p><Btn primary onClick={() => go('kontakty')}>Přejít na kontakty</Btn></section></div>}
+          {mod === 'kontakty' ? <LiveContacts /> : mod === 'tym' ? <LiveTeam /> : mod === 'zabezpeceni' ? <LiveSecurity enabled={me.user.twoFactorEnabled} required={me.user.twoFactorRequired} /> : <div className="page"><section className="panel empty"><h3>Tento modul zatím není napojený</h3><p>V databázové verzi jsou zatím dostupné kontakty a tým.</p><Btn primary onClick={() => go('kontakty')}>Přejít na kontakty</Btn></section></div>}
         </div>
       </main>
       <MobileTabs />
@@ -111,10 +119,15 @@ function Frame() {
   );
 }
 
+/** Screens outside the app frame still need toasts (copying backup codes). */
+const QueryShell = ({ children }: { children: React.ReactNode }) => <>{children}<Toaster position="bottom-right" richColors closeButton /></>;
+
 function Session() {
   const me = useMe();
   if (me.isPending) return <div className="page" aria-busy="true"><LoadingBlock label="Ověřuji přihlášení…" /></div>;
   if (me.isError) return <div className="page"><LoadFailure error={me.error} onRetry={() => void me.refetch()} title="Aplikace se nepřipojila k serveru" /></div>;
+  // An administrator without 2FA works with no data until it is on; the API enforces the same.
+  if (me.data.user.twoFactorRequired && !me.data.user.twoFactorEnabled) return <QueryShell><ForcedTwoFactor name={me.data.user.name} /></QueryShell>;
   if (!me.data.workspaces.length) return <div className="page"><section className="panel empty"><h3>Nemáte přístup k žádnému prostoru</h3><p>Požádejte správce o pozvání do pracovního prostoru.</p><Btn onClick={() => void signOut()}>Odhlásit se</Btn></section></div>;
   return <LiveProvider me={me.data}><Frame /></LiveProvider>;
 }
