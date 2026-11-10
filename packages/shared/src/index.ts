@@ -4,13 +4,18 @@ import { z } from 'zod';
 /* ---------- roles and permissions (zadání 3.1) ---------- */
 export type Role = 'agency_admin' | 'workspace_admin' | 'member';
 export const ROLE_LABEL: Record<Role, string> = { agency_admin: 'Správce agentury', workspace_admin: 'Správce prostoru', member: 'Člen týmu' };
-export type Permission = 'contact:read' | 'contact:write' | 'contact:delete';
+export type Permission = 'contact:read' | 'contact:write' | 'contact:delete' | 'team:read' | 'team:manage';
 const PERMISSIONS: Record<Role, readonly Permission[]> = {
-  agency_admin: ['contact:read', 'contact:write', 'contact:delete'],
-  workspace_admin: ['contact:read', 'contact:write', 'contact:delete'],
-  member: ['contact:read', 'contact:write'],
+  agency_admin: ['contact:read', 'contact:write', 'contact:delete', 'team:read', 'team:manage'],
+  workspace_admin: ['contact:read', 'contact:write', 'contact:delete', 'team:read', 'team:manage'],
+  member: ['contact:read', 'contact:write', 'team:read'],
 };
 export const can = (role: Role, permission: Permission) => PERMISSIONS[role].includes(permission);
+/** Roles that can be granted inside a workspace. `agency_admin` comes from the agency, never from an invitation. */
+export const WORKSPACE_ROLES = ['workspace_admin', 'member'] as const;
+export type WorkspaceRole = (typeof WORKSPACE_ROLES)[number];
+/** Two-factor authentication is mandatory for administrators (zadání 6.1). */
+export const requiresTwoFactor = (role: Role) => role !== 'member';
 
 /* ---------- normalization ---------- */
 export const normalizeEmail = (s: string) => s.trim().toLowerCase();
@@ -59,12 +64,27 @@ export type ContactListQuery = z.input<typeof contactListQuerySchema>;
 export const tagAddSchema = z.strictObject({ name: text(60).min(1, 'Zadejte štítek.') });
 export const noteBodySchema = z.strictObject({ body: text(2000).min(1, 'Poznámka je prázdná.') });
 
+/* ---------- accounts and team ---------- */
+export const PASSWORD_MIN = 12;
+export const passwordSchema = z.string().min(PASSWORD_MIN, `Heslo musí mít aspoň ${PASSWORD_MIN} znaků.`).max(128, 'Heslo může mít nejvýše 128 znaků.');
+const token = z.string().trim().min(20, 'Odkaz je neúplný.').max(200, 'Odkaz je neplatný.');
+export const invitationCreateSchema = z.strictObject({ email, role: z.enum(WORKSPACE_ROLES, 'Vyberte roli.') });
+export type InvitationCreateInput = z.input<typeof invitationCreateSchema>;
+export const memberRoleSchema = z.strictObject({ role: z.enum(WORKSPACE_ROLES, 'Vyberte roli.') });
+export const invitationTokenSchema = z.strictObject({ token });
+export const invitationAcceptSchema = z.strictObject({ token, name: name.optional(), password: passwordSchema.optional() });
+export type InvitationAcceptInput = z.input<typeof invitationAcceptSchema>;
+
 /* ---------- responses ---------- */
 export interface UserRef { id: string; name: string }
 export interface TagDto { id: string; name: string }
 export interface WorkspaceDto { id: string; name: string; kind: 'internal' | 'client'; role: Role }
-export interface MeDto { user: { id: string; name: string; email: string }; workspaces: WorkspaceDto[] }
-export interface MemberDto extends UserRef { role: Role }
+/** `twoFactorRequired`: the user administers at least one workspace and must turn on 2FA before working with data. */
+export interface MeDto { user: { id: string; name: string; email: string; twoFactorEnabled: boolean; twoFactorRequired: boolean }; workspaces: WorkspaceDto[] }
+export interface MemberDto extends UserRef { email: string; role: Role; twoFactorEnabled: boolean }
+export interface InvitationDto { id: string; email: string; role: WorkspaceRole; invitedBy: UserRef | null; createdAt: string; expiresAt: string }
+export interface InvitationPreviewDto { workspaceName: string; email: string; role: WorkspaceRole; accountExists: boolean }
+export interface InvitationAcceptedDto { workspaceId: string; email: string; accountCreated: boolean }
 export interface ContactDto {
   id: string; name: string; email: string; phone: string; company: string; city: string;
   stage: ContactStage; source: string; owner: UserRef | null; tags: TagDto[];
@@ -78,5 +98,6 @@ export interface ActivityDto { id: string; type: ActivityKind; title: string; de
 export interface ActivityPageDto { items: ActivityDto[]; nextCursor: string | null }
 
 /* ---------- errors ---------- */
-export type ErrorCode = 'UNAUTHENTICATED' | 'FORBIDDEN' | 'NOT_FOUND' | 'VALIDATION_FAILED' | 'DUPLICATE_EMAIL' | 'VERSION_CONFLICT' | 'BAD_ORIGIN' | 'SERVICE_UNAVAILABLE' | 'INTERNAL';
+export type ErrorCode = 'UNAUTHENTICATED' | 'FORBIDDEN' | 'NOT_FOUND' | 'VALIDATION_FAILED' | 'DUPLICATE_EMAIL' | 'VERSION_CONFLICT' | 'BAD_ORIGIN' | 'SERVICE_UNAVAILABLE' | 'INTERNAL'
+  | 'TWO_FACTOR_REQUIRED' | 'ALREADY_MEMBER' | 'INVITATION_INVALID' | 'SIGN_IN_REQUIRED';
 export interface ApiErrorBody { code: ErrorCode; message: string; fields?: Record<string, string> }

@@ -38,6 +38,24 @@ describe('role', () => {
   it('aplikace nemůže měnit členství ani si přidat roli', async () => {
     await denied(() => withTenant(app, { userId: 'seed-outsider', workspaceId: B }, tx => tx.$executeRaw`insert into hub.workspace_membership (workspace_id, user_id, role) values (${A}::uuid, 'seed-outsider', 'workspace_admin')`));
     await denied(() => withTenant(app, { userId: 'seed-outsider', workspaceId: B }, tx => tx.$executeRaw`update hub.workspace_membership set role = 'workspace_admin'`));
+    await denied(() => withTenant(app, { userId: 'seed-outsider', workspaceId: B }, tx => tx.$executeRaw`insert into hub.invitation (workspace_id, email, email_normalized, role, token_hash, expires_at) values (${A}::uuid, 'x@x.example', 'x@x.example', 'member', 'x', now() + interval '1 day')`));
+  });
+  it('databázové funkce týmu odmítnou člena i cizího správce, i když je API zavolá', async () => {
+    const call = (userId: string, ws: string) => withTenant(app, { userId, workspaceId: ws }, async tx => ({
+      invite: (await tx.$queryRaw<{ r: { status: string } }[]>`select hub.invite_member(${ws}::uuid, 'utok@x.example', 'workspace_admin', ${'h' + userId}, now() + interval '1 day') r`)[0].r.status,
+      role: (await tx.$queryRaw<{ r: string }[]>`select hub.set_member_role(${ws}::uuid, 'seed-member', 'workspace_admin') r`)[0].r,
+      remove: (await tx.$queryRaw<{ r: string }[]>`select hub.remove_member(${ws}::uuid, 'seed-manager') r`)[0].r,
+    }));
+    assert.deepEqual(await call('seed-member', A), { invite: 'forbidden', role: 'forbidden', remove: 'forbidden' });
+    assert.deepEqual(await call('seed-outsider', A), { invite: 'forbidden', role: 'forbidden', remove: 'forbidden' });
+    const [m] = await owner.$queryRaw<{ role: string }[]>`select role::text from hub.workspace_membership where workspace_id = ${A}::uuid and user_id = 'seed-member'`;
+    assert.equal(m.role, 'member');
+  });
+  it('aplikace nečte hash tokenu pozvánky ani tajemství 2FA, cizí pozvánky nevidí', async () => {
+    await denied(() => app.$queryRaw`select token_hash from hub.invitation`);
+    await denied(() => app.$queryRaw`select secret from hub."twoFactor"`);
+    assert.equal(await withTenant(app, { userId: 'seed-member', workspaceId: A }, tx => tx.invitation.count()), 0, 'člen pozvánky nevidí');
+    assert.equal(await asOutsider(A, tx => tx.invitation.count()), 0);
   });
 });
 

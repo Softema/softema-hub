@@ -16,6 +16,6 @@ const env = { ...process.env, NODE_ENV: 'test', DATABASE_OWNER_URL: swap(process
 const shell = process.platform === 'win32';
 const setup = spawnSync('pnpm', ['--filter', '@softema/db', 'run', 'setup'], { stdio: 'inherit', env, shell });
 if (setup.status) process.exit(setup.status);
-const files = process.argv.slice(2).length ? process.argv.slice(2) : ['test/api.test.ts', 'test/rls.test.ts', 'test/rate-limit.test.ts'];
+const files = process.argv.slice(2).length ? process.argv.slice(2) : ['test/api.test.ts', 'test/rls.test.ts', 'test/account.test.ts', 'test/rate-limit.test.ts'];
 const r = spawnSync('pnpm', ['--filter', '@softema/api', 'exec', 'tsx', '--test', '--test-concurrency=1', ...files], { stdio: 'inherit', env, shell });
 process.exit(r.status ?? 1);

@@ -24,6 +24,7 @@
     "db:setup": "pnpm --filter @softema/db run setup",
     "db:reset": "pnpm --filter @softema/db run reset",
     "db:seed": "pnpm --filter @softema/db run seed",
+    "totp": "pnpm --silent --filter @softema/db run totp",
     "check:separation": "node scripts/check-separation.mjs"
   },
   "devDependencies": {

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "exports": { ".": "./src/index.ts", "./seed-auth": "./src/seed-auth.ts" },
   "scripts": {
     "generate": "prisma generate",
     "postinstall": "prisma generate",
@@ -11,6 +11,7 @@
     "migrate": "prisma migrate deploy",
     "roles": "tsx scripts/roles.ts",
     "seed": "tsx scripts/seed.ts",
+    "totp": "tsx scripts/totp.ts",
     "setup": "prisma migrate deploy && tsx scripts/roles.ts && tsx scripts/seed.ts",
     "reset": "tsx scripts/reset.ts && prisma migrate deploy && tsx scripts/roles.ts && tsx scripts/seed.ts"
   },
@@ -24,6 +25,7 @@
     "@softema/shared": "workspace:*",
     "@types/node": "22.19.19",
     "@types/pg": "8.15.5",
+    "better-auth": "1.7.14",
     "prisma": "7.10.1",
     "tsx": "4.21.0",
     "typescript": "5.9.3"

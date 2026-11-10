@@ -18,10 +18,14 @@ model User {
   email              String              @unique
   emailVerified      Boolean             @default(false)
   image              String?
+  /// Set by Better-Auth's two-factor plugin after the first TOTP code is verified.
+  twoFactorEnabled   Boolean?            @default(false)
   createdAt          DateTime            @default(now()) @db.Timestamptz
   updatedAt          DateTime            @updatedAt @db.Timestamptz
   sessions           Session[]
   accounts           Account[]
+  twoFactors         TwoFactor[]
+  invitationsSent    Invitation[]        @relation("InvitationInviter")
   agencyMemberships  AgencyMembership[]
   memberships        WorkspaceMembership[]
   ownedContacts      Contact[]           @relation("ContactOwner")
@@ -82,6 +86,22 @@ model Verification {
   @@schema("hub")
 }
 
+/// TOTP secret and backup codes, both encrypted with BETTER_AUTH_SECRET. Readable only by the auth role.
+model TwoFactor {
+  id                      String    @id
+  secret                  String
+  backupCodes             String
+  userId                  String
+  verified                Boolean?  @default(true)
+  failedVerificationCount Int?      @default(0)
+  lockedUntil             DateTime? @db.Timestamptz
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("twoFactor")
+  @@schema("hub")
+}
+
 /* ---------- tenancy ---------- */
 enum WorkspaceKind {
   internal
@@ -131,6 +151,7 @@ model Workspace {
   createdAt DateTime              @default(now()) @map("created_at") @db.Timestamptz
   agency    Agency                @relation(fields: [agencyId], references: [id], onDelete: Restrict)
   members   WorkspaceMembership[]
+  invitations Invitation[]
 
   @@index([agencyId])
   @@map("workspace")
@@ -148,6 +169,29 @@ model WorkspaceMembership {
   @@id([workspaceId, userId])
   @@index([userId])
   @@map("workspace_membership")
+  @@schema("hub")
+}
+
+/// Invitation into a workspace. Only the SHA-256 of the token is stored; the token itself exists only in the e-mail.
+/// Written exclusively by the SECURITY DEFINER functions in migration 0002; the application role can read it without `token_hash`.
+model Invitation {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId      String        @map("workspace_id") @db.Uuid
+  email            String
+  emailNormalized  String        @map("email_normalized")
+  role             WorkspaceRole
+  tokenHash        String        @unique @map("token_hash")
+  invitedByUserId  String?       @map("invited_by_user_id")
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  expiresAt        DateTime      @map("expires_at") @db.Timestamptz
+  acceptedAt       DateTime?     @map("accepted_at") @db.Timestamptz
+  acceptedByUserId String?       @map("accepted_by_user_id")
+  revokedAt        DateTime?     @map("revoked_at") @db.Timestamptz
+  workspace        Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedBy        User?         @relation("InvitationInviter", fields: [invitedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@map("invitation")
   @@schema("hub")
 }
 

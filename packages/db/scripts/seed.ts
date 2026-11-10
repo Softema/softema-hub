@@ -1,8 +1,10 @@
 // Fictional, disposable data: one agency, two workspaces, four users. Safe to run repeatedly.
 // E-mail domains use the reserved `.example` TLD.
 import { hash } from '@node-rs/argon2';
+import { symmetricEncrypt } from 'better-auth/crypto';
 import { normalizeEmail, normalizeSearch } from '@softema/shared';
 import { createClient, withTenant } from '../src/index';
+import { seedTotpSecret } from '../src/seed-auth';
 import { required } from './env';
 
 const AGENCY = '10000000-0000-4000-8000-000000000001';
@@ -22,13 +24,23 @@ const CONTACTS: [string, string, string, string, 'lead' | 'prospect' | 'client',
   ['Tereza Nováková', 'tereza@novakova.example', 'Novákovi s.r.o.', 'Plzeň', 'lead', ['Newsletter', 'Webinář']],
 ];
 
+// Administrators must have 2FA (zadání 6.1), so the seed gives them a TOTP secret. `pnpm totp` prints the current code.
+const ADMINS: readonly string[] = ['seed-admin', 'seed-manager', 'seed-outsider'];
+
 const owner = createClient(required('DATABASE_OWNER_URL'), 2);
 const app = createClient(required('DATABASE_APP_URL'), 2);
-const password = await hash(required('SEED_USER_PASSWORD'), { algorithm: 2, memoryCost: 19456, timeCost: 2, parallelism: 1 });
+const seedPassword = required('SEED_USER_PASSWORD');
+const password = await hash(seedPassword, { algorithm: 2, memoryCost: 19456, timeCost: 2, parallelism: 1 });
+// Encrypted exactly like Better-Auth's two-factor plugin does with a single BETTER_AUTH_SECRET.
+const authSecret = required('BETTER_AUTH_SECRET');
+const twoFactor = { secret: await symmetricEncrypt({ key: authSecret, data: seedTotpSecret(seedPassword) }), backupCodes: await symmetricEncrypt({ key: authSecret, data: '[]' }), verified: true, failedVerificationCount: 0, lockedUntil: null };
 
 for (const u of USERS) {
-  await owner.user.upsert({ where: { id: u.id }, create: { ...u, emailVerified: true }, update: { name: u.name, email: u.email } });
+  const twoFactorEnabled = ADMINS.includes(u.id);
+  await owner.user.upsert({ where: { id: u.id }, create: { ...u, emailVerified: true, twoFactorEnabled }, update: { name: u.name, email: u.email, twoFactorEnabled } });
   await owner.account.upsert({ where: { id: `acc-${u.id}` }, create: { id: `acc-${u.id}`, accountId: u.id, providerId: 'credential', userId: u.id, password }, update: { password } });
+  if (twoFactorEnabled) await owner.twoFactor.upsert({ where: { id: `tf-${u.id}` }, create: { id: `tf-${u.id}`, userId: u.id, ...twoFactor }, update: twoFactor });
+  else await owner.twoFactor.deleteMany({ where: { userId: u.id } });
 }
 await owner.agency.upsert({ where: { id: AGENCY }, create: { id: AGENCY, name: 'Softema (ukázka)' }, update: {} });
 await owner.workspace.upsert({ where: { id: WORKSPACE_A }, create: { id: WORKSPACE_A, agencyId: AGENCY, name: 'Prostor Alfa', kind: 'internal' }, update: {} });
@@ -60,4 +72,4 @@ await withTenant(app, { userId: 'seed-outsider', workspaceId: WORKSPACE_B }, asy
 });
 await owner.$disconnect(); await app.$disconnect();
 console.log('Seed je hotový: 2 prostory, 4 uživatelé, 6 smyšlených kontaktů.');
-for (const u of USERS) console.log(`  ${u.email}`);
+for (const u of USERS) console.log(`  ${u.email}${ADMINS.includes(u.id) ? ' (dvoufázové ověření, kód vypíše pnpm totp)' : ''}`);

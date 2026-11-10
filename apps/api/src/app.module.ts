@@ -3,29 +3,35 @@ import { APP_FILTER } from '@nestjs/core';
 import { createClient, type PrismaClient } from '@softema/db';
 import { createAuth } from './auth/auth';
 import { ApiExceptionFilter } from './common/errors';
-import { SessionGuard, WorkspaceGuard } from './common/guards';
+import { OriginGuard, SessionGuard, WorkspaceGuard } from './common/guards';
 import type { Config } from './config';
 import { ContactsController } from './contacts/contacts.controller';
 import { ContactsService } from './contacts/contacts.service';
-import { APP_DB, AUTH, AUTH_DB, CONFIG } from './tokens';
+import { DEFAULT_OUTBOX, type Mailer, OutboxMailer } from './mail/mailer';
+import { InvitationsController, TeamController } from './team/team.controller';
+import { TeamService } from './team/team.service';
+import { APP_DB, AUTH, AUTH_DB, CONFIG, MAILER } from './tokens';
 import { WorkspacesController } from './workspaces/workspaces.controller';
 
 @Controller('api')
 class HealthController { @Get('health') health() { return { status: 'ok' }; } }
 
+export interface AppDeps { mailer?: Mailer }
+
 @Module({})
 export class AppModule {
-  static register(config: Config): DynamicModule {
+  static register(config: Config, deps: AppDeps = {}): DynamicModule {
     return {
       module: AppModule,
-      controllers: [HealthController, WorkspacesController, ContactsController],
+      controllers: [HealthController, WorkspacesController, ContactsController, TeamController, InvitationsController],
       providers: [
         { provide: CONFIG, useValue: config },
+        { provide: MAILER, useValue: deps.mailer ?? new OutboxMailer(config.MAIL_OUTBOX_DIR ?? DEFAULT_OUTBOX) },
         { provide: APP_DB, useFactory: () => createClient(config.DATABASE_APP_URL) },
         { provide: AUTH_DB, useFactory: () => createClient(config.DATABASE_AUTH_URL, 5) },
-        { provide: AUTH, useFactory: (db: PrismaClient) => createAuth(config, db), inject: [AUTH_DB] },
+        { provide: AUTH, useFactory: (db: PrismaClient, mailer: Mailer) => createAuth(config, db, mailer), inject: [AUTH_DB, MAILER] },
         { provide: APP_FILTER, useClass: ApiExceptionFilter },
-        SessionGuard, WorkspaceGuard, ContactsService,
+        SessionGuard, WorkspaceGuard, OriginGuard, ContactsService, TeamService,
       ],
     };
   }
