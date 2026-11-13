@@ -13,7 +13,10 @@ import { useLive } from './live-state';
 import './live-account.css';
 
 const ROLES = WORKSPACE_ROLES.map(r => [r, ROLE_LABEL[r]] as [string, string]);
-const OUTBOX = 'V lokální verzi se e-mail neodesílá, najdete ho ve složce .outbox v projektu.';
+/** On this computer the API writes e-mails into the .outbox folder instead of sending them. */
+const sentNote = (email: string) => /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)
+  ? `Pozvánka pro ${email} je připravená. V lokální verzi se e-mail neodesílá, najdete ho ve složce .outbox v projektu.`
+  : `Pozvánka pro ${email} byla odeslána e-mailem.`;
 
 export function LiveTeam() {
   const { workspace, me, allowed } = useLive();
@@ -114,7 +117,7 @@ function InviteDialog({ open, onClose }: { open: boolean; onClose: () => void })
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     invite.mutate({ email, role }, {
-      onSuccess: i => { toast.success(`Pozvánka pro ${i.email} je připravená. ${OUTBOX}`); reset(); onClose(); },
+      onSuccess: i => { toast.success(sentNote(i.email)); reset(); onClose(); },
       onError: err => { setError(message(err)); setFields(err instanceof ApiFailure ? err.fields ?? {} : {}); },
     });
   };
