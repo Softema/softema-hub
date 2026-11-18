@@ -1,0 +1,13 @@
+# Reviewed Gitleaks findings (18. 11. 2026). All are fictional values in tests, none is a real key or password:
+# - test passwords of throwaway accounts created by the API and E2E tests,
+# - a fake "sk_live_1234…" string that the demo smoke test uses to check that the integrations dialog refuses keys.
+# Each entry is one finding in one commit. A new finding still fails CI and needs its own review.
+f1f8917d92b6159a28edce3d6fba5770bbb9af61:apps/api/test/security.test.ts:generic-api-key:58
+27ca330fd6d090789183bd52e66bf191d22cb210:apps/web/e2e-live/live.spec.ts:generic-api-key:279
+a545e12d1b28827d07fe32b21967dc4b37bb0496:apps/api/test/rate-limit.test.ts:generic-api-key:10
+a90f0ebb917b4ef75f22d0c2392e105493e66dcd:apps/api/test/account.test.ts:generic-api-key:67
+a90f0ebb917b4ef75f22d0c2392e105493e66dcd:apps/api/test/account.test.ts:generic-api-key:108
+a90f0ebb917b4ef75f22d0c2392e105493e66dcd:apps/api/test/account.test.ts:generic-api-key:110
+a90f0ebb917b4ef75f22d0c2392e105493e66dcd:apps/api/test/account.test.ts:generic-api-key:185
+a545e12d1b28827d07fe32b21967dc4b37bb0496:apps/api/test/api.test.ts:generic-api-key:37
+9a36cea9ecfdaa671f02804cc2798f681031ea32:e2e/smoke.spec.ts:stripe-access-token:406

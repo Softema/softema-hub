@@ -16,7 +16,7 @@ jobs:
         run: >-
           docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/repo"
           -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*'
-          ghcr.io/gitleaks/gitleaks:v8.24.0 git /repo --redact --no-banner --verbose
+          ghcr.io/gitleaks/gitleaks:v8.24.0 git /repo --gitleaks-ignore-path /repo/.gitleaksignore --redact --no-banner --verbose
   verify:
     runs-on: ubuntu-latest
     env:
