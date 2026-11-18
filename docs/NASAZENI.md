@@ -80,3 +80,27 @@ sudo docker compose up -d
 ```
 
 Web na Vercelu se nasadí sám po pushi na `main`.
+
+## 7. Zálohy
+
+Free plán Supabase zálohy nedělá, proto je dělá server. `deploy/backup.sh` jednou denně uloží výpis schématu `hub` (`pg_dump`, formát custom) do `/var/backups/softema-hub` (jen root). Záloha tak leží mimo Supabase, kde jsou data. Uchovává 14 dní (`BACKUP_KEEP_DAYS`) a každý výpis ověří přes `pg_restore --list`. Když záloha selže, přijde e-mail na `ALERT_EMAIL` z `deploy/.env` (přes Resend).
+
+```sh
+echo '30 2 * * * root /opt/softema-hub/deploy/backup.sh >> /var/log/softema-hub-backup.log 2>&1' | sudo tee /etc/cron.d/softema-hub-backup
+sudo /opt/softema-hub/deploy/backup.sh          # první záloha hned
+sudo /opt/softema-hub/deploy/restore-check.sh   # test obnovy: dočasný PostgreSQL bez sítě, počty řádků proti produkci
+```
+
+**Obnova do Supabase** (jen po rozhodnutí, přepíše data): `pg_restore --clean --if-exists --schema=hub -d "$DATABASE_OWNER_URL" <soubor>`. Role `hub_app`/`hub_auth` a rozšíření ve schématu `extensions` výpis neobsahuje. Vytvoří je migrace (`pnpm --filter @softema/db run deploy`).
+
+Výpis obsahuje hashe hesel a zašifrované 2FA klíče. Kopie mimo server proto jen šifrovaně.
+
+## 8. Monitoring
+
+`.github/workflows/monitor.yml` každých 15 minut zkontroluje:
+- web → API → databázi (`/api/health`, který při nedostupné databázi vrátí 503),
+- bezpečnostní hlavičky přihlašovací stránky,
+- že backend mimo web odmítá požadavky,
+- platnost certifikátů aspoň 14 dní.
+
+Selhání pošle GitHub e-mailem tomu, kdo naposledy změnil plán (`cron`) v tomto souboru. Doručení e-mailů z Actions se nastavuje v GitHubu: Settings → Notifications → Actions. Ruční spuštění: Actions → Monitor Softema Hub → Run workflow. GitHub plán pozastaví po 60 dnech bez commitu, pak ho stačí znovu zapnout.

@@ -1,0 +1,41 @@
+# Uptime monitor of the live database version (Softema standard, "Monitoring a reakce").
+# A failed scheduled run makes GitHub e-mail the person who last changed the schedule below.
+# GitHub pauses schedules after 60 days without commits in a public repository; re-enable under Actions if that happens.
+name: Monitor Softema Hub
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: monitor
+  cancel-in-progress: false
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      WEB: https://softema-hub.vercel.app
+      API: https://hub-api.srv1083481.hstgr.cloud
+    steps:
+      - name: Web, API a databáze (přes proxy Vercelu)
+        run: |
+          body=$(curl -fsS --retry 3 --retry-all-errors --retry-delay 20 --max-time 20 "$WEB/api/health")
+          echo "$body"; test "$body" = '{"status":"ok"}'
+      - name: Přihlašovací stránka a bezpečnostní hlavičky
+        run: |
+          headers=$(curl -fsS --retry 3 --retry-all-errors --retry-delay 20 --max-time 20 -D - -o /dev/null "$WEB/prihlaseni")
+          grep -qi '^content-security-policy:' <<<"$headers"
+          grep -qi '^strict-transport-security:' <<<"$headers"
+      - name: Backend nejde volat mimo web
+        run: |
+          code=$(curl -sS --retry 3 --retry-all-errors --retry-delay 20 --max-time 20 -o /dev/null -w '%{http_code}' "$API/api/v1/me")
+          echo "$code"; test "$code" = 403
+      - name: Platnost certifikátů (aspoň 14 dní)
+        run: |
+          for host in softema-hub.vercel.app hub-api.srv1083481.hstgr.cloud; do
+            end=$(echo | openssl s_client -connect "$host:443" -servername "$host" 2>/dev/null | openssl x509 -noout -enddate | cut -d= -f2)
+            days=$(( ($(date -d "$end" +%s) - $(date +%s)) / 86400 ))
+            echo "$host: $days dní"; test "$days" -ge 14
+          done
