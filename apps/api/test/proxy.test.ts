@@ -23,6 +23,14 @@ it('se správným klíčem funguje přihlášení i API', async () => {
   assert.equal((await c.req('GET', '/api/v1/me', undefined, h)).status, 200);
 });
 
+it('IP návštěvníka bere z hlavičky od proxy, ne z adresy Vercelu', async () => {
+  const c = new Client(ctx.base);
+  const h = { 'x-hub-proxy': SECRET, 'x-hub-client-ip': '198.51.100.7', 'x-forwarded-for': '3.70.132.135' };
+  assert.equal((await c.req('POST', '/api/auth/sign-in/email', { email: USERS.member, password: process.env.SEED_USER_PASSWORD }, h)).status, 200);
+  const sessions = (await c.req('GET', '/api/v1/me/sessions', undefined, h)).body as { current: boolean; ipAddress: string }[];
+  assert.equal(sessions.find(s => s.current)?.ipAddress, '198.51.100.7');
+});
+
 it('v produkci API bez tajného klíče nenastartuje', async () => {
   await assert.rejects(() => start({ NODE_ENV: 'production', HUB_PROXY_SECRET: '' }), /HUB_PROXY_SECRET/);
 });

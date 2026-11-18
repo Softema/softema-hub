@@ -138,6 +138,9 @@ function ChangePassword() {
   );
 }
 
+/** Loopback and unspecified addresses (local development) say nothing to the user. */
+const publicIp = (ip: string | null) => !!ip && !/^[0:]+$|^::1$|^::ffff:127\.|^127\./.test(ip);
+
 /** "Chrome · Windows" from a user-agent string. Approximate, only to recognise one's own devices. */
 function describe(ua: string | null) {
   if (!ua) return { name: 'Neznámé zařízení', mobile: false };
@@ -171,7 +174,7 @@ function Devices() {
             return (
               <li key={s.id}>
                 {d.mobile ? <Smartphone aria-hidden /> : <Monitor aria-hidden />}
-                <div><strong>{d.name}</strong> {s.current && <Badge tone="green">Toto zařízení</Badge>}<small>Naposledy aktivní {fmtDateTime(s.lastActiveAt)}{s.ipAddress ? ` · IP ${s.ipAddress}` : ''} · přihlášeno {fmtDateTime(s.createdAt)}</small></div>
+                <div><strong>{d.name}</strong> {s.current && <Badge tone="green">Toto zařízení</Badge>}<small>Naposledy aktivní {fmtDateTime(s.lastActiveAt)}{publicIp(s.ipAddress) ? ` · IP ${s.ipAddress}` : ''} · přihlášeno {fmtDateTime(s.createdAt)}</small></div>
                 {!s.current && <Btn className="danger-ghost" disabled={m.revoke.isPending} onClick={() => end(s)}>Odhlásit</Btn>}
               </li>
             );
@@ -207,7 +210,8 @@ export function LiveSecurity({ enabled, required }: { enabled: boolean; required
               </div>)}
           {enabled && required && <p className="small muted">Správci ověření vypnout nemohou. Při ztrátě telefonu se přihlaste záložním kódem a zapněte ověření na novém telefonu.</p>}
         </section>
-        <Devices />`n        <section className="panel account-section" aria-labelledby="sec-pass">
+        <Devices />
+        <section className="panel account-section" aria-labelledby="sec-pass">
           <h2 id="sec-pass">Heslo</h2>
           <p>Po změně hesla vás na ostatních zařízeních odhlásíme.</p>
           <ChangePassword />

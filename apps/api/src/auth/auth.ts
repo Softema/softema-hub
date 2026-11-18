@@ -96,7 +96,9 @@ export function createAuth(config: Config, db: PrismaClient, mailer: Mailer) {
       after: createAuthMiddleware(async ctx => { if (ctx.path === '/sign-in/email') await lock.after(ctx.body, ctx.context.returned); }),
     },
     session: { expiresIn: 60 * 60 * 12, updateAge: 60 * 60 },
-    advanced: { ipAddress: { ipAddressHeaders: ['x-forwarded-for'] } },
+    // Behind the Vercel proxy the visitor's IP comes in x-hub-client-ip, trusted only because every request must carry
+    // the proxy secret (bootstrap.ts). Locally the API sits behind Next.js on 127.0.0.1 and x-forwarded-for is enough.
+    advanced: { ipAddress: { ipAddressHeaders: config.HUB_PROXY_SECRET ? ['x-hub-client-ip', 'x-forwarded-for'] : ['x-forwarded-for'] } },
     rateLimit: {
       enabled: true, window: 60, max: 100, storage: 'memory',
       customRules: {

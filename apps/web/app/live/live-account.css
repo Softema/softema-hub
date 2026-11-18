@@ -1,9 +1,13 @@
 /* Account security and team screens of the database version. Built on the tokens in shell.css. */
 @layer components {
-  .account-grid { display: grid; gap: var(--sp-4); max-width: 760px; }
-  .account-section { display: grid; gap: var(--sp-3); }
-  .account-section h2 { font-size: 17px; font-weight: 600; color: var(--ink); }
-  .account-section > p { color: var(--ink-2); font-size: 14px; }
+  .account-grid { display: grid; gap: var(--sp-6); max-width: 760px; }
+  .account-grid > * { min-width: 0; } /* long values (IPv6) must wrap, not widen the card past the screen */
+  /* .panel has no padding of its own; sections breathe like the other cards of the app. */
+  .account-section { display: grid; gap: var(--sp-4); padding: var(--sp-6); }
+  .account-section h2 { display: flex; align-items: center; gap: var(--sp-2); font-size: 17px; font-weight: 600; color: var(--ink); }
+  .account-section > p { margin-top: calc(var(--sp-2) * -1); color: var(--ink-2); font-size: 14px; line-height: 1.55; }
+  .account-section .form-grid { gap: var(--sp-4); }
+  @media (max-width: 640px) { .account-section { padding: var(--sp-4); } }
   .account-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); }
   .totp-steps { display: grid; gap: var(--sp-4); margin: 0; padding-left: 20px; color: var(--ink-2); font-size: 14px; }
   .totp-steps li::marker { color: var(--ink-3); font-weight: 600; }
@@ -14,10 +18,12 @@
   .totp-open:hover { background: var(--brand-primary-hover); }
   .totp-open:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
   .device-list { display: grid; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; }
-  .device-list li { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3); border: 1px solid var(--line); border-radius: var(--r-ctl); }
+  .device-list li { display: flex; align-items: center; gap: var(--sp-3) var(--sp-4); padding: var(--sp-3) var(--sp-4); border: 1px solid var(--line); border-radius: var(--r-ctl); }
   .device-list li > svg { flex: none; width: 20px; height: 20px; color: var(--ink-3); }
   .device-list li > div { flex: 1; min-width: 0; color: var(--ink); font-size: 14px; }
-  .device-list small { display: block; margin-top: 2px; color: var(--ink-3); font-size: 13px; }
+  .device-list small { display: block; margin-top: 2px; color: var(--ink-3); font-size: 13px; overflow-wrap: anywhere; }
+  /* Phones: the button goes under the text, which keeps the full width. */
+  @media (max-width: 640px) { .device-list li { flex-wrap: wrap; } .device-list li > div { flex-basis: calc(100% - 20px - var(--sp-4)); } .device-list li > button { margin-left: calc(20px + var(--sp-4)); } }
   .backup-codes { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--sp-2); margin: 0; padding: var(--sp-3); list-style: none; border: 1px solid var(--line); border-radius: var(--r-ctl); background: var(--surface-2); color: var(--ink); }
   .forced-2fa { max-width: 640px; margin: var(--sp-6, 24px) auto; }
   .team-pending td { color: var(--ink-2); }
