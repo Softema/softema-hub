@@ -85,6 +85,10 @@ export interface MemberDto extends UserRef { email: string; role: Role; twoFacto
 export interface InvitationDto { id: string; email: string; role: WorkspaceRole; invitedBy: UserRef | null; createdAt: string; expiresAt: string }
 export interface InvitationPreviewDto { workspaceName: string; email: string; role: WorkspaceRole; accountExists: boolean }
 export interface InvitationAcceptedDto { workspaceId: string; email: string; accountCreated: boolean }
+/** One signed-in device of the current user. Never carries the session token. */
+export interface SessionDto { id: string; current: boolean; createdAt: string; lastActiveAt: string; ipAddress: string | null; userAgent: string | null }
+/** Temporary lock after repeated wrong passwords (zadání 6.1). */
+export const LOGIN_LOCK = { attempts: 5, minutes: 15 } as const;
 export interface ContactDto {
   id: string; name: string; email: string; phone: string; company: string; city: string;
   stage: ContactStage; source: string; owner: UserRef | null; tags: TagDto[];
@@ -99,5 +103,5 @@ export interface ActivityPageDto { items: ActivityDto[]; nextCursor: string | nu
 
 /* ---------- errors ---------- */
 export type ErrorCode = 'UNAUTHENTICATED' | 'FORBIDDEN' | 'NOT_FOUND' | 'VALIDATION_FAILED' | 'DUPLICATE_EMAIL' | 'VERSION_CONFLICT' | 'BAD_ORIGIN' | 'SERVICE_UNAVAILABLE' | 'INTERNAL'
-  | 'TWO_FACTOR_REQUIRED' | 'ALREADY_MEMBER' | 'INVITATION_INVALID' | 'SIGN_IN_REQUIRED';
+  | 'TWO_FACTOR_REQUIRED' | 'ALREADY_MEMBER' | 'INVITATION_INVALID' | 'SIGN_IN_REQUIRED' | 'CURRENT_SESSION';
 export interface ApiErrorBody { code: ErrorCode; message: string; fields?: Record<string, string> }

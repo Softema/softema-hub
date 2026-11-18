@@ -8,6 +8,7 @@ import type { Config } from './config';
 import { ContactsController } from './contacts/contacts.controller';
 import { ContactsService } from './contacts/contacts.service';
 import { DEFAULT_OUTBOX, type Mailer, OutboxMailer, ResendMailer } from './mail/mailer';
+import { SessionsController } from './sessions/sessions.controller';
 import { InvitationsController, TeamController } from './team/team.controller';
 import { TeamService } from './team/team.service';
 import { APP_DB, AUTH, AUTH_DB, CONFIG, MAILER } from './tokens';
@@ -23,7 +24,7 @@ export class AppModule {
   static register(config: Config, deps: AppDeps = {}): DynamicModule {
     return {
       module: AppModule,
-      controllers: [HealthController, WorkspacesController, ContactsController, TeamController, InvitationsController],
+      controllers: [HealthController, WorkspacesController, ContactsController, TeamController, InvitationsController, SessionsController],
       providers: [
         { provide: CONFIG, useValue: config },
         { provide: MAILER, useValue: deps.mailer ?? (config.MAIL_PROVIDER === 'resend' ? new ResendMailer(config.RESEND_API_KEY!, config.MAIL_FROM!) : new OutboxMailer(config.MAIL_OUTBOX_DIR ?? DEFAULT_OUTBOX)) },

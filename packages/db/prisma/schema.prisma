@@ -86,6 +86,18 @@ model Verification {
   @@schema("hub")
 }
 
+/// Wrong passwords per e-mail address, for the temporary sign-in lock. Auth role only. Rows exist for unknown
+/// addresses too, so the lock does not reveal which addresses have an account; old rows are cleaned up.
+model LoginLock {
+  emailNormalized String    @id @map("email_normalized")
+  failedCount     Int       @default(0) @map("failed_count")
+  lastFailedAt    DateTime  @map("last_failed_at") @db.Timestamptz
+  lockedUntil     DateTime? @map("locked_until") @db.Timestamptz
+
+  @@map("login_lock")
+  @@schema("hub")
+}
+
 /// TOTP secret and backup codes, both encrypted with BETTER_AUTH_SECRET. Readable only by the auth role.
 model TwoFactor {
   id                      String    @id

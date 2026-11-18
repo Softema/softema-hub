@@ -11,15 +11,22 @@ export async function signIn(email: string, password: string): Promise<SignInRes
     const res = await post('/sign-in/email', { email, password });
     if (res.ok) return (await res.json().catch(() => ({})))?.twoFactorRedirect ? { twoFactor: true } : { ok: true };
     if (res.status === 401 || res.status === 400) return { error: 'Nesprávný e-mail nebo heslo.' };
-    if (res.status === 429) return { error: 'Příliš mnoho pokusů. Zkuste to prosím za chvíli.' };
+    if (res.status === 429) {
+      const body = await res.json().catch(() => null) as { code?: string } | null;
+      if (body?.code === 'ACCOUNT_LOCKED') return { error: 'Účet je kvůli opakovaně špatnému heslu na 15 minut zamčený. Počkejte, nebo si nastavte nové heslo přes „Zapomněli jste heslo?“.' };
+      return { error: 'Příliš mnoho pokusů. Zkuste to prosím za chvíli.' };
+    }
     return { error: 'Přihlášení se nepodařilo. Server je dočasně nedostupný.' };
   } catch { return { error: `Přihlášení se nepodařilo. ${OFFLINE}` }; }
 }
 
-/** Second step of the sign-in: a code from the authenticator app, or one of the backup codes. */
-export async function verifyTwoFactor(code: string, backup: boolean): Promise<string | null> {
+/**
+ * Second step of the sign-in: a code from the authenticator app, or one of the backup codes.
+ * `trust` remembers this browser for 30 days, so the code is not asked again on the user's own phone or computer.
+ */
+export async function verifyTwoFactor(code: string, backup: boolean, trust = false): Promise<string | null> {
   try {
-    const res = await post(backup ? '/two-factor/verify-backup-code' : '/two-factor/verify-totp', { code: code.replace(/\s/g, '') });
+    const res = await post(backup ? '/two-factor/verify-backup-code' : '/two-factor/verify-totp', { code: code.replace(/\s/g, ''), trustDevice: trust });
     if (res.ok) return null;
     if (res.status === 429) return 'Příliš mnoho pokusů. Zkuste to prosím za chvíli.';
     const body = await res.json().catch(() => null) as { code?: string } | null;

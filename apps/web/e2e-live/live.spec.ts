@@ -350,3 +350,57 @@ test('zapomenuté heslo: odkaz z e-mailu nastaví nové heslo a platí jen jedno
   await expect(page.locator('.a-error')).toContainText('neplatný');
   await reset(PASSWORD); // other tests use the seed password
 });
+test('bezpečnostní hlavičky a žádné porušení CSP při práci v aplikaci', async ({ page }) => {
+  const violations: string[] = [];
+  page.on('console', m => { if (/Content Security Policy|Refused to/i.test(m.text())) violations.push(m.text()); });
+  const res = await page.goto('/prihlaseni');
+  const h = res!.headers();
+  expect(h['content-security-policy']).toContain("frame-ancestors 'none'");
+  expect(h['content-security-policy']).toContain("default-src 'self'");
+  expect(h['x-content-type-options']).toBe('nosniff');
+  await login(page, MANAGER);
+  await expect(page.getByRole('heading', { level: 1, name: 'Kontakty' })).toBeVisible();
+  await page.goto('/aplikace#zabezpeceni');
+  await expect(page.getByRole('heading', { name: 'Přihlášená zařízení' })).toBeVisible();
+  await page.goto('/aplikace#tym');
+  await expect(page.getByRole('heading', { level: 1, name: 'Tým' })).toBeVisible();
+  expect(violations).toEqual([]);
+});
+
+test('přihlášená zařízení: druhé zařízení jde odhlásit na dálku', async ({ browser }, info) => {
+  const phone = await session(browser, MEMBER, info), laptop = await session(browser, MEMBER, info);
+  await laptop.goto('/aplikace#zabezpeceni');
+  const devices = laptop.getByRole('region', { name: 'Přihlášená zařízení' });
+  await expect(devices.getByText('Toto zařízení')).toHaveCount(1);
+  // Earlier tests leave more sessions of this member, so "all others" is the reliable way to reach the phone.
+  expect(await devices.getByRole('listitem').count()).toBeGreaterThanOrEqual(2);
+  await devices.getByRole('button', { name: 'Odhlásit všechna ostatní zařízení' }).click();
+  await laptop.getByRole('dialog').getByRole('button', { name: 'Odhlásit ostatní' }).click();
+  await expect(laptop.getByText(/Odhlášeno zařízení: \d+\./)).toBeVisible();
+  await expect(devices.getByRole('listitem')).toHaveCount(1);
+  await phone.reload();
+  await expect(phone).toHaveURL(/\/prihlaseni/);
+  await laptop.reload();
+  await expect(laptop.getByRole('heading', { name: 'Přihlášená zařízení' })).toBeVisible();
+  await phone.context().close(); await laptop.context().close();
+});
+
+test('„na tomto zařízení se 30 dní neptat“: po novém přihlášení se kód nechce', async ({ page }, info) => {
+  test.skip(!!info.project.use.isMobile, 'odhlášení je v postranním panelu');
+  await page.goto('/prihlaseni');
+  await page.getByLabel('E-mail').fill(OUTSIDER);
+  await page.getByLabel('Heslo', { exact: true }).fill(PASSWORD);
+  await page.getByRole('button', { name: 'Přihlásit se', exact: true }).click();
+  await page.getByLabel('Ověřovací kód').fill(totp(SEED_TOTP));
+  await page.getByLabel('Na tomto zařízení se 30 dní neptat').check();
+  await page.getByRole('button', { name: 'Ověřit a přihlásit' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Kontakty' })).toBeVisible();
+  await page.locator('.sidebar-bottom .profile').click();
+  await page.getByRole('menuitem', { name: 'Odhlásit se' }).click();
+  await expect(page).toHaveURL(/\/prihlaseni/);
+  await page.getByLabel('E-mail').fill(OUTSIDER);
+  await page.getByLabel('Heslo', { exact: true }).fill(PASSWORD);
+  await page.getByRole('button', { name: 'Přihlásit se', exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Kontakty' })).toBeVisible();
+  await expect(page.getByLabel('Ověřovací kód')).toHaveCount(0);
+});

@@ -11,7 +11,7 @@ import { ApiError, notFound } from './errors';
 
 export interface Actor { userId: string; workspaceId: string; role: Role }
 export interface SessionUser { id: string; name: string; email: string; twoFactorEnabled?: boolean | null }
-type Authed = Request & { user?: SessionUser; actor?: Actor };
+type Authed = Request & { user?: SessionUser; sessionId?: string; actor?: Actor };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (s: string) => UUID.test(s);
@@ -30,6 +30,7 @@ export class SessionGuard implements CanActivate {
     const session = await this.auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
     if (!session) throw new ApiError(401, 'UNAUTHENTICATED', 'Přihlaste se prosím.');
     req.user = session.user;
+    req.sessionId = session.session.id;
     return true;
   }
 }
@@ -73,4 +74,5 @@ export class WorkspaceGuard implements CanActivate {
 }
 
 export const CurrentActor = createParamDecorator((_: unknown, ctx: ExecutionContext) => ctx.switchToHttp().getRequest<Authed>().actor!);
+export const CurrentSessionId = createParamDecorator((_: unknown, ctx: ExecutionContext): string => ctx.switchToHttp().getRequest<Authed>().sessionId!);
 export const CurrentUser = createParamDecorator((_: unknown, ctx: ExecutionContext): SessionUser => ctx.switchToHttp().getRequest<Authed>().user!);

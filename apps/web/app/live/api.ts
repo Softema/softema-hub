@@ -1,6 +1,6 @@
 /** Client of the local API. Every request reports failure explicitly: nothing here assumes a write succeeded. */
 import { keepPreviousData, QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { type ActivityPageDto, type ApiErrorBody, type ContactCreateInput, type ContactDetailDto, type ContactDto, type ContactListDto, type ContactUpdateInput, type ErrorCode, type InvitationAcceptedDto, type InvitationAcceptInput, type InvitationCreateInput, type InvitationDto, type InvitationPreviewDto, type MeDto, type MemberDto, type NoteDto, PASSWORD_MIN, type TagDto, type WorkspaceRole } from '@softema/shared';
+import { type ActivityPageDto, type ApiErrorBody, type ContactCreateInput, type ContactDetailDto, type ContactDto, type ContactListDto, type ContactUpdateInput, type ErrorCode, type InvitationAcceptedDto, type InvitationAcceptInput, type InvitationCreateInput, type InvitationDto, type InvitationPreviewDto, type MeDto, type MemberDto, type NoteDto, PASSWORD_MIN, type SessionDto, type TagDto, type WorkspaceRole } from '@softema/shared';
 
 export class ApiFailure extends Error {
   constructor(readonly status: number, readonly code: ErrorCode | 'NETWORK' | 'AUTH', message: string, readonly fields?: Record<string, string>) { super(message); }
@@ -73,6 +73,17 @@ export function useTeamMutations(w: string) {
     revoke: useMutation({ mutationFn: (id: string) => send<void>('DELETE', `${ws(w)}/invitations/${id}`), onSuccess: refresh }),
     setRole: useMutation({ mutationFn: (v: { userId: string; role: WorkspaceRole }) => send<MemberDto[]>('PATCH', `${ws(w)}/members/${encodeURIComponent(v.userId)}`, { role: v.role }), onSuccess: refresh }),
     remove: useMutation({ mutationFn: (userId: string) => send<void>('DELETE', `${ws(w)}/members/${encodeURIComponent(userId)}`), onSuccess: refresh }),
+  };
+}
+
+/** Signed-in devices of the current user. The list never contains session tokens. */
+export const useSessions = () => useQuery({ queryKey: ['sessions'], queryFn: () => request<SessionDto[]>('/me/sessions') });
+export function useSessionMutations() {
+  const qc = useQueryClient();
+  const refresh = () => qc.invalidateQueries({ queryKey: ['sessions'] });
+  return {
+    revoke: useMutation({ mutationFn: (id: string) => send<void>('DELETE', `/me/sessions/${encodeURIComponent(id)}`), onSuccess: refresh }),
+    revokeOthers: useMutation({ mutationFn: () => send<{ revoked: number }>('DELETE', '/me/sessions'), onSuccess: refresh }),
   };
 }
 

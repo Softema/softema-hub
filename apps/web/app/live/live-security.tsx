@@ -2,13 +2,15 @@
 /* Account security: two-factor authentication (TOTP + backup codes) and password change, over Better-Auth. */
 import React, { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Copy, Download, KeyRound, LogOut, ShieldCheck, Smartphone } from 'lucide-react';
+import { Copy, Download, KeyRound, LogOut, Monitor, ShieldCheck, Smartphone } from 'lucide-react';
 import { toast } from 'sonner';
 import { encode } from 'uqr';
-import { PASSWORD_MIN } from '@softema/shared';
+import { PASSWORD_MIN, type SessionDto } from '@softema/shared';
+import { fmtDateTime } from '@/lib/hub/format';
 import { Badge, Btn, Field, Modal, PageHead } from '../ui';
-import { FormError, Notice } from '../kit-core';
-import { authCall, message, signOut } from './api';
+import { FormError, Notice, useConfirm } from '../kit-core';
+import { authCall, message, signOut, useSessionMutations, useSessions } from './api';
+import { LoadFailure, LoadingBlock } from './live-ui';
 import './live-account.css';
 
 const PASSWORD_HINT = `Aspoň ${PASSWORD_MIN} znaků. Nejlépe několik slov, která spolu nesouvisí.`;
@@ -68,7 +70,7 @@ export function TwoFactorSetup({ onDone, onCancel }: { onDone: () => void; onCan
     <form className="stack" onSubmit={e => { e.preventDefault(); void run(async () => { await authCall('/two-factor/verify-totp', { code: code.replace(/\s/g, '') }); setStep('codes'); }); }}>
       <ol className="totp-steps">
         <li>Otevřete v telefonu autentizační aplikaci, například Google Authenticator, Microsoft Authenticator nebo 1Password.</li>
-        <li>Přidejte nový účet a naskenujte QR kód:<br /><TotpQr uri={setup.totpURI} /><br />Skenovat nejde? Zadejte v aplikaci ručně tento klíč:<br /><code className="totp-key mono" aria-label="Klíč pro autentizační aplikaci">{keyOf(setup.totpURI)}</code><br /><a href={setup.totpURI} className="small"><Smartphone size={14} aria-hidden className="inline" /> Na telefonu otevřít rovnou v aplikaci</a></li>
+        <li>Přidejte do aplikace účet Softema Hub.<div className="totp-phone"><span>Nastavujete přímo na telefonu?</span><a href={setup.totpURI} className="totp-open"><Smartphone size={16} aria-hidden />Otevřít v autentizační aplikaci</a></div>Na počítači naskenujte telefonem QR kód:<TotpQr uri={setup.totpURI} />Nejde to? Zadejte v aplikaci ručně tento klíč:<br /><code className="totp-key mono" aria-label="Klíč pro autentizační aplikaci">{keyOf(setup.totpURI)}</code></li>
         <li>Opište šestimístný kód, který aplikace ukáže.</li>
       </ol>
       <Field label="Ověřovací kód"><input inputMode="numeric" autoComplete="one-time-code" maxLength={8} value={code} onChange={e => { setCode(e.target.value); setError(''); }} placeholder="123456" required autoFocus /></Field>
@@ -136,6 +138,52 @@ function ChangePassword() {
   );
 }
 
+/** "Chrome · Windows" from a user-agent string. Approximate, only to recognise one's own devices. */
+function describe(ua: string | null) {
+  if (!ua) return { name: 'Neznámé zařízení', mobile: false };
+  const browser = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Prohlížeč';
+  const os = /iPhone|iPad/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Macintosh|Mac OS X/.test(ua) ? 'macOS' : /Linux/.test(ua) ? 'Linux' : '';
+  return { name: os ? `${browser} · ${os}` : browser, mobile: /Mobi|iPhone|Android/.test(ua) };
+}
+
+/** Signed-in devices (zadání 8.1): see where the account is signed in and end the ones you do not recognise. */
+function Devices() {
+  const q = useSessions();
+  const m = useSessionMutations();
+  const [confirmEl, confirm] = useConfirm();
+  const others = (q.data ?? []).filter(s => !s.current).length;
+  const end = (s: SessionDto) => confirm({
+    title: `Odhlásit ${describe(s.userAgent).name}?`, desc: 'Na tomto zařízení bude potřeba se znovu přihlásit.', confirm: 'Odhlásit zařízení', danger: true,
+    onConfirm: () => m.revoke.mutate(s.id, { onSuccess: () => toast.success('Zařízení bylo odhlášeno.'), onError: e => toast.error(message(e)) }),
+  });
+  const endOthers = () => confirm({
+    title: 'Odhlásit všechna ostatní zařízení?', desc: 'Zůstanete přihlášení jen tady. Pokud si nějaké přihlášení nepamatujete, změňte si i heslo.', confirm: 'Odhlásit ostatní', danger: true,
+    onConfirm: () => m.revokeOthers.mutate(undefined, { onSuccess: r => toast.success(r.revoked ? `Odhlášeno zařízení: ${r.revoked}.` : 'Jiná zařízení přihlášená nebyla.'), onError: e => toast.error(message(e)) }),
+  });
+  return (
+    <section className="panel account-section" aria-labelledby="sec-devices">
+      <h2 id="sec-devices">Přihlášená zařízení</h2>
+      <p>Kde je váš účet právě přihlášený. Zařízení, které nepoznáváte, odhlaste a změňte si heslo.</p>
+      {q.isPending ? <LoadingBlock label="Načítám zařízení…" /> : !q.data ? <LoadFailure error={q.error} onRetry={() => void q.refetch()} /> : (
+        <ul className="device-list">
+          {q.data.map(s => {
+            const d = describe(s.userAgent);
+            return (
+              <li key={s.id}>
+                {d.mobile ? <Smartphone aria-hidden /> : <Monitor aria-hidden />}
+                <div><strong>{d.name}</strong> {s.current && <Badge tone="green">Toto zařízení</Badge>}<small>Naposledy aktivní {fmtDateTime(s.lastActiveAt)}{s.ipAddress ? ` · IP ${s.ipAddress}` : ''} · přihlášeno {fmtDateTime(s.createdAt)}</small></div>
+                {!s.current && <Btn className="danger-ghost" disabled={m.revoke.isPending} onClick={() => end(s)}>Odhlásit</Btn>}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {others > 0 && <div className="account-row"><Btn disabled={m.revokeOthers.isPending} onClick={endOthers}><LogOut aria-hidden />Odhlásit všechna ostatní zařízení</Btn></div>}
+      {confirmEl}
+    </section>
+  );
+}
+
 export function LiveSecurity({ enabled, required }: { enabled: boolean; required: boolean }) {
   const qc = useQueryClient();
   const [setup, setSetup] = useState(false);
@@ -159,7 +207,7 @@ export function LiveSecurity({ enabled, required }: { enabled: boolean; required
               </div>)}
           {enabled && required && <p className="small muted">Správci ověření vypnout nemohou. Při ztrátě telefonu se přihlaste záložním kódem a zapněte ověření na novém telefonu.</p>}
         </section>
-        <section className="panel account-section" aria-labelledby="sec-pass">
+        <Devices />`n        <section className="panel account-section" aria-labelledby="sec-pass">
           <h2 id="sec-pass">Heslo</h2>
           <p>Po změně hesla vás na ostatních zařízeních odhlásíme.</p>
           <ChangePassword />
