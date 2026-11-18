@@ -235,3 +235,65 @@ describe('CSRF a chybové odpovědi', () => {
   });
   it('zdravotní kontrola nepotřebuje session', async () => { assert.equal((await new Client(ctx.base).get('/api/health')).status, 200); });
 });
+
+describe('vlastní pole', () => {
+  const fieldsUrl = (ws: string) => `/api/v1/workspaces/${ws}/custom-fields`;
+  it('uloží se při založení, úprava nahradí celou sadu a časová osa nese jen názvy', async () => {
+    const m = await ctx.as('manager');
+    const c = await make('manager', A, { customFields: { '  Obor ': ' Strojírenství ', Kanál: 'E-mail' } });
+    assert.deepEqual(c.customFields, { Obor: 'Strojírenství', Kanál: 'E-mail' });
+    const r = await m.patch(`${contacts(A)}/${c.id}`, { version: c.version, customFields: { Obor: 'Stavebnictví', 'Velikost firmy': '11–50' } });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.deepEqual(r.body.customFields, { Obor: 'Stavebnictví', 'Velikost firmy': '11–50' });
+    const act = (await m.get(`${contacts(A)}/${c.id}/activities`)).body.items.find((a: any) => a.type === 'field');
+    assert.equal(act.title, 'Upravena vlastní pole');
+    assert.equal(act.detail, 'Změněno: Kanál, Obor, Velikost firmy');
+    assert.equal(act.detail.includes('Stavebnictví'), false, 'hodnoty na časovou osu nepatří');
+    const audit = await ctx.ownerDb.auditLog.findFirstOrThrow({ where: { entityId: c.id, action: 'update' } });
+    assert.deepEqual(audit.changedFields, ['customFields']);
+  });
+  it('stejné pole se v prostoru píše jednotně a nabízí se v seznamu názvů', async () => {
+    const name = `Region ${Date.now()}`;
+    await make('manager', A, { customFields: { [name]: 'Morava' } });
+    const second = await make('member', A, { customFields: { [name.toLowerCase().replace('region', 'REGIÓN')]: 'Čechy' } });
+    assert.deepEqual(second.customFields, { [name]: 'Čechy' });
+    const names = (await (await ctx.as('member')).get(fieldsUrl(A))).body as string[];
+    assert.equal(names.filter(n => n === name).length, 1);
+  });
+  it('neplatná pole odmítne česky a nic neuloží', async () => {
+    const m = await ctx.as('manager');
+    const c = await make();
+    for (const [customFields, msg] of [
+      [{ '': 'x' }, /název pole/i],
+      [{ Obor: 'a', obor: 'b' }, /dvakrát/],
+      [{ ['x'.repeat(61)]: 'a' }, /nejvýše 60/],
+      [{ Obor: 'x'.repeat(501) }, /nejvýše 500/],
+      [Object.fromEntries(Array.from({ length: 51 }, (_, i) => [`Pole ${i}`, 'a'])), /nejvýše 50/],
+      [{ Obor: 5 }, /./],
+    ] as const) {
+      const r = await m.patch(`${contacts(A)}/${c.id}`, { version: c.version, customFields });
+      assert.equal(r.status, 422, JSON.stringify(customFields).slice(0, 40)); assert.equal(r.body.code, 'VALIDATION_FAILED'); assert.match(r.body.message, msg);
+    }
+    assert.deepEqual((await m.get(`${contacts(A)}/${c.id}`)).body.customFields, {});
+  });
+  it('klíč __proto__ nezmění prototyp, ostatní pole se uloží', async () => {
+    const c = await make('manager', A, { customFields: JSON.parse('{"__proto__": {"polluted": "ano"}, "Obor": "IT"}') });
+    assert.deepEqual(c.customFields, { Obor: 'IT' });
+    assert.equal(({} as Record<string, unknown>).polluted, undefined);
+    const stored = await ctx.ownerDb.contact.findUniqueOrThrow({ where: { id: c.id }, select: { customFields: true } });
+    assert.deepEqual(stored.customFields, { Obor: 'IT' });
+  });
+  it('souběžná úprava polí skončí konfliktem verze, ne tichým přepsáním', async () => {
+    const m = await ctx.as('manager'); const u = await ctx.as('member');
+    const c = await make('manager', A, { customFields: { Obor: 'IT' } });
+    assert.equal((await m.patch(`${contacts(A)}/${c.id}`, { version: c.version, customFields: { Obor: 'Obchod' } })).status, 200);
+    const r = await u.patch(`${contacts(A)}/${c.id}`, { version: c.version, customFields: { Obor: 'Výroba' } });
+    assert.equal(r.status, 409); assert.equal(r.body.code, 'VERSION_CONFLICT');
+  });
+  it('názvy polí cizího prostoru nejsou vidět', async () => {
+    const secret = `Tajné pole ${Date.now()}`;
+    await make('outsider', B, { customFields: { [secret]: 'B' } });
+    assert.equal(((await (await ctx.as('member')).get(fieldsUrl(A))).body as string[]).includes(secret), false);
+    assert.equal((await (await ctx.as('member')).get(fieldsUrl(B))).status, 404);
+  });
+});

@@ -62,6 +62,7 @@ export const useContacts = (w: string, p: ListParams) => useQuery({ queryKey: ['
 export const useContact = (w: string, id: string) => useQuery({ queryKey: ['contact', w, id], queryFn: () => request<ContactDetailDto>(`${ws(w)}/contacts/${id}`) });
 export const useActivities = (w: string, id: string) => useQuery({ queryKey: ['activities', w, id], queryFn: () => request<ActivityPageDto>(`${ws(w)}/contacts/${id}/activities`) });
 export const useTags = (w: string) => useQuery({ queryKey: ['tags', w], queryFn: () => request<TagDto[]>(`${ws(w)}/tags`) });
+export const useCustomFieldNames = (w: string) => useQuery({ queryKey: ['custom-fields', w], queryFn: () => request<string[]>(`${ws(w)}/custom-fields`) });
 export const useMembers = (w: string) => useQuery({ queryKey: ['members', w], queryFn: () => request<MemberDto[]>(`${ws(w)}/members`) });
 export const useInvitations = (w: string, enabled: boolean) => useQuery({ queryKey: ['invitations', w], queryFn: () => request<InvitationDto[]>(`${ws(w)}/invitations`), enabled });
 
@@ -94,7 +95,7 @@ export const acceptInvitation = (v: InvitationAcceptInput) => send<InvitationAcc
 /** Writes refresh what they touched from the server; the screen never shows a state the server did not confirm. */
 export function useContactMutations(w: string, id?: string) {
   const qc = useQueryClient();
-  const refresh = async () => { await Promise.all([qc.invalidateQueries({ queryKey: ['contacts', w] }), qc.invalidateQueries({ queryKey: ['tags', w] }), ...(id ? [qc.invalidateQueries({ queryKey: ['contact', w, id] }), qc.invalidateQueries({ queryKey: ['activities', w, id] })] : [])]); };
+  const refresh = async () => { await Promise.all([qc.invalidateQueries({ queryKey: ['contacts', w] }), qc.invalidateQueries({ queryKey: ['tags', w] }), qc.invalidateQueries({ queryKey: ['custom-fields', w] }), ...(id ? [qc.invalidateQueries({ queryKey: ['contact', w, id] }), qc.invalidateQueries({ queryKey: ['activities', w, id] })] : [])]); };
   const base = `${ws(w)}/contacts/${id}`;
   return {
     refresh,

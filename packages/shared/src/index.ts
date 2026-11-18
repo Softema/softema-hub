@@ -31,12 +31,33 @@ const text = (max: number) => z.string().trim().max(max, `Nejvýše ${max} znak�
 const name = text(200).min(1, 'Vyplňte jméno a příjmení.');
 const email = z.string().trim().max(254, 'E-mail je příliš dlouhý.').regex(/^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/, 'Zadejte platný e-mail, např. jana@firma.cz.');
 
+/** Custom fields of a contact (zadání 8.2): name → plain-text value. Names are unique regardless of case and
+ *  diacritics; the API additionally adopts the spelling already used in the workspace. */
+export const CUSTOM_FIELDS = { max: 50, name: 60, value: 500 } as const;
+export const customFieldsSchema = z.record(z.string(), z.string()).transform((rec, ctx) => {
+  const out: [string, string][] = [];
+  const seen = new Set<string>();
+  for (const [rawName, rawValue] of Object.entries(rec)) {
+    const name = rawName.trim(), value = rawValue.trim();
+    const problem = !name ? 'Doplňte název pole.'
+      : name.length > CUSTOM_FIELDS.name ? `Název pole může mít nejvýše ${CUSTOM_FIELDS.name} znaků.`
+      : value.length > CUSTOM_FIELDS.value ? `Hodnota pole „${name}“ může mít nejvýše ${CUSTOM_FIELDS.value} znaků.`
+      : seen.has(normalizeSearch(name)) ? `Pole „${name}“ je u kontaktu dvakrát.` : '';
+    if (problem) { ctx.addIssue({ code: 'custom', message: problem }); return z.NEVER; }
+    seen.add(normalizeSearch(name)); out.push([name, value]);
+  }
+  if (out.length > CUSTOM_FIELDS.max) { ctx.addIssue({ code: 'custom', message: `Kontakt může mít nejvýše ${CUSTOM_FIELDS.max} vlastních polí.` }); return z.NEVER; }
+  // fromEntries defines own properties, so a name like "__proto__" stays an ordinary field.
+  return Object.fromEntries(out) as Record<string, string>;
+});
+
 export const contactCreateSchema = z.strictObject({
   name, email,
   phone: text(50).default(''), company: text(200).default(''), city: text(120).default(''),
   stage: z.enum(CONTACT_STAGES).default('lead'),
   ownerId: z.string().min(1).nullable().optional(),
   tags: z.array(text(60).min(1)).max(50).default([]),
+  customFields: customFieldsSchema.default({}),
 });
 export type ContactCreateInput = z.input<typeof contactCreateSchema>;
 
@@ -46,6 +67,8 @@ export const contactUpdateSchema = z.strictObject({
   phone: text(50).optional(), company: text(200).optional(), city: text(120).optional(),
   stage: z.enum(CONTACT_STAGES).optional(),
   ownerId: z.string().min(1).nullable().optional(),
+  /** The complete new set of custom fields; fields left out are removed. */
+  customFields: customFieldsSchema.optional(),
 });
 export type ContactUpdateInput = z.input<typeof contactUpdateSchema>;
 
@@ -92,12 +115,13 @@ export const LOGIN_LOCK = { attempts: 5, minutes: 15 } as const;
 export interface ContactDto {
   id: string; name: string; email: string; phone: string; company: string; city: string;
   stage: ContactStage; source: string; owner: UserRef | null; tags: TagDto[];
+  customFields: Record<string, string>;
   version: number; createdAt: string; updatedAt: string;
 }
 export interface NoteDto { id: string; body: string; author: UserRef; createdAt: string; updatedAt: string }
 export interface ContactDetailDto extends ContactDto { notes: NoteDto[] }
 export interface ContactListDto { items: ContactDto[]; total: number; page: number; limit: number; sources: string[] }
-export type ActivityKind = 'contact' | 'note' | 'tag' | 'stage';
+export type ActivityKind = 'contact' | 'note' | 'tag' | 'stage' | 'field';
 export interface ActivityDto { id: string; type: ActivityKind; title: string; detail: string; actor: UserRef | null; createdAt: string }
 export interface ActivityPageDto { items: ActivityDto[]; nextCursor: string | null }
 

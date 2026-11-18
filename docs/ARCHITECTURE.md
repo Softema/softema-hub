@@ -55,8 +55,9 @@ Kontakty a poznámky aplikace nemůže tvrdě mazat, historie a audit jsou jen p
 | `GET {ws}/contacts` | seznam: `q, stage, tag, source, sort, page, limit` | člen |
 | `POST {ws}/contacts` | vytvoření | člen |
 | `GET {ws}/contacts/:id` | detail s poznámkami, zapisuje audit čtení | člen |
-| `PATCH {ws}/contacts/:id` | úprava, povinné `version` | člen |
+| `PATCH {ws}/contacts/:id` | úprava, povinné `version`; `customFields` nahradí celou sadu vlastních polí | člen |
 | `DELETE {ws}/contacts/:id` | měkké smazání | správce |
+| `GET {ws}/custom-fields` | názvy vlastních polí použité v prostoru | člen |
 | `GET {ws}/tags` | štítky prostoru | člen |
 | `POST`, `DELETE {ws}/contacts/:id/tags[/:tagId]` | štítky kontaktu | člen |
 | `POST`, `PATCH`, `DELETE {ws}/contacts/:id/notes[/:noteId]` | poznámky | člen |

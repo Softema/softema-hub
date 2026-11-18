@@ -1,17 +1,17 @@
 'use client';
-/* Contact detail over the API: profile, tags, stage, owner, notes and timeline. */
+/* Contact detail over the API: profile, tags, custom fields, stage, owner, notes and timeline. */
 import React, { useState } from 'react';
-import { ArrowLeft, Building2, Mail, MapPin, Pencil, Phone, Plus, RefreshCw, StickyNote, Tag as TagIcon, Trash2, User, X } from 'lucide-react';
+import { ArrowLeft, Building2, ListPlus, Mail, MapPin, Pencil, Phone, Plus, RefreshCw, StickyNote, Tag as TagIcon, Trash2, User, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { CONTACT_STAGES, type ActivityDto, type ContactDetailDto, type ContactStage, STAGE_LABEL } from '@softema/shared';
+import { CONTACT_STAGES, CUSTOM_FIELDS, type ActivityDto, type ContactDetailDto, type ContactStage, normalizeSearch, STAGE_LABEL } from '@softema/shared';
 import { daysSince, fmtDate, fmtDateTime, fmtTime, plural } from '@/lib/hub/format';
 import { Avatar, Btn, Field, IconBtn, Metric, Modal, Pick, Tabbar } from '../ui';
 import { FormError, Notice, OptionCombobox, useConfirm } from '../kit-core';
-import { ApiFailure, message, useActivities, useContact, useContactMutations, useMembers, useTags } from './api';
+import { ApiFailure, message, useActivities, useContact, useContactMutations, useCustomFieldNames, useMembers, useTags } from './api';
 import { LoadFailure, LoadingBlock } from './live-ui';
 import { useLive, useLiveRoute } from './live-state';
 
-const ICON: Record<ActivityDto['type'], [typeof User, string]> = { contact: [User, 'gray'], note: [StickyNote, 'orange'], tag: [TagIcon, 'gray'], stage: [User, 'blue'] };
+const ICON: Record<ActivityDto['type'], [typeof User, string]> = { contact: [User, 'gray'], note: [StickyNote, 'orange'], tag: [TagIcon, 'gray'], stage: [User, 'blue'], field: [ListPlus, 'gray'] };
 const isConflict = (e: unknown) => e instanceof ApiFailure && e.code === 'VERSION_CONFLICT';
 
 export function LiveContactDetail({ id }: { id: string }) {
@@ -66,6 +66,7 @@ function Detail({ c, back }: { c: ContactDetailDto; back: React.ReactNode }) {
             <div className="info-row"><MapPin aria-hidden />{c.city || 'Město neuvedeno'}</div>
           </div>
           <TagsBox c={c} />
+          <CustomFieldsBox c={c} />
           <div className="contact-info">
             <Field label="Fáze životního cyklu"><Pick value={c.stage} onChange={s => { if (s !== c.stage) quick({ stage: s as ContactStage }, 'Fáze byla změněna.'); }} options={CONTACT_STAGES.map(s => [s, STAGE_LABEL[s]] as [string, string])} className="full" label="Fáze" /></Field>
             <Field label="Vlastník"><Pick value={c.owner?.id ?? 'none'} onChange={o => { if (o !== (c.owner?.id ?? 'none')) quick({ ownerId: o === 'none' ? null : o }, 'Vlastník byl změněn.'); }} options={owners} className="full" label="Vlastník" /></Field>
@@ -143,6 +144,67 @@ function TagsBox({ c }: { c: ContactDetailDto }) {
         <OptionCombobox value="" onChange={add} options={(tags.data ?? []).map(t => t.name).filter(n => !c.tags.some(x => x.name === n))} label="Přidat štítek" trigger={<button type="button" className="pill-tag" disabled={busy}>{busy ? 'Ukládám…' : '+ Přidat'}</button>} />
       </div>
     </div>
+  );
+}
+
+/** Custom fields (zadání 8.2): name → value, shared names across the workspace so segments and imports can use them. */
+function CustomFieldsBox({ c }: { c: ContactDetailDto }) {
+  const [dialog, setDialog] = useState<{ name?: string } | null>(null);
+  // `?? {}`: an older API (during a deploy) does not send the field yet.
+  const entries = Object.entries(c.customFields ?? {}).sort(([a], [b]) => a.localeCompare(b, 'cs'));
+  return (
+    <section className="contact-info" aria-labelledby="custom-fields-title">
+      <div className="cf-head"><h3 id="custom-fields-title">Vlastní pole</h3>{entries.length < CUSTOM_FIELDS.max && <IconBtn label="Přidat vlastní pole" onClick={() => setDialog({})}><Plus /></IconBtn>}</div>
+      {entries.length ? <div className="cf-list">{entries.map(([name, value]) => <button key={name} type="button" className="custom-field-row" onClick={() => setDialog({ name })} aria-label={`Upravit pole ${name}`}><span>{name}</span><strong>{value || '—'}</strong></button>)}</div>
+        : <><p className="cf-empty">Zatím tu nejsou žádná vlastní pole. Doplňte třeba obor nebo preferovaný kanál.</p><button type="button" className="pill-tag" onClick={() => setDialog({})}>+ Přidat pole</button></>}
+      {dialog && <FieldDialog c={c} fieldName={dialog.name} onClose={() => setDialog(null)} />}
+    </section>
+  );
+}
+
+function FieldDialog({ c, fieldName, onClose }: { c: ContactDetailDto; fieldName?: string; onClose: () => void }) {
+  const { workspace } = useLive();
+  const m = useContactMutations(workspace.id, c.id);
+  const names = useCustomFieldNames(workspace.id);
+  const [name, setName] = useState(fieldName ?? '');
+  const current = c.customFields ?? {};
+  const [value, setValue] = useState(fieldName ? current[fieldName] ?? '' : '');
+  const [error, setError] = useState('');
+  const pending = m.update.isPending;
+  const others = Object.keys(current).filter(k => k !== fieldName);
+  // Suggest names used elsewhere in the workspace that this contact does not have yet.
+  const suggestions = (names.data ?? []).filter(n => !others.some(o => normalizeSearch(o) === normalizeSearch(n)));
+  const save = (next: Record<string, string>, done: string) => m.update.mutate({ version: c.version, customFields: next }, {
+    onSuccess: () => { toast.success(done); onClose(); },
+    onError: e => { if (isConflict(e)) { void m.refresh(); setError('Kontakt mezitím upravil někdo jiný. Načetli jsme aktuální data, uložte prosím znovu.'); } else setError(message(e)); },
+  });
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const n = name.trim();
+    if (!n) return setError('Vyberte nebo napište název pole.');
+    if (others.some(o => normalizeSearch(o) === normalizeSearch(n))) return setError(`Pole „${n}“ už u tohoto kontaktu existuje.`);
+    const next = { ...current };
+    if (fieldName) delete next[fieldName];
+    next[n] = value.trim();
+    save(next, fieldName ? 'Vlastní pole bylo upraveno.' : 'Vlastní pole bylo přidáno.');
+  };
+  const removeField = () => { const next = { ...current }; delete next[fieldName!]; save(next, 'Vlastní pole bylo odebráno.'); };
+  return (
+    <Modal open onClose={() => { if (!pending) onClose(); }} title={fieldName ? 'Upravit vlastní pole' : 'Nové vlastní pole'} desc={`${c.name} · stejně pojmenované pole sdílí celý prostor.`}>
+      <form onSubmit={submit} noValidate>
+        <fieldset disabled={pending} className="contents">
+          <div className="stack">
+            <Field label="Název pole" hint="Např. Obor, Velikost firmy nebo Preferovaný kanál."><OptionCombobox value={name} onChange={v => { setName(v.slice(0, CUSTOM_FIELDS.name)); setError(''); }} options={suggestions} label="Název pole" placeholder="Vyberte nebo napište nový" emptyText="Zatím žádná pole, napište nový název." /></Field>
+            <Field label="Hodnota"><input value={value} onChange={e => setValue(e.target.value)} maxLength={CUSTOM_FIELDS.value} placeholder="Zadejte hodnotu" /></Field>
+            <FormError>{error}</FormError>
+          </div>
+          <div className="form-actions">
+            {fieldName && <Btn type="button" className="mr-auto" onClick={removeField}><Trash2 aria-hidden />Odebrat pole</Btn>}
+            <Btn type="button" onClick={onClose}>Zrušit</Btn><Btn primary type="submit" aria-busy={pending}>{pending ? 'Ukládám…' : fieldName ? 'Uložit změny' : 'Přidat pole'}</Btn>
+          </div>
+        </fieldset>
+      </form>
+    </Modal>
   );
 }
 

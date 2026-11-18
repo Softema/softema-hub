@@ -7,14 +7,21 @@ import { type Actor, isUuid } from '../common/guards';
 import { APP_DB } from '../tokens';
 
 const SELECT = {
-  id: true, name: true, email: true, phone: true, company: true, city: true, stage: true, source: true, version: true, createdAt: true, updatedAt: true,
+  id: true, name: true, email: true, phone: true, company: true, city: true, stage: true, source: true, customFields: true, version: true, createdAt: true, updatedAt: true,
   owner: { select: { id: true, name: true } },
   tags: { select: { tag: { select: { id: true, name: true } } }, orderBy: { tag: { name: 'asc' } } },
 } satisfies Prisma.ContactSelect;
 type Row = Prisma.ContactGetPayload<{ select: typeof SELECT }>;
 const NOTE_SELECT = { id: true, body: true, createdAt: true, updatedAt: true, author: { select: { id: true, name: true } } } satisfies Prisma.NoteSelect;
 
-const toDto = (c: Row): ContactDto => ({ ...c, tags: c.tags.map(t => t.tag), createdAt: c.createdAt.toISOString(), updatedAt: c.updatedAt.toISOString() });
+/** Custom fields as stored; anything that is not a flat name → text object (legacy or manual edits) reads as empty. */
+const fieldsOf = (v: Prisma.JsonValue): Record<string, string> =>
+  v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).filter((e): e is [string, string] => typeof e[1] === 'string')) : {};
+const sameFields = (a: Record<string, string>, b: Record<string, string>) => Object.keys(a).length === Object.keys(b).length && Object.entries(a).every(([k, v]) => b[k] === v);
+/** Names whose value was added, changed or removed, for the timeline and the audit log (names only, never values). */
+const changedFieldNames = (before: Record<string, string>, after: Record<string, string>) =>
+  [...new Set([...Object.keys(before), ...Object.keys(after)])].filter(k => before[k] !== after[k]).sort((x, y) => x.localeCompare(y, 'cs'));
+const toDto = (c: Row): ContactDto => ({ ...c, tags: c.tags.map(t => t.tag), customFields: fieldsOf(c.customFields), createdAt: c.createdAt.toISOString(), updatedAt: c.updatedAt.toISOString() });
 const toNote = (n: Prisma.NoteGetPayload<{ select: typeof NOTE_SELECT }>): NoteDto => ({ ...n, createdAt: n.createdAt.toISOString(), updatedAt: n.updatedAt.toISOString() });
 const FIELD_LABEL: Record<string, string> = { name: 'jméno', email: 'e-mail', phone: 'telefon', company: 'firma', city: 'město', ownerId: 'vlastník' };
 const duplicate = () => new ApiError(409, 'DUPLICATE_EMAIL', 'Kontakt s tímto e-mailem už v prostoru existuje.', { email: 'Kontakt s tímto e-mailem už v prostoru existuje.' });
@@ -49,6 +56,21 @@ export class ContactsService {
     await tx.tag.createMany({ data: { workspaceId: actor.workspaceId, name, nameNormalized }, skipDuplicates: true });
     return tx.tag.findUniqueOrThrow({ where: key, select: { id: true, name: true } });
   }
+  /** Custom field names in use in the workspace, optionally ignoring one contact (whose own names may be renamed). */
+  private async fieldNames(tx: TenantTx, actor: Actor, exceptContactId?: string) {
+    const rows = await tx.$queryRaw<{ name: string }[]>`
+      select distinct jsonb_object_keys(custom_fields) as name from hub.contact
+      where workspace_id = ${actor.workspaceId}::uuid and deleted_at is null and jsonb_typeof(custom_fields) = 'object'
+      ${exceptContactId ? Prisma.sql`and id <> ${exceptContactId}::uuid` : Prisma.empty}`;
+    return rows.map(r => r.name);
+  }
+  /** One spelling per field in the workspace: "obor" on a new contact becomes the existing "Obor", so segments and
+   *  imports see a single field. */
+  private async canonical(tx: TenantTx, actor: Actor, fields: Record<string, string>, exceptContactId?: string) {
+    if (!Object.keys(fields).length) return fields;
+    const known = new Map((await this.fieldNames(tx, actor, exceptContactId)).map(n => [normalizeSearch(n), n]));
+    return Object.fromEntries(Object.entries(fields).map(([k, v]) => [known.get(normalizeSearch(k)) ?? k, v])) as Record<string, string>;
+  }
 
   list(actor: Actor, q: z.output<typeof contactListQuerySchema>): Promise<ContactListDto> {
     const where: Prisma.ContactWhereInput = {
@@ -71,7 +93,8 @@ export class ContactsService {
       return await this.tx(actor, async tx => {
         const ownerId = input.ownerId === undefined ? actor.userId : input.ownerId;
         if (ownerId && ownerId !== actor.userId) await this.member(tx, actor, ownerId);
-        const c = await tx.contact.create({ data: { workspaceId: actor.workspaceId, name: input.name, email: input.email, emailNormalized: normalizeEmail(input.email), phone: input.phone, company: input.company, city: input.city, stage: input.stage, ownerUserId: ownerId ?? null }, select: { id: true } });
+        const customFields = await this.canonical(tx, actor, input.customFields);
+        const c = await tx.contact.create({ data: { workspaceId: actor.workspaceId, name: input.name, email: input.email, emailNormalized: normalizeEmail(input.email), phone: input.phone, company: input.company, city: input.city, stage: input.stage, ownerUserId: ownerId ?? null, customFields }, select: { id: true } });
         for (const name of new Set(input.tags)) { const t = await this.tag(tx, actor, name); await tx.contactTag.createMany({ data: { workspaceId: actor.workspaceId, contactId: c.id, tagId: t.id }, skipDuplicates: true }); }
         await this.activity(tx, actor, c.id, 'contact', 'Kontakt přidán do databáze', 'Zdroj: Ruční zadání');
         await this.audit(tx, actor, 'create', 'contact', c.id);
@@ -93,20 +116,24 @@ export class ContactsService {
     try {
       return await this.tx(actor, async tx => {
         const cur = await this.live(tx, actor, id);
-        const { version, ownerId, ...fields } = input;
+        const { version, ownerId, customFields: rawFields, ...fields } = input;
         const changed = (Object.keys(fields) as (keyof typeof fields)[]).filter(k => fields[k] !== undefined && fields[k] !== cur[k]);
         const ownerChanged = ownerId !== undefined && ownerId !== (cur.owner?.id ?? null);
         if (ownerChanged && ownerId) await this.member(tx, actor, ownerId);
+        const before = fieldsOf(cur.customFields);
+        const customFields = rawFields === undefined ? undefined : await this.canonical(tx, actor, rawFields, id);
+        const fieldsChanged = customFields !== undefined && !sameFields(before, customFields);
         // The version check and the write are one statement, so two members can never overwrite each other silently.
         const res = await tx.contact.updateMany({
           where: { id, workspaceId: actor.workspaceId, deletedAt: null, version },
-          data: { ...fields, ...(fields.email ? { emailNormalized: normalizeEmail(fields.email) } : {}), ...(ownerChanged ? { ownerUserId: ownerId } : {}), version: { increment: 1 } },
+          data: { ...fields, ...(fields.email ? { emailNormalized: normalizeEmail(fields.email) } : {}), ...(ownerChanged ? { ownerUserId: ownerId } : {}), ...(fieldsChanged ? { customFields } : {}), version: { increment: 1 } },
         });
         if (!res.count) throw new ApiError(409, 'VERSION_CONFLICT', 'Kontakt mezitím upravil někdo jiný. Načtěte aktuální data a změnu zopakujte.');
         const names = [...changed.filter(k => k !== 'stage'), ...(ownerChanged ? ['ownerId'] : [])];
         if (input.stage && changed.includes('stage')) await this.activity(tx, actor, id, 'stage', `Fáze změněna na ${STAGE_LABEL[input.stage]}`, `Předtím: ${STAGE_LABEL[cur.stage]}`);
         if (names.length) await this.activity(tx, actor, id, 'contact', 'Kontakt upraven', `Změněno: ${names.map(n => FIELD_LABEL[n] ?? n).join(', ')}`);
-        await this.audit(tx, actor, 'update', 'contact', id, [...changed, ...(ownerChanged ? ['ownerId'] : [])]);
+        if (fieldsChanged) await this.activity(tx, actor, id, 'field', 'Upravena vlastní pole', `Změněno: ${changedFieldNames(before, customFields).join(', ')}`);
+        await this.audit(tx, actor, 'update', 'contact', id, [...changed, ...(ownerChanged ? ['ownerId'] : []), ...(fieldsChanged ? ['customFields'] : [])]);
         return toDto(await this.live(tx, actor, id));
       });
     } catch (e) { if (isUniqueViolation(e)) throw duplicate(); throw e; }
@@ -119,6 +146,11 @@ export class ContactsService {
       await this.activity(tx, actor, id, 'contact', 'Kontakt smazán');
       await this.audit(tx, actor, 'delete', 'contact', id);
     });
+  }
+
+  /** Custom field names used in the workspace, for suggestions when adding a field. */
+  customFieldNames(actor: Actor): Promise<string[]> {
+    return this.tx(actor, async tx => (await this.fieldNames(tx, actor)).sort((a, b) => a.localeCompare(b, 'cs')));
   }
 
   tags(actor: Actor): Promise<TagDto[]> {

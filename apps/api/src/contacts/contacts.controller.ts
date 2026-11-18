@@ -20,6 +20,9 @@ export class ContactsController {
   @Delete('contacts/:id') @HttpCode(204) @Requires('contact:delete')
   remove(@CurrentActor() a: Actor, @Param('id') id: string) { return this.contacts.remove(a, id); }
 
+  @Get('custom-fields') @Requires('contact:read')
+  customFields(@CurrentActor() a: Actor) { return this.contacts.customFieldNames(a); }
+
   @Get('tags') @Requires('contact:read')
   tags(@CurrentActor() a: Actor) { return this.contacts.tags(a); }
   @Post('contacts/:id/tags') @Requires('contact:write')

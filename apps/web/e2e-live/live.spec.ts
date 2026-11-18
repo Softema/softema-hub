@@ -100,7 +100,7 @@ test('dva členové sdílejí kontakt, štítky i poznámky', async ({ browser }
   const manager = await session(browser, MANAGER, info), member = await session(browser, MEMBER, info);
   const name = `Sdílený ${Date.now().toString(36)}`;
   const { id } = await createContact(manager, name);
-  await manager.getByRole('button', { name: '+ Přidat' }).click();
+  await manager.getByRole('button', { name: '+ Přidat', exact: true }).click();
   await manager.getByPlaceholder('Hledat nebo napsat nový…').fill('E2E štítek');
   await manager.getByRole('option', { name: /Vytvořit|E2E štítek/ }).first().click();
   await expect(manager.locator('.tag-chip', { hasText: 'E2E štítek' })).toBeVisible();
@@ -121,6 +121,46 @@ test('dva členové sdílejí kontakt, štítky i poznámky', async ({ browser }
   await expect(manager.getByRole('heading', { name: 'Přidána interní poznámka' })).toBeVisible();
   await expect(manager.getByRole('heading', { name: 'Přidán štítek E2E štítek' })).toBeVisible();
   await manager.context().close(); await member.context().close();
+});
+
+test('vlastní pole: přidání, nabídka názvu u dalšího kontaktu, úprava, časová osa a odebrání', async ({ page }) => {
+  await login(page, MEMBER);
+  await expect(page.getByRole('heading', { level: 1, name: 'Kontakty' })).toBeVisible();
+  const field = `Obor ${Date.now().toString(36)}`;
+  await createContact(page, `Pole první ${Date.now().toString(36)}`);
+  await page.getByRole('button', { name: '+ Přidat pole' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: 'Název pole' }).click();
+  await page.getByPlaceholder('Hledat nebo napsat nový…').fill(field);
+  await page.getByRole('option', { name: `Vytvořit „${field}“` }).click();
+  await dialog.getByLabel('Hodnota').fill('Strojírenství');
+  await dialog.getByRole('button', { name: 'Přidat pole' }).click();
+  await expect(page.getByRole('button', { name: `Upravit pole ${field}` })).toContainText('Strojírenství');
+
+  // A second contact is offered the same name instead of a new spelling.
+  await page.getByRole('button', { name: 'Zpět na kontakty' }).click();
+  await createContact(page, `Pole druhý ${Date.now().toString(36)}`);
+  await page.getByRole('button', { name: '+ Přidat pole' }).click();
+  await dialog.getByRole('button', { name: 'Název pole' }).click();
+  await page.getByPlaceholder('Hledat nebo napsat nový…').fill(field.slice(0, 8).toLowerCase());
+  await page.getByRole('option', { name: field, exact: true }).click();
+  await dialog.getByLabel('Hodnota').fill('Výroba');
+  await dialog.getByRole('button', { name: 'Přidat pole' }).click();
+  const row = page.getByRole('button', { name: `Upravit pole ${field}` });
+  await expect(row).toContainText('Výroba');
+
+  await row.click();
+  await dialog.getByLabel('Hodnota').fill('Výroba nábytku');
+  await dialog.getByRole('button', { name: 'Uložit změny' }).click();
+  await expect(row).toContainText('Výroba nábytku');
+  await page.reload();
+  await expect(row).toContainText('Výroba nábytku');
+  await expect(page.getByRole('heading', { name: 'Upravena vlastní pole' }).first()).toBeVisible();
+
+  await row.click();
+  await dialog.getByRole('button', { name: 'Odebrat pole' }).click();
+  await expect(row).toHaveCount(0);
+  await expect(page.getByText('Zatím tu nejsou žádná vlastní pole.')).toBeVisible();
 });
 
 test('mazat smí jen správce; smazaný kontakt zmizí všem', async ({ browser }, info) => {
