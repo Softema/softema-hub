@@ -31,6 +31,17 @@ it('IP návštěvníka bere z hlavičky od proxy, ne z adresy Vercelu', async ()
   assert.equal(sessions.find(s => s.current)?.ipAddress, '198.51.100.7');
 });
 
+it('odpovědi API se nesmí ukládat do mezipaměti prohlížeče ani CDN', async () => {
+  const c = new Client(ctx.base);
+  const h = { 'x-hub-proxy': SECRET };
+  assert.equal((await c.req('POST', '/api/auth/sign-in/email', { email: USERS.member, password: process.env.SEED_USER_PASSWORD }, h)).status, 200);
+  for (const path of ['/api/v1/me', '/api/v1/me/sessions', '/api/auth/get-session']) {
+    const res = await fetch(ctx.base + path, { headers: { ...h, cookie: c.cookie } });
+    assert.equal(res.status, 200, path);
+    assert.equal(res.headers.get('cache-control'), 'no-store', path);
+  }
+});
+
 it('v produkci API bez tajného klíče nenastartuje', async () => {
   await assert.rejects(() => start({ NODE_ENV: 'production', HUB_PROXY_SECRET: '' }), /HUB_PROXY_SECRET/);
 });

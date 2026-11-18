@@ -14,6 +14,8 @@ import type { Auth } from './auth/auth';
 export async function createApp(config: Config, deps: AppDeps = {}) {
   const app = await NestFactory.create<NestExpressApplication>(AppModule.register(config, deps),{ bodyParser: false, logger: config.NODE_ENV === 'test' ? false : ['error', 'warn', 'log'] });
   app.use(helmet());
+  // Every API answer is private (sessions, contacts, team), so no browser or CDN may keep a copy.
+  app.use((_req: Request, res: Response, next: NextFunction) => { res.setHeader('Cache-Control', 'no-store'); next(); });
   // Behind the Vercel proxy only: a request without the shared secret did not come through our web, so it is refused
   // before any route, including Better-Auth. The health check stays open for the server's own monitoring.
   if (config.HUB_PROXY_SECRET) {

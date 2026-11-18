@@ -1,6 +1,6 @@
 # Nasazení databázové verze
 
-Web na **Vercelu**, databáze na **Supabase** (jen hostovaný PostgreSQL), backend (API) na **VPS v Dockeru**. Veřejné demo zůstává beze změny ve svém vlastním projektu na Vercelu.
+Web na **Vercelu**, databáze na **Supabase** (jen hostovaný PostgreSQL), backend (API) na **VPS v Dockeru** (varianta B interního standardu Softema). Projekt `softema-hub` na Vercelu teď běží jako databázová verze. Demo by potřebovalo samostatný projekt.
 
 ```
 prohlížeč ──HTTPS──> Vercel (web, proxy.ts) ──HTTPS + tajný klíč──> VPS: Docker „api“ ──> Supabase (EU)
@@ -10,7 +10,7 @@ prohlížeč ──HTTPS──> Vercel (web, proxy.ts) ──HTTPS + tajný klí
 - Cookie přihlášení je na doméně webu. CORS není potřeba.
 - Tajné hodnoty jsou jen v `deploy/.env` na serveru a v proměnných projektu na Vercelu, nikdy v Gitu.
 
-**Stav:** prototyp. Chybí CSP, správa přihlášených zařízení a ověřené zálohy (Free plán Supabase zálohy nedělá). Zatím jen pro interní tým a smyšlené kontakty.
+**Stav:** prototyp v provozu. CSP, správa přihlášených zařízení a zámek účtu jsou nasazené. Chybí ověřené zálohy (Free plán Supabase zálohy nedělá), monitoring a kontrola backenďákem. Úplný stav podle interního standardu Softema je v [DEPLOY-CHECKLIST.md](DEPLOY-CHECKLIST.md). Zatím jen pro interní tým a smyšlené kontakty.
 
 ## 1. Supabase
 

@@ -1,6 +1,6 @@
 # Softema Hub — instrukce pro Claude Code
 
-Česká all-in-one marketingová a CRM platforma agentury Softema. **Aktuální etapa: dokončování skutečné aplikace.** Na větvi `feat/auth-contacts` je první dávka: přihlášení a kontakty nad PostgreSQL, zatím jen lokálně se smyšlenými daty. Veřejné demo (`main`, Vercel) zůstává beze změny. Architektura: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), spuštění: [docs/LOKALNI-VYVOJ.md](docs/LOKALNI-VYVOJ.md).
+Česká all-in-one marketingová a CRM platforma agentury Softema. **Aktuální etapa: dokončování skutečné aplikace.** Databázová verze (přihlášení, 2FA, tým, kontakty) je z `main` nasazená ve variantě B interního standardu Softema: web na Vercelu (projekt `softema-hub`), API v Dockeru na VPS, PostgreSQL v Supabase Cloud. Postup je v [docs/NASAZENI.md](docs/NASAZENI.md), stav podle standardu v [docs/DEPLOY-CHECKLIST.md](docs/DEPLOY-CHECKLIST.md). Ten checklist při změnách nasazení, přihlášení nebo oprávnění aktualizuj. Architektura: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), spuštění: [docs/LOKALNI-VYVOJ.md](docs/LOKALNI-VYVOJ.md).
 
 ## Podklady a jejich priorita
 
@@ -79,7 +79,7 @@ Rozhodnutí zadavatele:
 Detail je v zadání v kap. 3–6 a 13–15. Stručně: Next.js App Router + TS strict + Tailwind + shadcn/ui; buildery Unlayer, React Flow, Tiptap; backend **NestJS** (REST + webhooky); **Prisma** (migrace jen přes `prisma migrate`); **PostgreSQL s RLS** (+ pgvector); **Redis + BullMQ** (fronty, workflow engine); **Better-Auth** (2FA, oddělená auth klientského portálu); Resend za adaptérem `EmailProvider`; Stripe + Fakturoid; S3/R2; **Docker + Hetzner (EU)**; monorepo pnpm + Turborepo (`apps/web`, `apps/api`, `apps/worker`, `packages/*`).
 
 V aktuální etapě:
-- Backend, autentizace a databáze běží jen lokálně. Žádnou externí integraci neaktivuj bez zadání.
+- Produkce běží podle `docs/NASAZENI.md`. Push na `main` (nasadí web), změny na serveru, produkční migrace a proměnné prostředí jen na výslovné zadání. Seed se smyšlenými účty online nikdy. Žádnou další externí integraci neaktivuj bez zadání.
 - `supabase/` je historický návrh v jiném stacku, nenavazuj na něj. Supabase může později sloužit jen jako hostovaný PostgreSQL, viz [docs/POC-AUTH-RLS.md](docs/POC-AUTH-RLS.md).
 - `lib/server/email/resend.ts` je připravený, nezapojený adaptér (Resend je v cílovém stacku). Nepoužívej ho k reálnému odesílání.
 - Secrets nikdy nepatří do Gitu, klientského stavu, URL, logů ani do proměnných `NEXT_PUBLIC_`/`VITE_`.
