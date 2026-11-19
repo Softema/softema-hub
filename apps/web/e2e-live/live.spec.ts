@@ -224,6 +224,60 @@ test('segmenty: živý počet ze serveru, uložení, úprava pravidel, proklik n
   await expect(page.getByRole('button', { name: new RegExp(name) })).toBeVisible();
 });
 
+test('hromadné akce: výběr, štítek, fáze, výběr podle filtru a smazání jen pro správce', async ({ browser }, info) => {
+  const stamp = Date.now().toString(36), city = `Hromadov ${stamp}`, tag = `Hromadný ${stamp}`;
+  const member = await session(browser, MEMBER, info);
+  for (const n of [1, 2, 3]) {
+    await member.getByRole('button', { name: 'Nový kontakt' }).first().click();
+    await member.getByPlaceholder('Např. Jana Novotná').fill(`Hromadný ${n} ${stamp}`);
+    await member.getByPlaceholder('jana@firma.cz').fill(unique());
+    await member.getByRole('dialog').getByRole('textbox', { name: 'Město', exact: true }).fill(city);
+    await member.getByRole('button', { name: 'Vytvořit kontakt' }).click();
+    await expect(member.getByRole('heading', { level: 2, name: `Hromadný ${n} ${stamp}` })).toBeVisible();
+    await member.getByRole('button', { name: 'Zpět na kontakty' }).click();
+  }
+  await member.getByPlaceholder('Hledat jméno, e-mail, firmu, město…').fill(city);
+  await expect(member.getByRole('row')).toHaveCount(4);
+  const bar = member.getByRole('region', { name: 'Hromadné akce' });
+  await member.getByRole('checkbox', { name: `Vybrat Hromadný 1 ${stamp}` }).click();
+  await member.getByRole('checkbox', { name: `Vybrat Hromadný 2 ${stamp}` }).click();
+  await expect(bar).toContainText('Vybráno 2 kontakty');
+  await expect(bar.getByRole('button', { name: 'Smazat' })).toHaveCount(0);
+
+  await bar.getByRole('button', { name: 'Přidat štítek' }).click();
+  const dialog = member.getByRole('dialog');
+  await dialog.getByRole('button', { name: 'Štítek', exact: true }).click();
+  await member.getByPlaceholder('Hledat nebo napsat nový…').fill(tag);
+  await member.getByRole('option', { name: `Vytvořit „${tag}“` }).click();
+  await dialog.getByRole('button', { name: 'Přidat štítek' }).click();
+  await expect(member.getByText(`Štítek „${tag}“ přidán k 2 kontaktům.`)).toBeVisible();
+  await expect(bar).toHaveCount(0);
+  await expect(member.getByRole('row', { name: new RegExp(`Hromadný 1 ${stamp}`) })).toContainText(tag);
+  await expect(member.getByRole('row', { name: new RegExp(`Hromadný 3 ${stamp}`) })).not.toContainText(tag);
+
+  // All on the page, then the stage for all of them.
+  await member.getByRole('checkbox', { name: 'Vybrat kontakty na této straně' }).click();
+  await expect(bar).toContainText('Vybráno 3 kontakty');
+  await bar.getByRole('button', { name: 'Změnit fázi' }).click();
+  await dialog.getByRole('combobox', { name: 'Nová fáze' }).click();
+  await member.getByRole('option', { name: 'Klient', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Změnit fázi' }).click();
+  await expect(member.getByText('Fáze Klient nastavena u 3 kontaktů.')).toBeVisible();
+  await member.getByRole('button', { name: `Hromadný 2 ${stamp}` }).click();
+  await expect(member.getByRole('heading', { name: 'Fáze změněna na Klient' }).first()).toBeVisible();
+  await member.close();
+
+  const manager = await session(browser, MANAGER, info);
+  await manager.goto(`/aplikace#kontakty?q=${encodeURIComponent(city)}`);
+  await expect(manager.getByRole('row')).toHaveCount(4);
+  await manager.getByRole('checkbox', { name: 'Vybrat kontakty na této straně' }).click();
+  await manager.getByRole('region', { name: 'Hromadné akce' }).getByRole('button', { name: 'Smazat' }).click();
+  await manager.getByRole('dialog').getByRole('button', { name: 'Smazat kontakty' }).click();
+  await expect(manager.getByText('Smazáno: 3 kontakty.')).toBeVisible();
+  await expect(manager.getByText('Žádný kontakt neodpovídá hledání.')).toBeVisible();
+  await manager.close();
+});
+
 test('mazat smí jen správce; smazaný kontakt zmizí všem', async ({ browser }, info) => {
   const manager = await session(browser, MANAGER, info), member = await session(browser, MEMBER, info);
   const name = `Ke smazání ${Date.now().toString(36)}`;

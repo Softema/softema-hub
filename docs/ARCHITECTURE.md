@@ -37,6 +37,7 @@ Kontakty a poznámky aplikace nemůže tvrdě mazat, historie a audit jsou jen p
 - Tokeny z e-mailů jsou ve fragmentu URL (`/nove-heslo#…`, `/pozvanka#…`). Prohlížeč je neposílá serveru a stránka je hned odstraní z adresního řádku.
 - **E-maily** jdou přes rozhraní `Mailer` ([apps/api/src/mail/mailer.ts](../apps/api/src/mail/mailer.ts)). Lokálně se nic neodesílá, zprávy se ukládají jako HTML do `.outbox/`. Testy používají `MemoryMailer`.
 - Změny rolí, členství a pozvánek se zapisují do `audit_log`.
+- **Hromadné akce** běží v jedné transakci: změní se všechny vybrané kontakty, nebo žádný. ID se dohledávají jen v aktuálním prostoru (cizí nebo smazaná se nezapočítají), výběr „všechny podle filtru“ vyhodnotí server. Každý změněný kontakt dostane vlastní záznam v časové ose a v auditu, změna fáze a smazání posunou `version`, takže otevřený formulář dostane konflikt.
 - **Segmenty** (migrace `0004`, tabulka `segment` pod FORCE RLS) ukládají jen pravidla, nikdy seznam kontaktů. Vyhodnocují se vždy na serveru jedním SQL dotazem nad všemi živými kontakty prostoru ([segment-sql.ts](../apps/api/src/segments/segment-sql.ts)): hodnoty jdou jako parametry, text se porovnává bez ohledu na velikost písmen a diakritiku (`hub.search_fold`), podřetězec přes `strpos`, ne `LIKE`. Pravidla: štítek, fáze, zdroj, město, firma, stáří kontaktu, vlastní pole. Pravidla v databázi, která neprojdou validací, neodpovídají nikomu (ne všem), aby kampaň nikdy omylem nešla na celou databázi. Vytvoření, úprava a smazání jdou do `audit_log`.
 
 ## API (`/api/v1`, cookie session)
@@ -58,6 +59,7 @@ Kontakty a poznámky aplikace nemůže tvrdě mazat, historie a audit jsou jen p
 | `GET {ws}/contacts/:id` | detail s poznámkami, zapisuje audit čtení | člen |
 | `PATCH {ws}/contacts/:id` | úprava, povinné `version`; `customFields` nahradí celou sadu vlastních polí | člen |
 | `DELETE {ws}/contacts/:id` | měkké smazání | správce |
+| `POST {ws}/contacts/bulk` | hromadná akce `tag`, `untag`, `stage`, `delete` nad `target.ids` (nejvýše 500) nebo `target.filter` (stejný filtr jako seznam, nejvýše 10 000 kontaktů); jedna transakce, vrací `{ matched, changed }` | člen, `delete` jen správce |
 | `GET {ws}/custom-fields` | názvy vlastních polí použité v prostoru | člen |
 | `GET {ws}/tags` | štítky prostoru | člen |
 | `POST`, `DELETE {ws}/contacts/:id/tags[/:tagId]` | štítky kontaktu | člen |
@@ -84,5 +86,5 @@ Přihlášení, 2FA, obnovu a změnu hesla obsluhuje Better-Auth pod `/api/auth`
 - Omezení pokusů (přihlášení, kódy 2FA, obnova hesla) je v paměti procesu a podle IP. Uzamčení účtu existuje jen u kódů 2FA, ne u hesla. `x-forwarded-for` je důvěryhodné jen proto, že API poslouchá na 127.0.0.1 za Next.js. Přijetí pozvánky limit nemá, token má ale 256 bitů.
 - Nastavení 2FA ukazuje klíč k opsání a odkaz `otpauth://`, ne QR kód. QR by vyžadoval novou závislost.
 - Správce agentury se spravuje jen v databázi (seed), v aplikaci ho přidat ani odebrat nejde.
-- Souhlasy, import a hromadné akce v databázové verzi nejsou. Segmenty zatím nevyužívá žádný modul (e-mailing přijde ve fázi C).
+- Souhlasy a import v databázové verzi nejsou. Segmenty zatím nevyužívá žádný modul (e-mailing přijde ve fázi C).
 - CSP pro web ještě není nastavená.

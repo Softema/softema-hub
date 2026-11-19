@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Prisma, type PrismaClient, type TenantTx, withTenant } from '@softema/db';
-import { type ActivityDto, type ActivityKind, type ActivityPageDto, type ContactDetailDto, type ContactDto, type ContactListDto, type contactCreateSchema, type contactListQuerySchema, type contactUpdateSchema, type NoteDto, normalizeEmail, normalizeSearch, STAGE_LABEL, type TagDto } from '@softema/shared';
+import { type ActivityDto, type ActivityKind, can, type ContactBulkResultDto, type contactBulkSchema, type ContactFilter, type ActivityPageDto, type ContactDetailDto, type ContactDto, type ContactListDto, type contactCreateSchema, type contactListQuerySchema, type contactUpdateSchema, type NoteDto, BULK_LIMITS, normalizeEmail, normalizeSearch, STAGE_LABEL, type TagDto } from '@softema/shared';
 import type { z } from 'zod';
 import { ApiError, isUniqueViolation, notFound } from '../common/errors';
 import { type Actor, isUuid } from '../common/guards';
@@ -24,6 +24,15 @@ const changedFieldNames = (before: Record<string, string>, after: Record<string,
 const toDto = (c: Row): ContactDto => ({ ...c, tags: c.tags.map(t => t.tag), customFields: fieldsOf(c.customFields), createdAt: c.createdAt.toISOString(), updatedAt: c.updatedAt.toISOString() });
 const toNote = (n: Prisma.NoteGetPayload<{ select: typeof NOTE_SELECT }>): NoteDto => ({ ...n, createdAt: n.createdAt.toISOString(), updatedAt: n.updatedAt.toISOString() });
 const FIELD_LABEL: Record<string, string> = { name: 'jméno', email: 'e-mail', phone: 'telefon', company: 'firma', city: 'město', ownerId: 'vlastník' };
+/** The list filter, shared by the list and by bulk actions on "all matching the filter". Live contacts only. */
+const filterWhere = (actor: Actor, f: ContactFilter): Prisma.ContactWhereInput => ({
+  workspaceId: actor.workspaceId, deletedAt: null,
+  ...(f.q ? { searchText: { contains: normalizeSearch(f.q) } } : {}),
+  ...(f.stage ? { stage: f.stage } : {}), ...(f.source ? { source: f.source } : {}),
+  ...(f.tag ? { tags: { some: { tag: { nameNormalized: normalizeSearch(f.tag) } } } } : {}),
+});
+const fmtCount = (n: number) => n.toLocaleString('cs-CZ');
+const BULK_DETAIL = 'Hromadná akce v seznamu kontaktů';
 const duplicate = () => new ApiError(409, 'DUPLICATE_EMAIL', 'Kontakt s tímto e-mailem už v prostoru existuje.', { email: 'Kontakt s tímto e-mailem už v prostoru existuje.' });
 
 @Injectable()
@@ -73,12 +82,7 @@ export class ContactsService {
   }
 
   list(actor: Actor, q: z.output<typeof contactListQuerySchema>): Promise<ContactListDto> {
-    const where: Prisma.ContactWhereInput = {
-      workspaceId: actor.workspaceId, deletedAt: null,
-      ...(q.q ? { searchText: { contains: normalizeSearch(q.q) } } : {}),
-      ...(q.stage ? { stage: q.stage } : {}), ...(q.source ? { source: q.source } : {}),
-      ...(q.tag ? { tags: { some: { tag: { nameNormalized: normalizeSearch(q.tag) } } } } : {}),
-    };
+    const where = filterWhere(actor, q);
     const orderBy: Prisma.ContactOrderByWithRelationInput[] = q.sort === 'name' ? [{ name: 'asc' }, { id: 'asc' }] : q.sort === 'company' ? [{ company: 'asc' }, { name: 'asc' }, { id: 'asc' }] : [{ createdAt: 'desc' }, { id: 'desc' }];
     return this.tx(actor, async tx => {
       const total = await tx.contact.count({ where });
@@ -145,6 +149,60 @@ export class ContactsService {
       await tx.contact.updateMany({ where: { id, workspaceId: actor.workspaceId, deletedAt: null }, data: { deletedAt: new Date(), version: { increment: 1 } } });
       await this.activity(tx, actor, id, 'contact', 'Kontakt smazán');
       await this.audit(tx, actor, 'delete', 'contact', id);
+    });
+  }
+
+  /**
+   * One action over many contacts in one transaction: all of them change, or none. Ids are resolved inside the
+   * workspace (foreign or deleted ids are simply not matched); a filter is evaluated on the server. Every changed
+   * contact gets its own timeline entry and audit record, as if the change were made in its detail.
+   */
+  bulk(actor: Actor, input: z.output<typeof contactBulkSchema>): Promise<ContactBulkResultDto> {
+    if (input.action === 'delete' && !can(actor.role, 'contact:delete')) throw new ApiError(403, 'FORBIDDEN', 'Na tuto akci nemáte oprávnění. Kontakty mažou jen správci.');
+    return this.tx(actor, async tx => {
+      const { ids: picked, filter } = input.target;
+      const where = picked ? { workspaceId: actor.workspaceId, deletedAt: null, id: { in: picked } } : filterWhere(actor, filter ?? {});
+      const rows = await tx.contact.findMany({ where, select: { id: true, stage: true }, orderBy: { id: 'asc' }, take: BULK_LIMITS.filter + 1 });
+      if (rows.length > BULK_LIMITS.filter) throw new ApiError(422, 'VALIDATION_FAILED', `Hromadná akce může najednou zasáhnout nejvýše ${fmtCount(BULK_LIMITS.filter)} kontaktů. Zužte filtr.`);
+      const ids = rows.map(r => r.id);
+      if (!ids.length) return { matched: 0, changed: 0 };
+      const log = async (changed: string[], type: ActivityKind, title: (id: string) => string, detail: (id: string) => string, action: string, fields: string[]) => {
+        if (!changed.length) return;
+        await tx.activity.createMany({ data: changed.map(contactId => ({ workspaceId: actor.workspaceId, contactId, actorUserId: actor.userId, type, payload: { title: title(contactId), detail: detail(contactId) } })) });
+        await tx.auditLog.createMany({ data: changed.map(entityId => ({ workspaceId: actor.workspaceId, actorUserId: actor.userId, action, entity: 'contact', entityId, changedFields: fields })) });
+      };
+      switch (input.action) {
+        case 'tag': {
+          const t = await this.tag(tx, actor, input.tag!);
+          const had = new Set((await tx.contactTag.findMany({ where: { workspaceId: actor.workspaceId, tagId: t.id, contactId: { in: ids } }, select: { contactId: true } })).map(x => x.contactId));
+          const changed = ids.filter(id => !had.has(id));
+          await tx.contactTag.createMany({ data: changed.map(contactId => ({ workspaceId: actor.workspaceId, contactId, tagId: t.id })), skipDuplicates: true });
+          await log(changed, 'tag', () => `Přidán štítek ${t.name}`, () => BULK_DETAIL, 'tag.add', ['tags']);
+          return { matched: ids.length, changed: changed.length };
+        }
+        case 'untag': {
+          const t = await tx.tag.findUnique({ where: { workspaceId_nameNormalized: { workspaceId: actor.workspaceId, nameNormalized: normalizeSearch(input.tag!) } }, select: { id: true, name: true } });
+          if (!t) return { matched: ids.length, changed: 0 };
+          const changed = (await tx.contactTag.findMany({ where: { workspaceId: actor.workspaceId, tagId: t.id, contactId: { in: ids } }, select: { contactId: true } })).map(x => x.contactId);
+          await tx.contactTag.deleteMany({ where: { workspaceId: actor.workspaceId, tagId: t.id, contactId: { in: changed } } });
+          await log(changed, 'tag', () => `Odebrán štítek ${t.name}`, () => BULK_DETAIL, 'tag.remove', ['tags']);
+          return { matched: ids.length, changed: changed.length };
+        }
+        case 'stage': {
+          const stage = input.stage!;
+          const before = new Map(rows.map(r => [r.id, r.stage]));
+          const changed = rows.filter(r => r.stage !== stage).map(r => r.id);
+          // The version moves on, so an open detail form gets a conflict instead of silently overwriting the new stage.
+          await tx.contact.updateMany({ where: { workspaceId: actor.workspaceId, deletedAt: null, id: { in: changed } }, data: { stage, version: { increment: 1 } } });
+          await log(changed, 'stage', () => `Fáze změněna na ${STAGE_LABEL[stage]}`, id => `Předtím: ${STAGE_LABEL[before.get(id)!]} · ${BULK_DETAIL}`, 'update', ['stage']);
+          return { matched: ids.length, changed: changed.length };
+        }
+        case 'delete': {
+          await tx.contact.updateMany({ where: { workspaceId: actor.workspaceId, deletedAt: null, id: { in: ids } }, data: { deletedAt: new Date(), version: { increment: 1 } } });
+          await log(ids, 'contact', () => 'Kontakt smazán', () => BULK_DETAIL, 'delete', []);
+          return { matched: ids.length, changed: ids.length };
+        }
+      }
     });
   }
 

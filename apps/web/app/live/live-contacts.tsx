@@ -1,12 +1,13 @@
 'use client';
 /* Contact list and creation over the API. Filters stay in the URL; search and paging run on the server. */
 import React, { useEffect, useState } from 'react';
-import { ChevronRight, Plus, Search, X } from 'lucide-react';
+import { ChevronRight, ListChecks, Plus, Search, Tag, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { CONTACT_STAGES, type ContactDto, type ContactStage, STAGE_LABEL } from '@softema/shared';
-import { fmt, fmtDate } from '@/lib/hub/format';
+import { BULK_LIMITS, type ContactBulkInput, type ContactBulkResultDto, type ContactFilter, CONTACT_STAGES, type ContactDto, type ContactStage, STAGE_LABEL } from '@softema/shared';
+import { Checkbox } from '@/components/ui/checkbox';
+import { fmt, fmtDate, plural } from '@/lib/hub/format';
 import { Avatar, Badge, Btn, Field, Modal, PageHead, Pick, SearchInput } from '../ui';
-import { FormError, Pager } from '../kit-core';
+import { FormError, OptionCombobox, Pager, useConfirm } from '../kit-core';
 import { ApiFailure, message, useContactMutations, useContacts, useTags } from './api';
 import { LoadFailure, LoadingBlock, stageTone } from './live-ui';
 import { LiveContactDetail } from './live-contact-detail';
@@ -22,12 +23,20 @@ export function LiveContacts() {
   return parts[1] ? <LiveContactDetail key={parts[1]} id={parts[1]} /> : <ContactList />;
 }
 
+/** Picked rows belong to one filter; changing the filter starts a new, empty selection. `all`: every contact matching it. */
+interface Selection { key: string; ids: Set<string>; all: boolean }
+type BulkDialog = null | 'tag' | 'untag' | 'stage';
+
 function ContactList() {
-  const { workspace } = useLive();
+  const { workspace, allowed } = useLive();
   const { query, setQuery, go } = useLiveRoute();
   const f = { q: query.get('q') ?? '', stage: query.get('faze') ?? '', tag: query.get('stitek') ?? '', source: query.get('zdroj') ?? '', sort: query.get('razeni') ?? 'newest' };
   const page = Number(query.get('strana') || 1);
   const [text, setText] = useState(f.q);
+  // A link or back/forward can change the search in the URL while the list stays mounted; the box follows it,
+  // otherwise the debounce below would put the old text back and drop the new filter.
+  const [urlQ, setUrlQ] = useState(f.q);
+  if (urlQ !== f.q) { setUrlQ(f.q); setText(f.q); }
   const [creating, setCreating] = useState(false);
   useEffect(() => { const t = setTimeout(() => { if (text !== f.q) setQuery({ q: text || undefined, strana: undefined }); }, 250); return () => clearTimeout(t); });
   const list = useContacts(workspace.id, { q: f.q, stage: f.stage, tag: f.tag, source: f.source, sort: f.sort, page });
@@ -36,6 +45,27 @@ function ContactList() {
   const filtered = !!(f.q || f.stage || f.tag || f.source);
   const clear = () => { setText(''); setQuery({ q: undefined, faze: undefined, stitek: undefined, zdroj: undefined, strana: undefined }); };
   const d = list.data;
+  const filterValue: ContactFilter = { q: f.q || undefined, stage: (f.stage || undefined) as ContactStage | undefined, tag: f.tag || undefined, source: f.source || undefined };
+  const filterKey = JSON.stringify(filterValue);
+  const [selection, setSelection] = useState<Selection>({ key: filterKey, ids: new Set(), all: false });
+  const sel = selection.key === filterKey ? selection : { key: filterKey, ids: new Set<string>(), all: false };
+  const selectedCount = sel.all ? d?.total ?? 0 : sel.ids.size;
+  const allOnPage = !!d?.items.length && (sel.all || d.items.every(c => sel.ids.has(c.id)));
+  const clearSelection = () => setSelection({ key: filterKey, ids: new Set(), all: false });
+  const toggle = (id: string, on: boolean) => { const ids = new Set(sel.all ? (d?.items ?? []).map(c => c.id) : sel.ids); if (on) ids.add(id); else ids.delete(id); setSelection({ key: filterKey, ids, all: false }); };
+  const togglePage = (on: boolean) => { const ids = new Set(sel.all ? [] : sel.ids); for (const c of d?.items ?? []) { if (on) ids.add(c.id); else ids.delete(c.id); } setSelection({ key: filterKey, ids, all: false }); };
+  const [dialog, setDialog] = useState<BulkDialog>(null);
+  const { bulk } = useContactMutations(workspace.id);
+  const [confirmEl, confirm] = useConfirm();
+  const target: ContactBulkInput['target'] = sel.all ? { filter: filterValue } : { ids: [...sel.ids] };
+  const removeSelected = () => confirm({
+    title: `Smazat ${plural(selectedCount, 'kontakt', 'kontakty', 'kontaktů')}?`, danger: true, confirm: 'Smazat kontakty',
+    desc: 'Kontakty zmizí ze seznamu všem členům prostoru. Jejich historie zůstane v auditu.',
+    onConfirm: () => bulk.mutate({ action: 'delete', target }, {
+      onSuccess: r => { toast.success(`Smazáno: ${plural(r.changed, 'kontakt', 'kontakty', 'kontaktů')}.`); clearSelection(); },
+      onError: e => toast.error(message(e)),
+    }),
+  });
   const pages = d ? Math.max(1, Math.ceil(d.total / LIMIT)) : 1;
   const from = d && d.total ? (d.page - 1) * LIMIT + 1 : 0;
   return (
@@ -54,6 +84,21 @@ function ContactList() {
         </div>
       </div>
       {filtered && <div className="chips" aria-label="Aktivní filtry"><button type="button" className="chip" onClick={clear}>Zrušit všechny filtry<X size={14} aria-hidden /></button></div>}
+      {selectedCount > 0 && d && (
+        <div className="bulk-bar" role="region" aria-label="Hromadné akce">
+          <strong>{sel.all ? `Vybráno všech ${plural(selectedCount, 'kontakt', 'kontakty', 'kontaktů')} podle filtru` : `Vybráno ${plural(selectedCount, 'kontakt', 'kontakty', 'kontaktů')}`}</strong>
+          {!sel.all && allOnPage && d.total > sel.ids.size && (d.total <= BULK_LIMITS.filter
+            ? <button type="button" className="text-link" onClick={() => setSelection({ key: filterKey, ids: new Set(), all: true })}>Vybrat všech {fmt(d.total)} podle filtru</button>
+            : <span className="muted small">Najednou lze upravit nejvýše {fmt(BULK_LIMITS.filter)} kontaktů. Zužte filtr.</span>)}
+          <div className="bulk-actions">
+            <Btn onClick={() => setDialog('tag')} disabled={bulk.isPending}><Tag aria-hidden />Přidat štítek</Btn>
+            <Btn onClick={() => setDialog('untag')} disabled={bulk.isPending}>Odebrat štítek</Btn>
+            <Btn onClick={() => setDialog('stage')} disabled={bulk.isPending}><ListChecks aria-hidden />Změnit fázi</Btn>
+            {allowed('contact:delete') && <Btn className="danger-ghost" onClick={removeSelected} disabled={bulk.isPending}><Trash2 aria-hidden />Smazat</Btn>}
+            <button type="button" className="text-link" onClick={clearSelection}>Zrušit výběr</button>
+          </div>
+        </div>
+      )}
       {list.isPending ? <LoadingBlock label="Načítám kontakty…" />
         : !d ? <LoadFailure error={list.error} onRetry={() => void list.refetch()} />
         : (
@@ -67,8 +112,8 @@ function ContactList() {
               <>
                 <div className="table-scroll">
                   <table className="hub-table data-table">
-                    <thead><tr><th>Kontakt</th><th className="col-opt">Firma</th><th className="col-opt">Štítky</th><th className="col-mob">Fáze</th><th className="col-opt">Zdroj</th><th className="col-opt">Přidáno</th><th aria-hidden /></tr></thead>
-                    <tbody>{d.items.map(c => <Row key={c.id} c={c} open={() => go('kontakty/' + c.id)} />)}</tbody>
+                    <thead><tr><th className="col-check"><Checkbox aria-label="Vybrat kontakty na této straně" checked={allOnPage} onCheckedChange={v => togglePage(!!v)} /></th><th>Kontakt</th><th className="col-opt">Firma</th><th className="col-opt">Štítky</th><th className="col-mob">Fáze</th><th className="col-opt">Zdroj</th><th className="col-opt">Přidáno</th><th aria-hidden /></tr></thead>
+                    <tbody>{d.items.map(c => <Row key={c.id} c={c} open={() => go('kontakty/' + c.id)} selected={sel.all || sel.ids.has(c.id)} onSelect={on => toggle(c.id, on)} />)}</tbody>
                   </table>
                 </div>
                 <Pager page={d.page} pages={pages} total={d.total} from={from} to={from + d.items.length - 1} onPage={p => setQuery({ strana: p > 1 ? String(p) : undefined })} noun="kontaktů" />
@@ -76,14 +121,18 @@ function ContactList() {
             )}
           </section>
         )}
+      <BulkEdit mode={dialog} onClose={() => setDialog(null)} count={selectedCount} tags={(tags.data ?? []).map(t => t.name)} pending={bulk.isPending}
+        run={(v, done) => bulk.mutate({ ...v, target }, { onSuccess: r => { done(r); clearSelection(); setDialog(null); }, onError: e => toast.error(message(e)) })} />
+      {confirmEl}
       <CreateContact open={creating} onClose={() => setCreating(false)} onCreated={id => go('kontakty/' + id)} />
     </div>
   );
 }
 
-function Row({ c, open }: { c: ContactDto; open: () => void }) {
+function Row({ c, open, selected, onSelect }: { c: ContactDto; open: () => void; selected: boolean; onSelect: (on: boolean) => void }) {
   return (
-    <tr onClick={open}>
+    <tr onClick={open} className={selected ? 'is-selected' : ''}>
+      <td className="col-check" onClick={e => e.stopPropagation()}><Checkbox aria-label={'Vybrat ' + c.name} checked={selected} onCheckedChange={v => onSelect(!!v)} /></td>
       <td><div className="name-cell"><Avatar name={c.name} /><button type="button" onClick={e => { e.stopPropagation(); open(); }}>{c.name}<small>{c.email}</small><span className="mob-only tag-cell"><Badge tone={stageTone(c.stage)}>{STAGE_LABEL[c.stage]}</Badge></span></button></div></td>
       <td className="col-opt muted ellipsis" title={c.company || undefined}>{c.company || '—'}</td>
       <td className="col-opt"><div className="tag-cell">{c.tags.slice(0, 1).map(t => <Badge key={t.id} tone="gray">{t.name}</Badge>)}{c.tags.length > 1 && <span className="muted small" title={c.tags.slice(1).map(t => t.name).join(', ')}>+{fmt(c.tags.length - 1)}</span>}</div></td>
@@ -92,6 +141,45 @@ function Row({ c, open }: { c: ContactDto; open: () => void }) {
       <td className="col-opt muted nowrap">{fmtDate(c.createdAt)}</td>
       <td className="col-go"><ChevronRight size={16} aria-hidden className="muted" /></td>
     </tr>
+  );
+}
+
+/** Tag or stage for the selected contacts. The toast reports what the server says actually changed. */
+function BulkEdit({ mode, onClose, count, tags, pending, run }: {
+  mode: BulkDialog; onClose: () => void; count: number; tags: string[]; pending: boolean;
+  run: (v: Omit<ContactBulkInput, 'target'>, done: (r: ContactBulkResultDto) => void) => void;
+}) {
+  const [tag, setTag] = useState('');
+  const [stage, setStage] = useState<ContactStage>('prospect');
+  const [error, setError] = useState('');
+  const close = () => { if (pending) return; setTag(''); setError(''); onClose(); };
+  const unchanged = (r: ContactBulkResultDto, what: string) => (r.changed < r.matched ? ` U ${plural(r.matched - r.changed, 'kontaktu', 'kontaktů', 'kontaktů')} ${what}.` : '');
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (mode === 'stage') return run({ action: 'stage', stage }, r => toast.success(`Fáze ${STAGE_LABEL[stage]} nastavena u ${plural(r.changed, 'kontaktu', 'kontaktů', 'kontaktů')}.${unchanged(r, 'už byla')}`));
+    const t = tag.trim();
+    if (!t) { setError('Zadejte nebo vyberte štítek.'); return; }
+    run({ action: mode === 'untag' ? 'untag' : 'tag', tag: t }, r => {
+      toast.success(mode === 'untag' ? `Štítek „${t}“ odebrán z ${plural(r.changed, 'kontaktu', 'kontaktů', 'kontaktů')}.${unchanged(r, 'nebyl')}` : `Štítek „${t}“ přidán k ${plural(r.changed, 'kontaktu', 'kontaktům', 'kontaktům')}.${unchanged(r, 'už byl')}`);
+      setTag('');
+    });
+  };
+  const title = mode === 'stage' ? 'Změnit fázi' : mode === 'untag' ? 'Odebrat štítek' : 'Přidat štítek';
+  return (
+    <Modal open={!!mode} onClose={close} title={title} desc={`Vybráno ${plural(count, 'kontakt', 'kontakty', 'kontaktů')}. Změna se zapíše do časové osy každého kontaktu.`}>
+      <form onSubmit={submit} noValidate>
+        <fieldset disabled={pending} className="contents">
+          <div className="stack">
+            {mode === 'stage'
+              ? <Field label="Nová fáze"><Pick value={stage} onChange={v => setStage(v as ContactStage)} options={CONTACT_STAGES.map(s => [s, STAGE_LABEL[s]] as [string, string])} className="full" label="Nová fáze" /></Field>
+              : mode === 'untag' && !tags.length ? <p className="muted">V prostoru zatím nejsou žádné štítky.</p>
+              : <div className="field"><span>Štítek</span><OptionCombobox value={tag} onChange={v => { setTag(v); setError(''); }} options={tags} allowCreate={mode === 'tag'} label={mode === 'untag' ? 'Štítek k odebrání' : 'Štítek'} placeholder={mode === 'untag' ? 'Vyberte štítek' : 'Vyberte nebo vytvořte štítek'} />{mode === 'tag' && <small>Vyberte existující štítek, nebo napište nový a zvolte „Vytvořit“.</small>}</div>}
+            <FormError>{error}</FormError>
+          </div>
+          <div className="form-actions"><Btn type="button" onClick={close}>Zrušit</Btn><Btn primary type="submit" aria-busy={pending} disabled={mode === 'untag' && !tags.length}>{pending ? 'Ukládám…' : title}</Btn></div>
+        </fieldset>
+      </form>
+    </Modal>
   );
 }
 

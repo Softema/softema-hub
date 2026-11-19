@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { contactCreateSchema, contactListQuerySchema, contactUpdateSchema, noteBodySchema, tagAddSchema } from '@softema/shared';
+import { contactBulkSchema, contactCreateSchema, contactListQuerySchema, contactUpdateSchema, noteBodySchema, tagAddSchema } from '@softema/shared';
 import { type Actor, CurrentActor, Requires, SessionGuard, WorkspaceGuard } from '../common/guards';
 import { parse } from '../common/validate';
 import { ContactsService } from './contacts.service';
@@ -13,6 +13,9 @@ export class ContactsController {
   list(@CurrentActor() a: Actor, @Query() q: unknown) { return this.contacts.list(a, parse(contactListQuerySchema, q)); }
   @Post('contacts') @Requires('contact:write')
   create(@CurrentActor() a: Actor, @Body() b: unknown) { return this.contacts.create(a, parse(contactCreateSchema, b)); }
+  /** Deleting additionally needs contact:delete, checked in the service per action. */
+  @Post('contacts/bulk') @HttpCode(200) @Requires('contact:write')
+  bulk(@CurrentActor() a: Actor, @Body() b: unknown) { return this.contacts.bulk(a, parse(contactBulkSchema, b)); }
   @Get('contacts/:id') @Requires('contact:read')
   detail(@CurrentActor() a: Actor, @Param('id') id: string) { return this.contacts.detail(a, id); }
   @Patch('contacts/:id') @Requires('contact:write')

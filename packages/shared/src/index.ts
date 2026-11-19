@@ -148,7 +148,32 @@ export function segmentRuleText(r: Pick<SegmentRule, 'field' | 'op' | 'value' | 
   return `${r.field === 'customField' ? r.key || SEGMENT_FIELD_LABEL.customField : SEGMENT_FIELD_LABEL[r.field]} ${SEGMENT_OP_LABEL[r.op]} ${value || '…'}`;
 }
 
-export const tagAddSchema =z.strictObject({ name: text(60).min(1, 'Zadejte štítek.') });
+/* ---------- bulk actions over contacts ---------- */
+export const CONTACT_BULK_ACTIONS = ['tag', 'untag', 'stage', 'delete'] as const;
+export type ContactBulkAction = (typeof CONTACT_BULK_ACTIONS)[number];
+/** Picked rows of one page are sent as ids; "all matching the filter" sends the filter and the server resolves it. */
+export const BULK_LIMITS = { ids: 500, filter: 10_000 } as const;
+const uuid = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'Neplatné ID kontaktu.');
+export const contactFilterSchema = z.strictObject({ q: text(200).optional(), stage: z.enum(CONTACT_STAGES).optional(), tag: text(60).optional(), source: text(120).optional() });
+export type ContactFilter = z.input<typeof contactFilterSchema>;
+export const contactBulkSchema = z.strictObject({
+  action: z.enum(CONTACT_BULK_ACTIONS, 'Neznámá hromadná akce.'),
+  /** Exactly one of `ids` and `filter`. */
+  target: z.strictObject({
+    ids: z.array(uuid).min(1, 'Vyberte aspoň jeden kontakt.').max(BULK_LIMITS.ids, `Najednou lze vybrat nejvýše ${BULK_LIMITS.ids} kontaktů. Použijte výběr podle filtru.`).optional(),
+    filter: contactFilterSchema.optional(),
+  }, 'Vyberte kontakty.').refine(t => (t.ids === undefined) !== (t.filter === undefined), 'Vyberte kontakty buď jednotlivě, nebo podle filtru.'),
+  tag: text(60).optional(),
+  stage: z.enum(CONTACT_STAGES).optional(),
+}).superRefine((v, ctx) => {
+  if ((v.action === 'tag' || v.action === 'untag') && !v.tag) ctx.addIssue({ code: 'custom', path: ['tag'], message: 'Zadejte nebo vyberte štítek.' });
+  if (v.action === 'stage' && !v.stage) ctx.addIssue({ code: 'custom', path: ['stage'], message: 'Vyberte fázi.' });
+});
+export type ContactBulkInput = z.input<typeof contactBulkSchema>;
+/** `matched`: contacts the action was applied to; `changed`: those that actually changed (e.g. did not have the tag yet). */
+export interface ContactBulkResultDto { matched: number; changed: number }
+
+export const tagAddSchema = z.strictObject({ name: text(60).min(1, 'Zadejte štítek.') });
 export const noteBodySchema = z.strictObject({ body: text(2000).min(1, 'Poznámka je prázdná.') });
 
 /* ---------- accounts and team ---------- */
@@ -195,7 +220,7 @@ export interface SegmentDto {
 }
 /** `ruleCounts[i]`: contacts matching rule i alone, so the editor can show which rule narrows the segment. */
 export interface SegmentPreviewDto { total: number; sample: SegmentMemberDto[]; ruleCounts: number[] }
-export type ActivityKind ='contact' | 'note' | 'tag' | 'stage' | 'field';
+export type ActivityKind = 'contact' | 'note' | 'tag' | 'stage' | 'field';
 export interface ActivityDto { id: string; type: ActivityKind; title: string; detail: string; actor: UserRef | null; createdAt: string }
 export interface ActivityPageDto { items: ActivityDto[]; nextCursor: string | null }
 

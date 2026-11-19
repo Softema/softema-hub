@@ -1,6 +1,6 @@
 /** Client of the local API. Every request reports failure explicitly: nothing here assumes a write succeeded. */
 import { keepPreviousData, QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { type ActivityPageDto, type ApiErrorBody, type ContactCreateInput, type ContactDetailDto, type ContactDto, type ContactListDto, type ContactUpdateInput, type ErrorCode, type InvitationAcceptedDto, type InvitationAcceptInput, type InvitationCreateInput, type InvitationDto, type InvitationPreviewDto, type MeDto, type MemberDto, type NoteDto, PASSWORD_MIN, type SegmentCreateInput, type SegmentDto, type SegmentMatch, type SegmentPreviewDto, type SegmentRule, type SegmentUpdateInput, type SessionDto, type TagDto, type WorkspaceRole } from '@softema/shared';
+import { type ActivityPageDto, type ApiErrorBody, type ContactBulkInput, type ContactBulkResultDto, type ContactCreateInput, type ContactDetailDto, type ContactDto, type ContactListDto, type ContactUpdateInput, type ErrorCode, type InvitationAcceptedDto, type InvitationAcceptInput, type InvitationCreateInput, type InvitationDto, type InvitationPreviewDto, type MeDto, type MemberDto, type NoteDto, PASSWORD_MIN, type SegmentCreateInput, type SegmentDto, type SegmentMatch, type SegmentPreviewDto, type SegmentRule, type SegmentUpdateInput, type SessionDto, type TagDto, type WorkspaceRole } from '@softema/shared';
 
 export class ApiFailure extends Error {
   constructor(readonly status: number, readonly code: ErrorCode | 'NETWORK' | 'AUTH', message: string, readonly fields?: Record<string, string>) { super(message); }
@@ -114,6 +114,8 @@ export function useContactMutations(w: string, id?: string) {
   return {
     refresh,
     create: useMutation({ mutationFn: (v: ContactCreateInput) => send<ContactDetailDto>('POST', `${ws(w)}/contacts`, v), onSuccess: refresh }),
+    /** Also refreshes after a failure: the server applies all or nothing, but the list may be stale either way. */
+    bulk: useMutation({ mutationFn: (v: ContactBulkInput) => send<ContactBulkResultDto>('POST', `${ws(w)}/contacts/bulk`, v), onSettled: refresh }),
     update: useMutation({ mutationFn: (v: ContactUpdateInput) => send<ContactDto>('PATCH', base, v), onSuccess: refresh }),
     remove: useMutation({ mutationFn: () => send<void>('DELETE', base) }),
     addTag: useMutation({ mutationFn: (name: string) => send<TagDto>('POST', `${base}/tags`, { name }), onSuccess: refresh }),
