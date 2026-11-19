@@ -84,7 +84,64 @@ export const contactListQuerySchema = z.object({
 });
 export type ContactListQuery = z.input<typeof contactListQuerySchema>;
 
-export const tagAddSchema = z.strictObject({ name: text(60).min(1, 'Zadejte štítek.') });
+/* ---------- segments (zadání 8.2, kap. 5 Segment) ---------- */
+/** Fields a rule can test. Courses, webinars and consent come with their modules. */
+export const SEGMENT_FIELDS = ['tag', 'stage', 'source', 'city', 'company', 'createdDays', 'customField'] as const;
+export type SegmentField = (typeof SEGMENT_FIELDS)[number];
+export const SEGMENT_OPS = ['is', 'isNot', 'contains', 'lessThan'] as const;
+export type SegmentOp = (typeof SEGMENT_OPS)[number];
+/** Allowed conditions per field; the first one is the default. Same set as the demo segment editor. */
+export const SEGMENT_FIELD_OPS: Record<SegmentField, readonly SegmentOp[]> = {
+  tag: ['is', 'isNot', 'contains'], stage: ['is', 'isNot'], source: ['is', 'isNot'],
+  city: ['is', 'isNot', 'contains'], company: ['contains', 'isNot'], createdDays: ['lessThan'], customField: ['is', 'isNot', 'contains'],
+};
+export const SEGMENT_FIELD_LABEL: Record<SegmentField, string> = {
+  tag: 'Štítek', stage: 'Fáze', source: 'Zdroj', city: 'Město', company: 'Firma', createdDays: 'Přidán do databáze', customField: 'Vlastní pole',
+};
+export const SEGMENT_OP_LABEL: Record<SegmentOp, string> = { is: 'je', isNot: 'není', contains: 'obsahuje', lessThan: 'za posledních' };
+export const SEGMENT_LIMITS = { rules: 20, name: 80, description: 200, value: 200, days: 3650 } as const;
+
+export const segmentRuleSchema = z.strictObject({
+  field: z.enum(SEGMENT_FIELDS, 'Neznámé pole pravidla.'),
+  op: z.enum(SEGMENT_OPS, 'Neznámá podmínka pravidla.'),
+  value: text(SEGMENT_LIMITS.value).min(1, 'Doplňte hodnoty všech pravidel, nebo nedokončená pravidla odeberte.'),
+  /** Name of the custom field; only for `customField`. */
+  key: text(CUSTOM_FIELDS.name).optional(),
+}).superRefine((r, ctx) => {
+  // Defensive: with an unknown field or op the enum issue above is already reported.
+  if (!SEGMENT_FIELD_OPS[r.field] || !SEGMENT_OPS.includes(r.op)) return;
+  const problem = !SEGMENT_FIELD_OPS[r.field].includes(r.op) ? `Podmínka „${SEGMENT_OP_LABEL[r.op]}“ u pole ${SEGMENT_FIELD_LABEL[r.field]} nejde použít.`
+    : r.field === 'stage' && !(CONTACT_STAGES as readonly string[]).includes(r.value) ? 'Neznámá fáze kontaktu.'
+    : r.field === 'createdDays' && !(/^\d{1,4}$/.test(r.value) && +r.value >= 1 && +r.value <= SEGMENT_LIMITS.days) ? `Počet dní musí být celé číslo od 1 do ${SEGMENT_LIMITS.days}.`
+    : r.field === 'customField' && !r.key ? 'Vyberte vlastní pole.'
+    : r.field !== 'customField' && r.key !== undefined ? 'Název pole patří jen k pravidlu Vlastní pole.' : '';
+  if (problem) ctx.addIssue({ code: 'custom', message: problem });
+});
+export type SegmentRule = z.output<typeof segmentRuleSchema>;
+export const SEGMENT_MATCHES = ['all', 'any'] as const;
+export type SegmentMatch = (typeof SEGMENT_MATCHES)[number];
+const segmentRules = z.array(segmentRuleSchema).max(SEGMENT_LIMITS.rules, `Segment může mít nejvýše ${SEGMENT_LIMITS.rules} pravidel.`);
+
+/** Rules only, for the live preview of an unsaved segment. */
+export const segmentPreviewSchema = z.strictObject({ match: z.enum(SEGMENT_MATCHES).default('all'), rules: segmentRules.default([]) });
+export const segmentCreateSchema = z.strictObject({
+  name: text(SEGMENT_LIMITS.name).min(1, 'Pojmenujte segment.'),
+  description: text(SEGMENT_LIMITS.description).default(''),
+  match: z.enum(SEGMENT_MATCHES).default('all'),
+  rules: segmentRules.default([]),
+});
+export type SegmentCreateInput = z.input<typeof segmentCreateSchema>;
+export const segmentUpdateSchema = segmentCreateSchema.extend({ version: z.number().int().positive('Chybí verze záznamu.') });
+export type SegmentUpdateInput = z.input<typeof segmentUpdateSchema>;
+
+/** Human-readable rule, e.g. "Štítek je VIP". */
+export function segmentRuleText(r: Pick<SegmentRule, 'field' | 'op' | 'value' | 'key'>) {
+  if (r.field === 'createdDays') return `${SEGMENT_FIELD_LABEL.createdDays} za posledních ${r.value} dní`;
+  const value = r.field === 'stage' && r.value in STAGE_LABEL ? STAGE_LABEL[r.value as ContactStage] : r.value;
+  return `${r.field === 'customField' ? r.key || SEGMENT_FIELD_LABEL.customField : SEGMENT_FIELD_LABEL[r.field]} ${SEGMENT_OP_LABEL[r.op]} ${value || '…'}`;
+}
+
+export const tagAddSchema =z.strictObject({ name: text(60).min(1, 'Zadejte štítek.') });
 export const noteBodySchema = z.strictObject({ body: text(2000).min(1, 'Poznámka je prázdná.') });
 
 /* ---------- accounts and team ---------- */
@@ -121,11 +178,21 @@ export interface ContactDto {
 export interface NoteDto { id: string; body: string; author: UserRef; createdAt: string; updatedAt: string }
 export interface ContactDetailDto extends ContactDto { notes: NoteDto[] }
 export interface ContactListDto { items: ContactDto[]; total: number; page: number; limit: number; sources: string[] }
-export type ActivityKind = 'contact' | 'note' | 'tag' | 'stage' | 'field';
+/** Contact as shown in a segment preview: enough to recognise it and open the detail. */
+export interface SegmentMemberDto { id: string; name: string; email: string; stage: ContactStage }
+export interface SegmentDto {
+  id: string; name: string; description: string; match: SegmentMatch; rules: SegmentRule[];
+  /** Live contacts matching the rules right now. */
+  count: number;
+  createdBy: UserRef | null; version: number; createdAt: string; updatedAt: string;
+}
+/** `ruleCounts[i]`: contacts matching rule i alone, so the editor can show which rule narrows the segment. */
+export interface SegmentPreviewDto { total: number; sample: SegmentMemberDto[]; ruleCounts: number[] }
+export type ActivityKind ='contact' | 'note' | 'tag' | 'stage' | 'field';
 export interface ActivityDto { id: string; type: ActivityKind; title: string; detail: string; actor: UserRef | null; createdAt: string }
 export interface ActivityPageDto { items: ActivityDto[]; nextCursor: string | null }
 
 /* ---------- errors ---------- */
 export type ErrorCode = 'UNAUTHENTICATED' | 'FORBIDDEN' | 'NOT_FOUND' | 'VALIDATION_FAILED' | 'DUPLICATE_EMAIL' | 'VERSION_CONFLICT' | 'BAD_ORIGIN' | 'SERVICE_UNAVAILABLE' | 'INTERNAL'
-  | 'TWO_FACTOR_REQUIRED' | 'ALREADY_MEMBER' | 'INVITATION_INVALID' | 'SIGN_IN_REQUIRED' | 'CURRENT_SESSION';
+  | 'DUPLICATE_NAME' | 'TWO_FACTOR_REQUIRED' | 'ALREADY_MEMBER' | 'INVITATION_INVALID' | 'SIGN_IN_REQUIRED' | 'CURRENT_SESSION';
 export interface ApiErrorBody { code: ErrorCode; message: string; fields?: Record<string, string> }

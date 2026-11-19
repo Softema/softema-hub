@@ -1,6 +1,6 @@
 /** Client of the local API. Every request reports failure explicitly: nothing here assumes a write succeeded. */
 import { keepPreviousData, QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { type ActivityPageDto, type ApiErrorBody, type ContactCreateInput, type ContactDetailDto, type ContactDto, type ContactListDto, type ContactUpdateInput, type ErrorCode, type InvitationAcceptedDto, type InvitationAcceptInput, type InvitationCreateInput, type InvitationDto, type InvitationPreviewDto, type MeDto, type MemberDto, type NoteDto, PASSWORD_MIN, type SessionDto, type TagDto, type WorkspaceRole } from '@softema/shared';
+import { type ActivityPageDto, type ApiErrorBody, type ContactCreateInput, type ContactDetailDto, type ContactDto, type ContactListDto, type ContactUpdateInput, type ErrorCode, type InvitationAcceptedDto, type InvitationAcceptInput, type InvitationCreateInput, type InvitationDto, type InvitationPreviewDto, type MeDto, type MemberDto, type NoteDto, PASSWORD_MIN, type SegmentCreateInput, type SegmentDto, type SegmentMatch, type SegmentPreviewDto, type SegmentRule, type SegmentUpdateInput, type SessionDto, type TagDto, type WorkspaceRole } from '@softema/shared';
 
 export class ApiFailure extends Error {
   constructor(readonly status: number, readonly code: ErrorCode | 'NETWORK' | 'AUTH', message: string, readonly fields?: Record<string, string>) { super(message); }
@@ -63,6 +63,20 @@ export const useContact = (w: string, id: string) => useQuery({ queryKey: ['cont
 export const useActivities = (w: string, id: string) => useQuery({ queryKey: ['activities', w, id], queryFn: () => request<ActivityPageDto>(`${ws(w)}/contacts/${id}/activities`) });
 export const useTags = (w: string) => useQuery({ queryKey: ['tags', w], queryFn: () => request<TagDto[]>(`${ws(w)}/tags`) });
 export const useCustomFieldNames = (w: string) => useQuery({ queryKey: ['custom-fields', w], queryFn: () => request<string[]>(`${ws(w)}/custom-fields`) });
+export const useSegments = (w: string) => useQuery({ queryKey: ['segments', w], queryFn: () => request<SegmentDto[]>(`${ws(w)}/segments`) });
+export const useSegment = (w: string, id: string | undefined) => useQuery({ queryKey: ['segment', w, id], queryFn: () => request<SegmentDto>(`${ws(w)}/segments/${id}`), enabled: !!id });
+/** Live count of the rules being edited; evaluated on the server over all contacts, never over a loaded page. */
+export const useSegmentPreview = (w: string, v: { match: SegmentMatch; rules: SegmentRule[] }) =>
+  useQuery({ queryKey: ['segment-preview', w, v], queryFn: () => send<SegmentPreviewDto>('POST', `${ws(w)}/segments/preview`, v), placeholderData: keepPreviousData });
+export function useSegmentMutations(w: string) {
+  const qc = useQueryClient();
+  const refresh = () => Promise.all([qc.invalidateQueries({ queryKey: ['segments', w] }), qc.invalidateQueries({ queryKey: ['segment', w] })]);
+  return {
+    create: useMutation({ mutationFn: (v: SegmentCreateInput) => send<SegmentDto>('POST', `${ws(w)}/segments`, v), onSuccess: refresh }),
+    update: useMutation({ mutationFn: ({ id, ...v }: SegmentUpdateInput & { id: string }) => send<SegmentDto>('PATCH', `${ws(w)}/segments/${id}`, v), onSuccess: refresh }),
+    remove: useMutation({ mutationFn: (id: string) => send<void>('DELETE', `${ws(w)}/segments/${id}`), onSuccess: refresh }),
+  };
+}
 export const useMembers = (w: string) => useQuery({ queryKey: ['members', w], queryFn: () => request<MemberDto[]>(`${ws(w)}/members`) });
 export const useInvitations = (w: string, enabled: boolean) => useQuery({ queryKey: ['invitations', w], queryFn: () => request<InvitationDto[]>(`${ws(w)}/invitations`), enabled });
 
@@ -95,7 +109,7 @@ export const acceptInvitation = (v: InvitationAcceptInput) => send<InvitationAcc
 /** Writes refresh what they touched from the server; the screen never shows a state the server did not confirm. */
 export function useContactMutations(w: string, id?: string) {
   const qc = useQueryClient();
-  const refresh = async () => { await Promise.all([qc.invalidateQueries({ queryKey: ['contacts', w] }), qc.invalidateQueries({ queryKey: ['tags', w] }), qc.invalidateQueries({ queryKey: ['custom-fields', w] }), ...(id ? [qc.invalidateQueries({ queryKey: ['contact', w, id] }), qc.invalidateQueries({ queryKey: ['activities', w, id] })] : [])]); };
+  const refresh = async () => { await Promise.all([qc.invalidateQueries({ queryKey: ['contacts', w] }), qc.invalidateQueries({ queryKey: ['tags', w] }), qc.invalidateQueries({ queryKey: ['custom-fields', w] }), qc.invalidateQueries({ queryKey: ['segments', w] }), ...(id ? [qc.invalidateQueries({ queryKey: ['contact', w, id] }), qc.invalidateQueries({ queryKey: ['activities', w, id] })] : [])]); };
   const base = `${ws(w)}/contacts/${id}`;
   return {
     refresh,

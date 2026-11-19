@@ -8,6 +8,8 @@ import { OriginGuard, SessionGuard, WorkspaceGuard } from './common/guards';
 import type { Config } from './config';
 import { ContactsController } from './contacts/contacts.controller';
 import { ContactsService } from './contacts/contacts.service';
+import { SegmentsController } from './segments/segments.controller';
+import { SegmentsService } from './segments/segments.service';
 import { DEFAULT_OUTBOX, type Mailer, OutboxMailer, ResendMailer } from './mail/mailer';
 import { SessionsController } from './sessions/sessions.controller';
 import { InvitationsController, TeamController } from './team/team.controller';
@@ -36,7 +38,7 @@ export class AppModule {
   static register(config: Config, deps: AppDeps = {}): DynamicModule {
     return {
       module: AppModule,
-      controllers: [HealthController, WorkspacesController, ContactsController, TeamController, InvitationsController, SessionsController],
+      controllers: [HealthController, WorkspacesController, ContactsController, SegmentsController, TeamController, InvitationsController, SessionsController],
       providers: [
         { provide: CONFIG, useValue: config },
         { provide: MAILER, useValue: deps.mailer ?? (config.MAIL_PROVIDER === 'resend' ? new ResendMailer(config.RESEND_API_KEY!, config.MAIL_FROM!) : new OutboxMailer(config.MAIL_OUTBOX_DIR ?? DEFAULT_OUTBOX)) },
@@ -44,7 +46,7 @@ export class AppModule {
         { provide: AUTH_DB, useFactory: () => createClient(config.DATABASE_AUTH_URL, 5) },
         { provide: AUTH, useFactory: (db: PrismaClient, mailer: Mailer) => createAuth(config, db, mailer), inject: [AUTH_DB, MAILER] },
         { provide: APP_FILTER, useClass: ApiExceptionFilter },
-        SessionGuard, WorkspaceGuard, OriginGuard, ContactsService, TeamService,
+        SessionGuard, WorkspaceGuard, OriginGuard, ContactsService, SegmentsService, TeamService,
       ],
     };
   }

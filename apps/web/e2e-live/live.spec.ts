@@ -163,6 +163,67 @@ test('vlastní pole: přidání, nabídka názvu u dalšího kontaktu, úprava, 
   await expect(page.getByText('Zatím tu nejsou žádná vlastní pole.')).toBeVisible();
 });
 
+test('segmenty: živý počet ze serveru, uložení, úprava pravidel, proklik na kontakt a smazání', async ({ page }) => {
+  await login(page, MEMBER);
+  await expect(page.getByRole('heading', { level: 1, name: 'Kontakty' })).toBeVisible();
+  const stamp = Date.now().toString(36), city = `Segmentov ${stamp}`, name = `Segment kontakt ${stamp}`;
+  await page.getByRole('button', { name: 'Nový kontakt' }).first().click();
+  await page.getByPlaceholder('Např. Jana Novotná').fill(name);
+  await page.getByPlaceholder('jana@firma.cz').fill(unique());
+  await page.getByLabel('Město').fill(city);
+  await page.getByRole('button', { name: 'Vytvořit kontakt' }).click();
+  await expect(page.getByRole('heading', { level: 2, name })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Zpět na kontakty' }).click();
+  await page.getByRole('navigation', { name: 'Části modulu' }).getByRole('button', { name: 'Segmenty' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Segmenty' })).toBeVisible();
+  await page.getByRole('button', { name: 'Nový segment' }).first().click();
+  const segName = `Město ${stamp}`;
+  await page.getByLabel('Název segmentu').fill(segName);
+  await page.getByRole('combobox', { name: 'Pole pravidla 1' }).click();
+  await page.getByRole('option', { name: 'Město', exact: true }).click();
+  // Without diacritics and in lower case, evaluated by the server.
+  await page.getByLabel('Hodnota pravidla 1').fill(city.toLowerCase().replace('ov', 'óv'));
+  const preview = page.locator('.sticky-side');
+  await expect(preview.locator('.seg-count strong')).toHaveText('0');
+  await page.getByLabel('Hodnota pravidla 1').fill(city.toUpperCase());
+  await expect(preview.locator('.seg-count strong')).toHaveText('1');
+  await expect(preview.getByRole('button', { name: new RegExp(name) })).toBeVisible();
+  await page.getByRole('button', { name: 'Vytvořit segment' }).click();
+  await expect(page.getByText('Segment byl vytvořen.')).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: segName })).toBeVisible();
+
+  // Second rule that nobody matches: "all" gives 0, "any" gives the contact again.
+  await page.getByRole('button', { name: 'Přidat pravidlo' }).click();
+  await page.getByRole('combobox', { name: 'Pole pravidla 2' }).click();
+  await page.getByRole('option', { name: 'Firma', exact: true }).click();
+  await page.getByLabel('Hodnota pravidla 2').fill(`nikdo-${stamp}`);
+  await expect(preview.locator('.seg-count strong')).toHaveText('0');
+  await page.getByRole('button', { name: 'Aspoň jedno' }).click();
+  await expect(preview.locator('.seg-count strong')).toHaveText('1');
+  await page.getByRole('button', { name: 'Uložit změny' }).click();
+  await expect(page.getByText('Segment byl uložen.')).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Aspoň jedno' })).toHaveAttribute('aria-pressed', 'true');
+
+  await page.getByRole('button', { name: 'Zpět na segmenty' }).click();
+  const row = page.getByRole('row', { name: new RegExp(segName) });
+  await expect(row).toContainText('1');
+  await row.getByRole('button', { name: segName }).click();
+  await preview.getByRole('button', { name: new RegExp(name) }).click();
+  await expect(page.getByRole('heading', { level: 2, name })).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole('heading', { level: 1, name: segName })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Smazat', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Smazat segment' }).click();
+  await expect(page.getByText('Segment byl smazán.')).toBeVisible();
+  await expect(page.getByRole('row', { name: new RegExp(segName) })).toHaveCount(0);
+  // The contact itself stays.
+  await page.goto(`/aplikace#kontakty?q=${encodeURIComponent(name)}`);
+  await expect(page.getByRole('button', { name: new RegExp(name) })).toBeVisible();
+});
+
 test('mazat smí jen správce; smazaný kontakt zmizí všem', async ({ browser }, info) => {
   const manager = await session(browser, MANAGER, info), member = await session(browser, MEMBER, info);
   const name = `Ke smazání ${Date.now().toString(36)}`;

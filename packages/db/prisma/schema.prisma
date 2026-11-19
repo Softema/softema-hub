@@ -31,6 +31,7 @@ model User {
   ownedContacts      Contact[]           @relation("ContactOwner")
   notes              Note[]
   activities         Activity[]
+  segmentsCreated    Segment[]
 
   @@map("user")
   @@schema("hub")
@@ -164,6 +165,7 @@ model Workspace {
   agency    Agency                @relation(fields: [agencyId], references: [id], onDelete: Restrict)
   members   WorkspaceMembership[]
   invitations Invitation[]
+  segments    Segment[]
 
   @@index([agencyId])
   @@map("workspace")
@@ -305,6 +307,28 @@ model Activity {
 
   @@index([workspaceId, contactId, createdAt(sort: Desc)])
   @@map("activity")
+  @@schema("hub")
+}
+
+/// Saved contact filter (zadání kap. 5 Segment). Only the rules are stored; members are evaluated on the server.
+/// `rules` follows `segmentRuleSchema` in @softema/shared; `match` is 'all' or 'any' (CHECK in migration 0004).
+model Segment {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId      String    @map("workspace_id") @db.Uuid
+  name             String
+  nameNormalized   String    @map("name_normalized")
+  description      String    @default("")
+  match            String    @default("all")
+  rules            Json      @default("[]")
+  createdByUserId  String?   @map("created_by_user_id")
+  version          Int       @default(1)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy        User?     @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, nameNormalized])
+  @@map("segment")
   @@schema("hub")
 }
 

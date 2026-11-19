@@ -8,16 +8,17 @@ import { fmt, fmtDate } from '@/lib/hub/format';
 import { Avatar, Badge, Btn, Field, Modal, PageHead, Pick, SearchInput } from '../ui';
 import { FormError, Pager } from '../kit-core';
 import { ApiFailure, message, useContactMutations, useContacts, useTags } from './api';
-import { LoadFailure, LoadingBlock } from './live-ui';
+import { LoadFailure, LoadingBlock, stageTone } from './live-ui';
 import { LiveContactDetail } from './live-contact-detail';
+import { ContactsNav, LiveSegments } from './live-segments';
 import { useLive, useLiveRoute } from './live-state';
 
-export const stageTone = (s: ContactStage) => (s === 'client' ? 'green' : s === 'prospect' ? 'blue' : 'gray');
 const SORTS: [string, string][] = [['newest', 'Nejnovější'], ['name', 'Podle jména'], ['company', 'Podle firmy']];
 const LIMIT = 25;
 
 export function LiveContacts() {
   const { parts } = useLiveRoute();
+  if (parts[1] === 'segmenty') return <LiveSegments />;
   return parts[1] ? <LiveContactDetail key={parts[1]} id={parts[1]} /> : <ContactList />;
 }
 
@@ -42,6 +43,7 @@ function ContactList() {
       <PageHead title="Kontakty" desc={`Databáze pracovního prostoru ${workspace.name}. Změny vidí všichni členové prostoru.`}>
         <Btn primary onClick={() => setCreating(true)}><Plus aria-hidden />Nový kontakt</Btn>
       </PageHead>
+      <ContactsNav active="kontakty" />
       <div className="filter-bar">
         <SearchInput value={text} onChange={setText} placeholder="Hledat jméno, e-mail, firmu, město…" />
         <div className="filter-row">

@@ -105,7 +105,8 @@ function Frame() {
             <button type="button" className="topbar-home" onClick={() => go('kontakty')} aria-label="Kontakty"><Workflow aria-hidden /></button>
             <span className="workspace-crumb">{workspace.name}</span><ChevronRight size={13} className="workspace-crumb" />
             <span>{title}</span>
-            {mod === 'kontakty' && parts[1] && <><ChevronRight size={13} /><span>Detail</span></>}
+            {mod === 'kontakty' && parts[1] === 'segmenty' ? <><ChevronRight size={13} /><span>Segmenty</span>{parts[2] && <><ChevronRight size={13} /><span>{parts[2] === 'novy' ? 'Nový segment' : 'Detail'}</span></>}</>
+              : mod === 'kontakty' && parts[1] && <><ChevronRight size={13} /><span>Detail</span></>}
           </div>
           <div className="topbar-right"><ThemeMenu /><ProfileMenu className="topbar-profile" /></div>
         </header>

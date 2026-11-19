@@ -37,6 +37,7 @@ Kontakty a poznámky aplikace nemůže tvrdě mazat, historie a audit jsou jen p
 - Tokeny z e-mailů jsou ve fragmentu URL (`/nove-heslo#…`, `/pozvanka#…`). Prohlížeč je neposílá serveru a stránka je hned odstraní z adresního řádku.
 - **E-maily** jdou přes rozhraní `Mailer` ([apps/api/src/mail/mailer.ts](../apps/api/src/mail/mailer.ts)). Lokálně se nic neodesílá, zprávy se ukládají jako HTML do `.outbox/`. Testy používají `MemoryMailer`.
 - Změny rolí, členství a pozvánek se zapisují do `audit_log`.
+- **Segmenty** (migrace `0004`, tabulka `segment` pod FORCE RLS) ukládají jen pravidla, nikdy seznam kontaktů. Vyhodnocují se vždy na serveru jedním SQL dotazem nad všemi živými kontakty prostoru ([segment-sql.ts](../apps/api/src/segments/segment-sql.ts)): hodnoty jdou jako parametry, text se porovnává bez ohledu na velikost písmen a diakritiku (`hub.search_fold`), podřetězec přes `strpos`, ne `LIKE`. Pravidla: štítek, fáze, zdroj, město, firma, stáří kontaktu, vlastní pole. Pravidla v databázi, která neprojdou validací, neodpovídají nikomu (ne všem), aby kampaň nikdy omylem nešla na celou databázi. Vytvoření, úprava a smazání jdou do `audit_log`.
 
 ## API (`/api/v1`, cookie session)
 
@@ -62,8 +63,11 @@ Kontakty a poznámky aplikace nemůže tvrdě mazat, historie a audit jsou jen p
 | `POST`, `DELETE {ws}/contacts/:id/tags[/:tagId]` | štítky kontaktu | člen |
 | `POST`, `PATCH`, `DELETE {ws}/contacts/:id/notes[/:noteId]` | poznámky | člen |
 | `GET {ws}/contacts/:id/activities` | časová osa, `cursor` | člen |
+| `GET`, `POST {ws}/segments` | segmenty s živým počtem kontaktů, nový segment (`name`, `description`, `match`, `rules`) | člen |
+| `POST {ws}/segments/preview` | počet, prvních 8 kontaktů a počet na každé pravidlo pro neuložená pravidla | člen |
+| `GET`, `PATCH`, `DELETE {ws}/segments/:id` | detail s počtem, úprava s povinným `version`, smazání (kontakty zůstanou) | člen |
 
-Chyby: `{ code, message, fields? }`. Kódy `UNAUTHENTICATED` 401, `FORBIDDEN`, `BAD_ORIGIN` a `TWO_FACTOR_REQUIRED` 403, `NOT_FOUND` 404, `DUPLICATE_EMAIL`, `VERSION_CONFLICT`, `ALREADY_MEMBER` a `SIGN_IN_REQUIRED` 409, `INVITATION_INVALID` 410, `VALIDATION_FAILED` 422, `SERVICE_UNAVAILABLE` 503.
+Chyby: `{ code, message, fields? }`. Kódy `UNAUTHENTICATED` 401, `FORBIDDEN`, `BAD_ORIGIN` a `TWO_FACTOR_REQUIRED` 403, `NOT_FOUND` 404, `DUPLICATE_EMAIL`, `DUPLICATE_NAME`, `VERSION_CONFLICT`, `ALREADY_MEMBER` a `SIGN_IN_REQUIRED` 409, `INVITATION_INVALID` 410, `VALIDATION_FAILED` 422, `SERVICE_UNAVAILABLE` 503.
 
 Přihlášení, 2FA, obnovu a změnu hesla obsluhuje Better-Auth pod `/api/auth` (`sign-in/email`, `two-factor/*`, `request-password-reset`, `reset-password`, `change-password`).
 
@@ -80,5 +84,5 @@ Přihlášení, 2FA, obnovu a změnu hesla obsluhuje Better-Auth pod `/api/auth`
 - Omezení pokusů (přihlášení, kódy 2FA, obnova hesla) je v paměti procesu a podle IP. Uzamčení účtu existuje jen u kódů 2FA, ne u hesla. `x-forwarded-for` je důvěryhodné jen proto, že API poslouchá na 127.0.0.1 za Next.js. Přijetí pozvánky limit nemá, token má ale 256 bitů.
 - Nastavení 2FA ukazuje klíč k opsání a odkaz `otpauth://`, ne QR kód. QR by vyžadoval novou závislost.
 - Správce agentury se spravuje jen v databázi (seed), v aplikaci ho přidat ani odebrat nejde.
-- Vlastní pole, souhlasy, import a hromadné akce v databázové verzi nejsou.
+- Souhlasy, import a hromadné akce v databázové verzi nejsou. Segmenty zatím nevyužívá žádný modul (e-mailing přijde ve fázi C).
 - CSP pro web ještě není nastavená.
