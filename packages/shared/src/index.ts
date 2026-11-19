@@ -131,7 +131,14 @@ export const segmentCreateSchema = z.strictObject({
   rules: segmentRules.default([]),
 });
 export type SegmentCreateInput = z.input<typeof segmentCreateSchema>;
-export const segmentUpdateSchema = segmentCreateSchema.extend({ version: z.number().int().positive('Chybí verze záznamu.') });
+/** Fields left out stay as they are: a missing `rules` must never turn a segment into "all contacts". */
+export const segmentUpdateSchema = z.strictObject({
+  version: z.number().int().positive('Chybí verze záznamu.'),
+  name: text(SEGMENT_LIMITS.name).min(1, 'Pojmenujte segment.').optional(),
+  description: text(SEGMENT_LIMITS.description).optional(),
+  match: z.enum(SEGMENT_MATCHES).optional(),
+  rules: segmentRules.optional(),
+});
 export type SegmentUpdateInput = z.input<typeof segmentUpdateSchema>;
 
 /** Human-readable rule, e.g. "Štítek je VIP". */

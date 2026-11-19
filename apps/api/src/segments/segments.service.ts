@@ -96,13 +96,15 @@ export class SegmentsService {
     try {
       return await this.tx(actor, async tx => {
         const cur = await this.find(tx, actor, id);
-        const { version, ...next } = input;
+        const before = rulesOf(cur);
+        const next = { name: input.name ?? cur.name, description: input.description ?? cur.description, match: input.match ?? before.match, rules: input.rules ?? before.rules };
         const changed: string[] = (['name', 'description', 'match'] as const).filter(k => next[k] !== cur[k]);
-        if (JSON.stringify(next.rules) !== JSON.stringify(rulesOf(cur).rules)) changed.push('rules');
+        if (JSON.stringify(next.rules) !== JSON.stringify(before.rules)) changed.push('rules');
         // The version check and the write are one statement, so two members can never overwrite each other silently.
         const res = await tx.segment.updateMany({
-          where: { id, workspaceId: actor.workspaceId, version },
-          data: { name: next.name, nameNormalized: normalizeSearch(next.name), description: next.description, match: next.match, rules: next.rules, version: { increment: 1 } },
+          where: { id, workspaceId: actor.workspaceId, version: input.version },
+          // Only what was sent is written, so stored rules that do not parse are never replaced by "no rules".
+          data: { name: next.name, nameNormalized: normalizeSearch(next.name), description: next.description, ...(input.match ? { match: input.match } : {}), ...(input.rules ? { rules: input.rules } : {}), version: { increment: 1 } },
         });
         if (!res.count) throw new ApiError(409, 'VERSION_CONFLICT', 'Segment mezitím upravil někdo jiný. Načtěte aktuální verzi a změnu zopakujte.');
         await this.audit(tx, actor, 'segment.update', id, changed);

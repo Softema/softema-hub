@@ -111,11 +111,14 @@ describe('uložené segmenty', () => {
 
     const u = await m.patch(`${base(A)}/segments/${s.id}`, { version: 1, name, rules: [{ field: 'tag', op: 'is', value: tag }, { field: 'stage', op: 'is', value: 'client' }] });
     assert.equal(u.status, 200, JSON.stringify(u.body)); assert.equal(u.body.version, 2); assert.equal(u.body.count, 0);
+    // Fields left out stay as they are; above all, missing rules do not turn into "all contacts".
+    const renamed = await m.patch(`${base(A)}/segments/${s.id}`, { version: 2, name: name + ' B' });
+    assert.equal(renamed.status, 200); assert.equal(renamed.body.description, 'Pro newsletter'); assert.equal(renamed.body.rules.length, 2); assert.equal(renamed.body.count, 0);
     const stale = await m.patch(`${base(A)}/segments/${s.id}`, { version: 1, name, rules: [] });
     assert.equal(stale.status, 409); assert.equal(stale.body.code, 'VERSION_CONFLICT');
 
     const audit = await ctx.ownerDb.auditLog.findMany({ where: { entity: 'segment', entityId: s.id }, orderBy: { createdAt: 'asc' } });
-    assert.deepEqual(audit.map(a => a.action), ['segment.create', 'segment.update']); assert.deepEqual(audit[1].changedFields, ['rules']);
+    assert.deepEqual(audit.map(a => a.action), ['segment.create', 'segment.update', 'segment.update']); assert.deepEqual(audit[1].changedFields, ['rules']); assert.deepEqual(audit[2].changedFields, ['name']);
 
     assert.equal((await m.del(`${base(A)}/segments/${s.id}`)).status, 204);
     assert.equal((await m.get(`${base(A)}/segments/${s.id}`)).status, 404);
@@ -135,6 +138,9 @@ describe('uložené segmenty', () => {
     await ctx.ownerDb.segment.update({ where: { id: s.id }, data: { rules: [{ field: 'neznamé' }] } });
     const d = (await m.get(`${base(A)}/segments/${s.id}`)).body;
     assert.equal(d.count, 0); assert.deepEqual(d.rules, []);
+    const r = await m.patch(`${base(A)}/segments/${s.id}`, { version: d.version, name: d.name + ' X' });
+    assert.equal(r.body.count, 0, 'přejmenování poškozená pravidla nenahradí prázdnými');
+    assert.deepEqual((await ctx.ownerDb.segment.findUniqueOrThrow({ where: { id: s.id } })).rules, [{ field: 'neznamé' }]);
   });
 });
 

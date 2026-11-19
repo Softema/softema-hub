@@ -170,7 +170,7 @@ test('segmenty: živý počet ze serveru, uložení, úprava pravidel, proklik n
   await page.getByRole('button', { name: 'Nový kontakt' }).first().click();
   await page.getByPlaceholder('Např. Jana Novotná').fill(name);
   await page.getByPlaceholder('jana@firma.cz').fill(unique());
-  await page.getByLabel('Město').fill(city);
+  await page.getByRole('dialog').getByRole('textbox', { name: 'Město', exact: true }).fill(city);
   await page.getByRole('button', { name: 'Vytvořit kontakt' }).click();
   await expect(page.getByRole('heading', { level: 2, name })).toBeVisible();
 
@@ -182,11 +182,11 @@ test('segmenty: živý počet ze serveru, uložení, úprava pravidel, proklik n
   await page.getByLabel('Název segmentu').fill(segName);
   await page.getByRole('combobox', { name: 'Pole pravidla 1' }).click();
   await page.getByRole('option', { name: 'Město', exact: true }).click();
-  // Without diacritics and in lower case, evaluated by the server.
-  await page.getByLabel('Hodnota pravidla 1').fill(city.toLowerCase().replace('ov', 'óv'));
   const preview = page.locator('.sticky-side');
+  await page.getByLabel('Hodnota pravidla 1').fill(`${city} jinde`);
   await expect(preview.locator('.seg-count strong')).toHaveText('0');
-  await page.getByLabel('Hodnota pravidla 1').fill(city.toUpperCase());
+  // Different case and diacritics, evaluated by the server.
+  await page.getByLabel('Hodnota pravidla 1').fill(city.toUpperCase().replace('OV', 'ÓV'));
   await expect(preview.locator('.seg-count strong')).toHaveText('1');
   await expect(preview.getByRole('button', { name: new RegExp(name) })).toBeVisible();
   await page.getByRole('button', { name: 'Vytvořit segment' }).click();
@@ -209,7 +209,7 @@ test('segmenty: živý počet ze serveru, uložení, úprava pravidel, proklik n
   await page.getByRole('button', { name: 'Zpět na segmenty' }).click();
   const row = page.getByRole('row', { name: new RegExp(segName) });
   await expect(row).toContainText('1');
-  await row.getByRole('button', { name: segName }).click();
+  await row.getByRole('button', { name: new RegExp(`^${segName}`) }).click();
   await preview.getByRole('button', { name: new RegExp(name) }).click();
   await expect(page.getByRole('heading', { level: 2, name })).toBeVisible();
   await page.goBack();
